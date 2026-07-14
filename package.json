@@ -1,0 +1,65 @@
+{
+  "name": "billedflow",
+  "productName": "Billedflow",
+  "version": "0.1.0",
+  "description": "Sortering og organisering af billedfiler til macOS",
+  "author": "Steffen Graumann",
+  "license": "UNLICENSED",
+  "private": true,
+  "type": "module",
+  "main": "electron/main.mjs",
+  "scripts": {
+    "postinstall": "node scripts/copy-ort-assets.mjs",
+    "dev": "concurrently -k \"vite\" \"node scripts/wait-and-run-electron.mjs\"",
+    "build": "vite build",
+    "test": "vitest run",
+    "smoke": "node test/smoke.mjs",
+    "dist:mac": "npm run build && electron-builder --mac zip --x64 --publish never"
+  },
+  "dependencies": {
+    "chokidar": "^4.0.3",
+    "sql.js": "^1.13.0"
+  },
+  "devDependencies": {
+    "@huggingface/transformers": "^3.5.2",
+    "@vitejs/plugin-react": "^4.5.0",
+    "concurrently": "^9.1.2",
+    "electron": "^37.2.0",
+    "electron-builder": "^26.0.12",
+    "playwright-core": "^1.53.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-window": "^1.8.11",
+    "sharp": "^0.34.2",
+    "vite": "^6.3.5",
+    "vitest": "^3.2.3"
+  },
+  "build": {
+    "appId": "dk.stefs.billedflow",
+    "productName": "Billedflow",
+    "asar": true,
+    "files": [
+      "dist/**",
+      "electron/**",
+      "package.json",
+      "node_modules/**"
+    ],
+    "directories": {
+      "buildResources": "build",
+      "output": "release"
+    },
+    "mac": {
+      "category": "public.app-category.photography",
+      "target": [
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "minimumSystemVersion": "11.0.0",
+      "artifactName": "Billedflow-mac-x64.zip"
+    }
+  }
+}
