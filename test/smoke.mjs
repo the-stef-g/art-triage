@@ -9,10 +9,11 @@ import { fileURLToPath } from 'node:url';
 
 const projectRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 
-function fejl(besked) {
-  console.error(`SMOKE FEJL: ${besked}`);
+// Haard deadline: uanset hvad der haenger, doer processen her.
+setTimeout(() => {
+  console.error('SMOKE FEJL: haard timeout efter 4 minutter');
   process.exit(1);
-}
+}, 240000);
 
 async function lavTestbilleder(dir) {
   const sharp = (await import('sharp')).default;
@@ -38,22 +39,29 @@ await lavTestbilleder(lib);
 const app = await electron.launch({
   args: ['.'],
   cwd: projectRoot,
+  timeout: 60000,
   env: {
     ...process.env,
     BILLEDFLOW_OPEN: lib,
     BILLEDFLOW_DISABLE_AI: '1',
+    ELECTRON_DISABLE_SANDBOX: '1',
   },
 });
 
+// Vis appens egen output i CI-loggen, saa fejl kan diagnosticeres.
+const proc = app.process();
+proc.stdout?.on('data', (d) => process.stdout.write(`[app] ${d}`));
+proc.stderr?.on('data', (d) => process.stderr.write(`[app] ${d}`));
+
+let succes = false;
 try {
-  // Find hovedvinduet (AI-vinduet er slaaet fra i CI).
-  const page = await app.firstWindow();
+  const page = await app.firstWindow({ timeout: 60000 });
   await page.waitForLoadState('domcontentloaded');
 
   // Grid med 4 billeder (3 i roden + 1 i undermappe, traeet viser alle).
   await page.waitForSelector('.tile', { timeout: 30000 });
-  let tiles = await page.locator('.tile').count();
-  if (tiles !== 4) fejl(`ventede 4 billeder i grid, fik ${tiles}`);
+  const tiles = await page.locator('.tile').count();
+  if (tiles !== 4) throw new Error(`ventede 4 billeder i grid, fik ${tiles}`);
 
   // Vaelg foerste billede og godkend med G.
   await page.locator('.tile').first().click();
@@ -87,15 +95,18 @@ try {
 
   await page.screenshot({ path: join(projectRoot, 'smoke-grid.png') });
   console.log('SMOKE OK: grid, godkend, virtuel kopi, kassér og mappefilter virker');
+  succes = true;
 } catch (err) {
-  try {
-    const page = await app.firstWindow();
-    await page.screenshot({ path: join(projectRoot, 'smoke-fejl.png') });
-  } catch {
-    // ingen skaermbillede muligt
+  console.error(`SMOKE FEJL: ${err?.message || err}`);
+  const win = app.windows()[0];
+  if (win) {
+    await win.screenshot({ path: join(projectRoot, 'smoke-fejl.png') }).catch(() => {});
   }
-  fejl(err?.message || String(err));
 } finally {
-  await app.close().catch(() => {});
+  await Promise.race([
+    app.close().catch(() => {}),
+    new Promise((r) => setTimeout(r, 10000)),
+  ]);
   rmSync(lib, { recursive: true, force: true });
+  process.exit(succes ? 0 : 1);
 }
