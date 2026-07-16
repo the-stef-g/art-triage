@@ -44,6 +44,10 @@ Billedanalysen kører 100% lokalt på din Mac. Første gang appen starter, hente
 
 Driller AI'en, ligger der en logfil med alle detaljer bag Hjælp > Vis AI-log. Send indholdet, så kan fejlen findes præcist.
 
+### Hvis modellen ikke kan hentes
+
+Hugging Face begrænser anonyme downloads, og rammes grænsen, afviser de med "Unauthorized". Appen håndterer det selv i to trin. Første trin: den skifter automatisk til det offentlige spejl hf-mirror.com og prøver igen med stigende ventetid. Andet trin, hvis spejlet heller ikke virker: opret en gratis konto på huggingface.co, gå til Settings > Access Tokens, lav en token af typen Read, og sæt den ind i appen under Hjælp > Hugging Face-token. Så hentes modellen med hævede grænser. Tokenet gemmes kun lokalt på din Mac og bruges kun mod huggingface.co. Når modellen først er hentet én gang, ligger den i lokal cache, og der hentes ikke igen.
+
 ## Udvikling
 
 Kildekoden ligger i denne mappe og er et Electron-projekt med Vite og React.

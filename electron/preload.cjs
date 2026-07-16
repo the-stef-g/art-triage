@@ -10,6 +10,7 @@ const CHANNELS = new Set([
   'ed:list', 'ed:open', 'ed:pick',
   'kw:top', 'kw:forFile',
   'search:status', 'app:counts', 'app:undo', 'app:redo',
+  'app:info', 'app:setHfToken',
 ]);
 
 contextBridge.exposeInMainWorld('billedflow', {

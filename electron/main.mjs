@@ -184,6 +184,18 @@ function createAiWindow() {
   };
 }
 
+// Genstarter AI-vinduet, fx efter at en Hugging Face-token er sat.
+function restartAiWindow() {
+  aiLog('AI-vinduet genstartes (ny konfiguration)');
+  if (aiWin && !aiWin.isDestroyed()) {
+    const dead = aiWin;
+    aiWin = null;
+    dead.destroy();
+  }
+  ai.windowGone();
+  if (!process.env.BILLEDFLOW_DISABLE_AI) createAiWindow();
+}
+
 // SVG-previews rasteriseres af Chromium i et usynligt vindue.
 async function rasterizeSvg(absPath, size, outPath) {
   const win = new BrowserWindow({
@@ -266,6 +278,10 @@ function buildMenu() {
             if (aiLogPath) shell.showItemInFolder(aiLogPath);
           },
         },
+        {
+          label: 'Hugging Face-token …',
+          click: () => mainWin?.webContents.send('evt', { type: 'genvej', cmd: 'hf-token' }),
+        },
       ],
     },
   ];
@@ -283,6 +299,17 @@ app.whenReady().then(() => {
 
   ipcMain.on('ai:msg', (event, msg) => {
     if (aiWin && event.sender === aiWin.webContents) ai.handleMessage(msg);
+  });
+  ipcMain.handle('ai:init', () => ({ hfToken: settings.data.hfToken || null }));
+  ipcMain.handle('app:info', () => ({
+    version: app.getVersion(),
+    hfToken: settings.data.hfToken || null,
+  }));
+  ipcMain.handle('app:setHfToken', (_event, payload) => {
+    settings.data.hfToken = String(payload?.token || '').trim() || null;
+    settings.save();
+    aiLog(`Hugging Face-token ${settings.data.hfToken ? 'sat' : 'fjernet'}`);
+    restartAiWindow();
   });
 
   registerProtocols();

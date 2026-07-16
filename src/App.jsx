@@ -31,6 +31,7 @@ export default function App() {
   const [showPreview, setShowPreview] = useState(false);
   const [modal, setModal] = useState(null);
   const [fejl, setFejl] = useState(null);
+  const [appInfo, setAppInfo] = useState(null);
 
   const filterRef = useRef(filter);
   filterRef.current = filter;
@@ -93,6 +94,7 @@ export default function App() {
   // Ved opstart: genaabn seneste bibliotek hvis muligt.
   useEffect(() => {
     if (!harBro) return;
+    invoke('app:info').then(setAppInfo).catch(() => {});
     (async () => {
       const cur = await invoke('lib:current');
       const rec = await invoke('lib:recent');
@@ -113,6 +115,19 @@ export default function App() {
       refresh();
       refreshMeta();
     } else if (evt.type === 'genvej') {
+      if (evt.cmd === 'hf-token') {
+        // Hjaelp-menuen: indtast/ret Hugging Face-token.
+        invoke('app:info').then((info) => {
+          setAppInfo(info);
+          setModal({
+            title: 'Hugging Face-token',
+            value: info?.hfToken || '',
+            placeholder: 'hf_...',
+            onSubmit: (token) => invoke('app:setHfToken', { token }).catch(visFejl),
+          });
+        }).catch(visFejl);
+        return;
+      }
       // Cmd+Z / Skift+Cmd+Z fra menuen: tekstfelter faar tekst-fortryd,
       // ellers fortrydes seneste katalog-handling.
       const el = document.activeElement;
@@ -348,6 +363,7 @@ export default function App() {
         searchInfo={searchInfo}
         fejl={fejl}
         library={library}
+        version={appInfo?.version}
       />
       {showPreview && focusedRow && (
         <PreviewOverlay

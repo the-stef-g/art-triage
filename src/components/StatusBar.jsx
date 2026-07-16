@@ -1,4 +1,4 @@
-export default function StatusBar({ counts, aiStatus, indexProgress, searchInfo, fejl, library }) {
+export default function StatusBar({ counts, aiStatus, indexProgress, searchInfo, fejl, library, version }) {
   const aiTekst = (() => {
     if (!aiStatus) return '';
     if (aiStatus.state === 'model') {
@@ -19,6 +19,7 @@ export default function StatusBar({ counts, aiStatus, indexProgress, searchInfo,
 
   return (
     <footer className="statusbar">
+      {version && <span className="version">Billedflow {version}</span>}
       <span className="bibliotek" title={library?.root}>{library?.root?.split('/').pop()}</span>
       {counts && (
         <span>
