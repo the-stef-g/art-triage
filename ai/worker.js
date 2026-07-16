@@ -20,6 +20,11 @@ const STALL_MS = 4 * 60 * 1000;
 env.allowLocalModels = false;
 // ORT's WASM-filer er bundtet med appen, saa inferens virker offline.
 env.backends.onnx.wasm.wasmPaths = new URL('ort/', document.baseURI).href;
+// En traad: ort-webs worker-opstart kan gaa i baglaas under appens egen
+// app://-protokol i den pakkede app. Enkelttraadet er langsommere, men
+// starter altid.
+env.backends.onnx.wasm.numThreads = 1;
+env.backends.onnx.wasm.proxy = false;
 
 const bridge = window.aiBridge;
 const send = (msg) => bridge.send(msg);

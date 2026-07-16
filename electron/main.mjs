@@ -1,8 +1,9 @@
 // Billedflow: hovedproces. Ejer vinduerne, de to custom-protokoller
 // (app:// til bundtede filer, thumb:// til previews) og AI-vinduet.
 import {
-  app, BrowserWindow, Menu, protocol, ipcMain, net, nativeTheme, screen,
+  app, BrowserWindow, Menu, protocol, ipcMain, net, nativeTheme, screen, shell,
 } from 'electron';
+import { appendFileSync, statSync, renameSync } from 'node:fs';
 import { debounce } from './lib/util.mjs';
 import { join, dirname, extname, normalize as pathNormalize } from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
@@ -32,6 +33,25 @@ let aiWin = null;
 let session = null;
 let ai = null;
 let settings = null;
+let aiLogPath = null;
+
+// AI-fejl er svaere at se i en pakket app; alt fra AI-vinduet logges til
+// en fil, som kan aabnes via Hjaelp-menuen.
+function aiLog(line) {
+  if (!aiLogPath) return;
+  try {
+    try {
+      if (statSync(aiLogPath).size > 1024 * 1024) {
+        renameSync(aiLogPath, `${aiLogPath}.old`);
+      }
+    } catch {
+      // foerste skrivning
+    }
+    appendFileSync(aiLogPath, `${new Date().toISOString()} ${line}\n`);
+  } catch {
+    // logning maa aldrig vaelte appen
+  }
+}
 
 function registerProtocols() {
   protocol.handle('app', async (req) => {
@@ -147,7 +167,12 @@ function createAiWindow() {
     },
   });
   aiWin.loadURL(pageUrl('ai.html'));
+  aiWin.webContents.on('console-message', (event, level, message) => {
+    const tekst = typeof message === 'string' ? message : event?.message ?? '';
+    aiLog(`console: ${tekst}`);
+  });
   aiWin.webContents.on('render-process-gone', () => {
+    aiLog('AI-processen doede; genstarter');
     ai.windowGone();
     const dead = aiWin;
     aiWin = null;
@@ -231,6 +256,18 @@ function buildMenu() {
         { role: 'close', label: 'Luk vindue' },
       ],
     },
+    {
+      label: 'Hjælp',
+      role: 'help',
+      submenu: [
+        {
+          label: 'Vis AI-log',
+          click: () => {
+            if (aiLogPath) shell.showItemInFolder(aiLogPath);
+          },
+        },
+      ],
+    },
   ];
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
@@ -238,7 +275,10 @@ function buildMenu() {
 app.whenReady().then(() => {
   nativeTheme.themeSource = 'dark';
   settings = new Settings(app.getPath('userData'));
+  aiLogPath = join(app.getPath('userData'), 'billedflow-ai.log');
   ai = new AiBridge(null);
+  ai.on('status', (s) => aiLog(`status: ${s.state} ${s.progress ?? 0}% ${s.detail || ''}`));
+  aiLog(`--- Billedflow ${app.getVersion()} startet (${process.platform}, Electron ${process.versions.electron}) ---`);
   session = new AppSession({ settings, ai, rasterizeSvg });
 
   ipcMain.on('ai:msg', (event, msg) => {

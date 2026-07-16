@@ -40,7 +40,9 @@ Appen er ikke signeret med et Apple-udviklercertifikat, så første gang siger m
 
 ## AI-modellen
 
-Billedanalysen kører 100 procent lokalt på din Mac. Første gang appen starter, henter den en CLIP-model (cirka 300 MB) fra Hugging Face og gemmer den lokalt. Derefter virker analyse og søgning uden internet. Statuslinjen nederst viser fremdrift for både download og indeksering. En stor samling tager noget tid første gang; søgningen virker undervejs på de billeder, der allerede er analyseret.
+Billedanalysen kører 100% lokalt på din Mac. Første gang appen starter, henter den en CLIP-model (cirka 300 MB) fra Hugging Face og gemmer den lokalt. Derefter virker analyse og søgning uden internet. Statuslinjen nederst viser fremdrift for både download og indeksering. En stor samling tager noget tid første gang; søgningen virker undervejs på de billeder, der allerede er analyseret.
+
+Driller AI'en, ligger der en logfil med alle detaljer bag Hjælp > Vis AI-log. Send indholdet, så kan fejlen findes præcist.
 
 ## Udvikling
 

@@ -1,9 +1,11 @@
 export default function StatusBar({ counts, aiStatus, indexProgress, searchInfo, fejl, library }) {
   const aiTekst = (() => {
     if (!aiStatus) return '';
-    if (aiStatus.state === 'model') return `Henter AI-model ${aiStatus.progress || 0} %`;
+    if (aiStatus.state === 'model') {
+      return `${aiStatus.detail || 'Henter AI-model'} ${aiStatus.progress || 0}%`;
+    }
     if (aiStatus.state === 'klar') return `AI klar (${aiStatus.device === 'webgpu' ? 'GPU' : 'CPU'})`;
-    if (aiStatus.state === 'offline') return 'AI offline: modellen kunne ikke hentes';
+    if (aiStatus.state === 'offline') return aiStatus.detail || 'AI offline: modellen kunne ikke hentes';
     if (aiStatus.state === 'fejl') return aiStatus.detail || 'AI-fejl';
     return 'AI starter …';
   })();
