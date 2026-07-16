@@ -139,6 +139,18 @@ describe('status og filtre', () => {
     expect(catalog.listVersions({})).toHaveLength(4);
   });
 
+  it('sorterer tal naturligt (2 foer 19 foer 199 foer 200)', () => {
+    skriv('IMG_199.png', 'a199');
+    skriv('IMG_20.png', 'a20');
+    skriv('IMG_200.png', 'a200');
+    skriv('IMG_2.png', 'a2');
+    catalog.sync();
+    const navne = catalog.listVersions({})
+      .map((r) => r.rel_path)
+      .filter((p) => p.startsWith('IMG_'));
+    expect(navne).toEqual(['IMG_2.png', 'IMG_20.png', 'IMG_199.png', 'IMG_200.png']);
+  });
+
   it('afviser ukendt bedoemmelse', () => {
     const [a] = catalog.listVersions({});
     expect(() => catalog.setRating([a.version_id], 'fantastisk')).toThrow();
@@ -242,7 +254,8 @@ describe('mapper og flytning', () => {
     const rel = catalog.createFolder('', 'Udvalgte');
     expect(rel).toBe('Udvalgte');
     const flyttet = catalog.moveFiles([a.file_id], 'Udvalgte');
-    expect(flyttet).toBe(1);
+    expect(flyttet).toHaveLength(1);
+    expect(flyttet[0]).toMatchObject({ fromDir: '', toDir: 'Udvalgte' });
     expect(existsSync(join(root, 'Udvalgte', 'a.png'))).toBe(true);
 
     const rows = catalog.listVersions({});
@@ -278,7 +291,7 @@ describe('mapper og flytning', () => {
     catalog.setRating([kopiId], 'godkendt');
 
     const n = catalog.moveDiscarded();
-    expect(n).toBe(1);
+    expect(n).toHaveLength(1);
     expect(existsSync(join(root, '_kasseret', 'kasseret.png'))).toBe(true);
     expect(existsSync(join(root, 'blandet.png'))).toBe(true);
   });

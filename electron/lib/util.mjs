@@ -89,7 +89,7 @@ export function walkDirs(root) {
       stack.push(childRel);
     }
   }
-  return out.sort();
+  return out.sort(daCollator.compare);
 }
 
 export function stemOf(fileName) {
@@ -118,6 +118,9 @@ export function uniquePath(absPath) {
   }
   throw new Error(`Kan ikke finde ledigt navn for ${absPath}`);
 }
+
+// Dansk, naturlig sortering: 2 foer 19 foer 199 foer 200, og æøå til sidst.
+export const daCollator = new Intl.Collator('da', { numeric: true, sensitivity: 'base' });
 
 export function debounce(fn, ms) {
   let t = null;

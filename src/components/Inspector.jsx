@@ -29,6 +29,7 @@ export default function Inspector({ row, selectedCount, editors, series, act }) 
           <li><b>F</b> færdig til/fra</li>
           <li><b>V</b> ny virtuel kopi</li>
           <li><b>Mellemrum</b> stort preview</li>
+          <li><b>Cmd+Z</b> fortryd</li>
         </ul>
       </aside>
     );

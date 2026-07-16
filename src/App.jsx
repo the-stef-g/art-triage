@@ -50,12 +50,23 @@ export default function App() {
   const refresh = useCallback(async () => {
     try {
       const res = await invoke('img:list', filterRef.current);
+      // Husk det fokuserede indeks fra den gamle liste: forsvinder hele
+      // markeringen (fx efter kassering), markeres billedet paa samme
+      // plads i den nye liste, altsaa det naeste foto.
+      const gamleRows = rowsRef.current;
+      const gammelSel = selectedRef.current;
+      const gammeltIdx = gamleRows.findIndex(
+        (r) => r.version_id === gammelSel[gammelSel.length - 1]
+      );
       setRows(res.rows);
       setCounts(res.counts);
       setSearchInfo(res.searchInfo);
       setSelected((sel) => {
         const valid = new Set(res.rows.map((r) => r.version_id));
-        return sel.filter((id) => valid.has(id));
+        const beholdt = sel.filter((id) => valid.has(id));
+        if (beholdt.length || gammeltIdx < 0 || !res.rows.length) return beholdt;
+        const idx = Math.min(gammeltIdx, res.rows.length - 1);
+        return [res.rows[idx].version_id];
       });
     } catch (err) {
       visFejl(err);
@@ -101,6 +112,16 @@ export default function App() {
     if (evt.type === 'changed') {
       refresh();
       refreshMeta();
+    } else if (evt.type === 'genvej') {
+      // Cmd+Z / Skift+Cmd+Z fra menuen: tekstfelter faar tekst-fortryd,
+      // ellers fortrydes seneste katalog-handling.
+      const el = document.activeElement;
+      const iTekstfelt = el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
+      if (iTekstfelt) {
+        document.execCommand(evt.cmd === 'redo' ? 'redo' : 'undo');
+      } else {
+        invoke(evt.cmd === 'redo' ? 'app:redo' : 'app:undo').catch(() => {});
+      }
     } else if (evt.type === 'index') {
       setIndexProgress(evt.progress);
       if (evt.progress?.phase === 'faerdig') refreshMeta();
@@ -308,6 +329,7 @@ export default function App() {
           rows={rows}
           selected={selected}
           setSelected={setSelected}
+          focusIndex={rows.findIndex((r) => r.version_id === selected[selected.length - 1])}
           onOpenPreview={() => setShowPreview(true)}
           onColumns={(c) => { columnsRef.current = c; }}
         />

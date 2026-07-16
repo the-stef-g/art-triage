@@ -26,7 +26,7 @@ Appen er ikke signeret med et Apple-udviklercertifikat, så første gang siger m
 
 **Bibliotek.** Klik "Vælg billedmappe" og peg på den mappe dine billeder ligger i. Billedflow scanner mappen og alle undermapper og laver previews af JPEG, TIFF, PNG, RAW (CR2, CR3, NEF, ARW, DNG med flere), PSD, HEIC, SVG og AI-filer. Mappen kan når som helst åbnes igen fra velkomstskærmen.
 
-**Bedømmelse og status.** Hvert billede kan være godkendt, kasseret eller ubedømt, og har derudover flagene redigeret og færdig. Kasserede billeder skjules som standard og kan vises igen med "Vis kasserede". Genveje: **G** godkend, **X** kassér, **U** nulstil, **R** redigeret til/fra, **F** færdig til/fra, **V** ny virtuel kopi, **mellemrum** stort preview, **piletaster** flytter markeringen.
+**Bedømmelse og status.** Hvert billede kan være godkendt, kasseret eller ubedømt, og har derudover flagene redigeret og færdig. Kasserede billeder skjules som standard og kan vises igen med "Vis kasserede". Genveje: **G** godkend, **X** kassér, **U** nulstil, **R** redigeret til/fra, **F** færdig til/fra, **V** ny virtuel kopi, **mellemrum** stort preview, **piletaster** flytter markeringen, **Cmd+Z** fortryder seneste handling (bedømmelse, flag, serie, omdøbning, virtuel kopi og flytning), **Skift+Cmd+Z** gentager.
 
 **Virtuelle kopier.** "Ny virtuel kopi" opretter en ekstra version af samme motiv, fx til en anden beskæring. Kopien fylder ingenting på disken, før du sender den til redigering. I det øjeblik laver Billedflow en fysisk kopi ved siden af originalen og åbner den i din editor.
 

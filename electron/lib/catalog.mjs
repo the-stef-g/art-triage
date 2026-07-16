@@ -7,7 +7,7 @@ import {
 } from 'node:fs';
 import { join, dirname, basename, extname, posix } from 'node:path';
 import {
-  walkImages, walkDirs, quickHash, stemOf, slug, uniquePath, extOf,
+  walkImages, walkDirs, quickHash, stemOf, slug, uniquePath, extOf, daCollator,
 } from './util.mjs';
 
 const SCHEMA = `
@@ -274,8 +274,7 @@ export class Catalog extends EventEmitter {
       where.push(`f.id IN (${filter.fileIds.map(() => '?').join(',')})`);
       params.push(...filter.fileIds);
     }
-    let order = 'f.rel_path COLLATE NOCASE ASC';
-    if (filter.sort === 'dato') order = 'f.mtime DESC';
+    const order = 'f.mtime DESC';
     const rows = this.db.all(
       `SELECT v.id AS version_id, v.image_id, v.name AS version_name, v.is_master,
               v.rating, v.edited, v.finished,
@@ -290,10 +289,16 @@ export class Catalog extends EventEmitter {
        ORDER BY ${order}, v.is_master DESC, v.id ASC`,
       ...params
     );
-    // Ved soegning bevarer vi relevans-raekkefoelgen fra fileIds.
+    // Ved soegning bevarer vi relevans-raekkefoelgen fra fileIds; ellers
+    // sorteres navne naturligt (2 foer 19 foer 199) med dansk collator.
     if (filter.fileIds && filter.orderByFileIds) {
       const pos = new Map(filter.fileIds.map((id, idx) => [id, idx]));
       rows.sort((a, b) => (pos.get(a.file_id) ?? 1e9) - (pos.get(b.file_id) ?? 1e9));
+    } else if (filter.sort !== 'dato') {
+      rows.sort((a, b) =>
+        daCollator.compare(a.rel_path, b.rel_path)
+        || (b.is_master - a.is_master)
+        || (a.version_id - b.version_id));
     }
     return rows;
   }
@@ -486,6 +491,7 @@ export class Catalog extends EventEmitter {
   }
 
   // Flytter filer til en anden mappe i biblioteket og opdaterer kataloget.
+  // Returnerer de udfoerte flytninger, saa de kan fortrydes.
   moveFiles(fileIds, targetRel) {
     const targetAbs = join(this.root, targetRel || '');
     mkdirSync(targetAbs, { recursive: true });
@@ -496,16 +502,17 @@ export class Catalog extends EventEmitter {
         if (!f || !f.present) continue;
         const srcAbs = this.abs(f.rel_path);
         const curDir = posix.dirname(f.rel_path);
-        if ((curDir === '.' ? '' : curDir) === (targetRel || '')) continue;
+        const fromDir = curDir === '.' ? '' : curDir;
+        if (fromDir === (targetRel || '')) continue;
         const destAbs = uniquePath(join(targetAbs, basename(f.rel_path)));
         renameSync(srcAbs, destAbs);
         const rel = toRel(this.root, destAbs);
         this.db.run('UPDATE files SET rel_path=? WHERE id=?', rel, id);
-        moved.push(id);
+        moved.push({ fileId: id, fromDir, toDir: targetRel || '' });
       }
     });
     if (moved.length) this.emit('changed');
-    return moved.length;
+    return moved;
   }
 
   // Flytter filer hvor ALLE tilknyttede versioner er kasserede til _kasseret/.

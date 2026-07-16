@@ -1,8 +1,9 @@
 // Billedflow: hovedproces. Ejer vinduerne, de to custom-protokoller
 // (app:// til bundtede filer, thumb:// til previews) og AI-vinduet.
 import {
-  app, BrowserWindow, Menu, protocol, ipcMain, net, nativeTheme,
+  app, BrowserWindow, Menu, protocol, ipcMain, net, nativeTheme, screen,
 } from 'electron';
+import { debounce } from './lib/util.mjs';
 import { join, dirname, extname, normalize as pathNormalize } from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { Settings } from './lib/settings.mjs';
@@ -89,10 +90,22 @@ function pageUrl(page) {
   return `app://bundle/${page}`;
 }
 
+// Gemte vinduesrammer bruges kun hvis de stadig rammer en skaerm.
+function validBounds(b) {
+  if (!b || typeof b.width !== 'number' || typeof b.x !== 'number') return null;
+  const area = screen.getDisplayMatching(b).workArea;
+  const overlapper = b.x < area.x + area.width && b.x + b.width > area.x
+    && b.y < area.y + area.height && b.y + b.height > area.y;
+  return overlapper ? b : null;
+}
+
 function createMainWindow() {
+  const husket = validBounds(settings.data.windowBounds);
   mainWin = new BrowserWindow({
-    width: 1440,
-    height: 920,
+    width: husket?.width ?? 1440,
+    height: husket?.height ?? 920,
+    x: husket?.x,
+    y: husket?.y,
     minWidth: 980,
     minHeight: 620,
     show: false,
@@ -104,6 +117,14 @@ function createMainWindow() {
       nodeIntegration: false,
     },
   });
+  const gemBounds = debounce(() => {
+    if (mainWin && !mainWin.isDestroyed() && !mainWin.isFullScreen() && !mainWin.isMinimized()) {
+      settings.data.windowBounds = mainWin.getNormalBounds();
+      settings.save();
+    }
+  }, 600);
+  mainWin.on('resize', gemBounds);
+  mainWin.on('move', gemBounds);
   mainWin.once('ready-to-show', () => mainWin.show());
   mainWin.loadURL(pageUrl('index.html'));
   mainWin.on('closed', () => {
@@ -174,8 +195,18 @@ function buildMenu() {
     {
       label: 'Rediger',
       submenu: [
-        { role: 'undo', label: 'Fortryd' },
-        { role: 'redo', label: 'Gentag' },
+        // Egne handlers: i tekstfelter laves tekst-fortryd, ellers
+        // fortrydes seneste katalog-handling. Renderer afgoer.
+        {
+          label: 'Fortryd',
+          accelerator: 'CmdOrCtrl+Z',
+          click: () => mainWin?.webContents.send('evt', { type: 'genvej', cmd: 'undo' }),
+        },
+        {
+          label: 'Gentag',
+          accelerator: 'Shift+CmdOrCtrl+Z',
+          click: () => mainWin?.webContents.send('evt', { type: 'genvej', cmd: 'redo' }),
+        },
         { type: 'separator' },
         { role: 'cut', label: 'Klip' },
         { role: 'copy', label: 'Kopier' },
@@ -183,6 +214,7 @@ function buildMenu() {
         { role: 'selectAll', label: 'Vælg alt' },
       ],
     },
+
     {
       label: 'Vis',
       submenu: [
@@ -233,13 +265,13 @@ app.on('before-quit', () => {
   app.isQuitting = true;
 });
 
-app.on('will-quit', async (event) => {
-  if (session && session.db) {
-    event.preventDefault();
+app.on('will-quit', () => {
+  // Synkron oprydning: databasen er committet loebende, og at vente paa
+  // watcher-lukning kan haenge paa macOS og blokere Cmd+Q.
+  if (session) {
     const s = session;
     session = null;
-    await s.closeLibrary().catch(() => {});
-    app.quit();
+    s.closeQuick();
   }
 });
 

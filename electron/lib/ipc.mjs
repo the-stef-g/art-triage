@@ -9,6 +9,7 @@ import { watchLibrary } from './watcher.mjs';
 import { detectEditors, openInApp } from './editors.mjs';
 import { SearchIndex, normalize } from './searchIndex.mjs';
 import { Indexer, MODEL_ID } from './indexer.mjs';
+import { UndoManager } from './undo.mjs';
 import { debounce } from './util.mjs';
 
 export class AppSession {
@@ -50,6 +51,7 @@ export class AppSession {
       rasterizeSvg: this.rasterizeSvg,
     });
     this.searchIndex = new SearchIndex(this.catalog, MODEL_ID);
+    this.undoMgr = new UndoManager(this.catalog);
     this.indexer = new Indexer({
       catalog: this.catalog,
       thumbs: this.thumbs,
@@ -81,6 +83,21 @@ export class AppSession {
     return { root };
   }
 
+  // Hurtig, synkron lukning til quit: venter ikke paa watcheren.
+  closeQuick() {
+    try { this.indexer?.stop(); } catch { /* ligegyldigt ved quit */ }
+    if (this.watcher) {
+      this.watcher.close().catch(() => {});
+      this.watcher = null;
+    }
+    try { this.db?.close(); } catch { /* ligegyldigt ved quit */ }
+    this.db = null;
+    this.catalog = null;
+    this.thumbs = null;
+    this.searchIndex = null;
+    this.indexer = null;
+  }
+
   async closeLibrary() {
     if (this.watcher) {
       await this.watcher.close().catch(() => {});
@@ -101,6 +118,7 @@ export class AppSession {
     this.catalog = null;
     this.thumbs = null;
     this.searchIndex = null;
+    this.undoMgr = null;
   }
 
   requireCatalog() {
@@ -161,14 +179,26 @@ export class AppSession {
 
     handle('img:imageVersions', ({ imageId }) =>
       this.requireCatalog().listVersionsForImage(imageId));
-    handle('img:setRating', ({ versionIds, rating }) =>
-      this.requireCatalog().setRating(versionIds, rating));
-    handle('img:setFlag', ({ versionIds, flag, value }) =>
-      this.requireCatalog().setFlag(versionIds, flag, value));
-    handle('img:virtualCopy', ({ versionId }) =>
-      this.requireCatalog().createVirtualCopy(versionId));
-    handle('img:renameVersion', ({ versionId, name }) =>
-      this.requireCatalog().renameVersion(versionId, name));
+    handle('img:setRating', ({ versionIds, rating }) => {
+      const catalog = this.requireCatalog();
+      this.undoMgr.beforeRatings(versionIds);
+      catalog.setRating(versionIds, rating);
+    });
+    handle('img:setFlag', ({ versionIds, flag, value }) => {
+      const catalog = this.requireCatalog();
+      this.undoMgr.beforeFlags(versionIds, flag);
+      catalog.setFlag(versionIds, flag, value);
+    });
+    handle('img:virtualCopy', ({ versionId }) => {
+      const nyId = this.requireCatalog().createVirtualCopy(versionId);
+      this.undoMgr.afterVirtualCopy(nyId);
+      return nyId;
+    });
+    handle('img:renameVersion', ({ versionId, name }) => {
+      const catalog = this.requireCatalog();
+      this.undoMgr.beforeRename(versionId);
+      catalog.renameVersion(versionId, name);
+    });
     handle('img:deleteVersion', async ({ versionId }) => {
       const fileAbs = this.requireCatalog().deleteVersion(versionId);
       if (fileAbs) await shell.trashItem(fileAbs).catch(() => {});
@@ -180,16 +210,29 @@ export class AppSession {
 
     handle('ser:list', () => this.requireCatalog().listSeries());
     handle('ser:create', ({ name }) => this.requireCatalog().createSeries(name));
-    handle('ser:assign', ({ imageIds, seriesId }) =>
-      this.requireCatalog().assignSeries(imageIds, seriesId ?? null));
+    handle('ser:assign', ({ imageIds, seriesId }) => {
+      const catalog = this.requireCatalog();
+      this.undoMgr.beforeSeries(imageIds);
+      catalog.assignSeries(imageIds, seriesId ?? null);
+    });
     handle('ser:delete', ({ seriesId }) => this.requireCatalog().deleteSeries(seriesId));
 
     handle('fold:tree', () => this.requireCatalog().folderTree());
     handle('fold:create', ({ parentRel, name }) =>
       this.requireCatalog().createFolder(parentRel, name));
-    handle('fold:move', ({ fileIds, targetRel }) =>
-      this.requireCatalog().moveFiles(fileIds, targetRel));
-    handle('fold:cleanup', () => this.requireCatalog().moveDiscarded());
+    handle('fold:move', ({ fileIds, targetRel }) => {
+      const moves = this.requireCatalog().moveFiles(fileIds, targetRel);
+      this.undoMgr.afterMoves(moves);
+      return moves.length;
+    });
+    handle('fold:cleanup', () => {
+      const moves = this.requireCatalog().moveDiscarded();
+      this.undoMgr.afterMoves(moves);
+      return moves.length;
+    });
+
+    handle('app:undo', () => (this.undoMgr ? this.undoMgr.undo() : null));
+    handle('app:redo', () => (this.undoMgr ? this.undoMgr.redo() : null));
 
     handle('ed:list', () => detectEditors(this.settings.data.customEditors));
     handle('ed:open', async ({ versionId, appPath }) => {

@@ -76,11 +76,13 @@ try {
     { timeout: 10000 }
   );
 
-  // Kassér den valgte version med X: skjules som standard.
+  // Kassér den valgte version med X: skjules som standard, og det
+  // naeste foto skal automatisk vaere markeret.
   await page.locator('.tile').first().click();
   await page.keyboard.press('x');
   await page.waitForFunction(
-    () => document.querySelectorAll('.tile').length === 4,
+    () => document.querySelectorAll('.tile').length === 4
+      && document.querySelectorAll('.tile.valgt').length === 1,
     null,
     { timeout: 10000 }
   );

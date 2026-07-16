@@ -9,7 +9,7 @@ const CHANNELS = new Set([
   'fold:tree', 'fold:create', 'fold:move', 'fold:cleanup',
   'ed:list', 'ed:open', 'ed:pick',
   'kw:top', 'kw:forFile',
-  'search:status', 'app:counts',
+  'search:status', 'app:counts', 'app:undo', 'app:redo',
 ]);
 
 contextBridge.exposeInMainWorld('billedflow', {

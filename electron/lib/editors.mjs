@@ -6,8 +6,8 @@ import { join, basename } from 'node:path';
 import { homedir } from 'node:os';
 
 const KNOWN = [
-  { re: /luminar neo/i, label: 'Luminar Neo' },
-  { re: /topaz photo ai/i, label: 'Topaz Photo AI' },
+  { re: /luminar/i, label: 'Luminar Neo' },
+  { re: /topaz photo|photo ai/i, label: 'Topaz Photo AI' },
   { re: /gigapixel/i, label: 'Topaz Gigapixel AI' },
   { re: /photoshop/i, label: 'Photoshop' },
   { re: /affinity photo/i, label: 'Affinity Photo' },
@@ -42,7 +42,9 @@ export function detectEditors(customApps = []) {
     ];
     for (const known of KNOWN) {
       const match = candidates.find((p) => known.re.test(basename(p, '.app')));
-      if (match) found.push({ appPath: match, label: known.label });
+      if (match && !found.some((f) => f.appPath === match)) {
+        found.push({ appPath: match, label: known.label });
+      }
     }
   }
   for (const p of customApps) {

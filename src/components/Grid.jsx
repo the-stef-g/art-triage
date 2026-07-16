@@ -53,12 +53,25 @@ function Tile({ row, isSelected, onClick, onDoubleClick, onDragStart }) {
   );
 }
 
-export default function Grid({ rows, selected, setSelected, onOpenPreview, onColumns }) {
+export default function Grid({ rows, selected, setSelected, focusIndex, onOpenPreview, onColumns }) {
   const [ref, size] = useSize();
   const anchorRef = useRef(0);
+  const gridRef = useRef(null);
 
   const columns = Math.max(1, Math.floor((size.width - 12) / CELL_W));
   useEffect(() => onColumns(columns), [columns, onColumns]);
+
+  // Det markerede billede skal altid blive i synsfeltet, ogsaa ved
+  // piletast-navigation.
+  useEffect(() => {
+    if (focusIndex >= 0 && gridRef.current) {
+      gridRef.current.scrollToItem({
+        rowIndex: Math.floor(focusIndex / columns),
+        columnIndex: focusIndex % columns,
+        align: 'smart',
+      });
+    }
+  }, [focusIndex, columns]);
 
   const selectedSet = useMemo(() => new Set(selected), [selected]);
 
@@ -115,6 +128,7 @@ export default function Grid({ rows, selected, setSelected, onOpenPreview, onCol
         </div>
       ) : (
         <FixedSizeGrid
+          ref={gridRef}
           columnCount={columns}
           rowCount={rowCount}
           columnWidth={CELL_W}
