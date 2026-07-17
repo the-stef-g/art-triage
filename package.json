@@ -1,7 +1,7 @@
 {
   "name": "billedflow",
   "productName": "Billedflow",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Sortering og organisering af billedfiler til macOS",
   "author": "Steffen Graumann",
   "license": "UNLICENSED",

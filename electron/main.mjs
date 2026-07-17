@@ -3,7 +3,10 @@
 import {
   app, BrowserWindow, Menu, protocol, ipcMain, net, nativeTheme, screen, shell,
 } from 'electron';
-import { appendFileSync, statSync, renameSync } from 'node:fs';
+import {
+  appendFileSync, statSync, renameSync, existsSync, readFileSync,
+  writeFileSync, mkdirSync,
+} from 'node:fs';
 import { debounce } from './lib/util.mjs';
 import { join, dirname, extname, normalize as pathNormalize } from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
@@ -26,6 +29,7 @@ const MIME = {
 protocol.registerSchemesAsPrivileged([
   { scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true, corsEnabled: true } },
   { scheme: 'thumb', privileges: { secure: true, supportFetchAPI: true, stream: true, corsEnabled: true } },
+  { scheme: 'hfmodel', privileges: { secure: true, supportFetchAPI: true, stream: true, corsEnabled: true } },
 ]);
 
 let mainWin = null;
@@ -76,6 +80,49 @@ function registerProtocols() {
     } catch {
       return new Response('Ikke fundet', { status: 404 });
     }
+  });
+
+  // Modeldownload gennem hovedprocessen: ingen CORS, token ét sted,
+  // disk-cache og fuld logning af HTTP-status pr. kilde.
+  const modelCacheDir = join(app.getPath('userData'), 'model-cache');
+  const modelHeaders = (relPath) => {
+    const headers = new Headers();
+    headers.set('Content-Type', relPath.endsWith('.json') ? 'application/json' : 'application/octet-stream');
+    headers.set('Access-Control-Allow-Origin', '*');
+    headers.set('Cross-Origin-Resource-Policy', 'cross-origin');
+    return headers;
+  };
+  protocol.handle('hfmodel', async (req) => {
+    const url = new URL(req.url);
+    const relPath = decodeURIComponent(url.pathname).replace(/^\/+/, '');
+    if (!relPath || relPath.includes('..')) return new Response('', { status: 400 });
+    const cacheFile = join(modelCacheDir, relPath.split('/').join('__'));
+    if (existsSync(cacheFile)) {
+      return new Response(readFileSync(cacheFile), { status: 200, headers: modelHeaders(relPath) });
+    }
+    const upstreams = [
+      { base: 'https://huggingface.co/', navn: 'huggingface.co', token: settings.data.hfToken || null },
+      { base: 'https://hf-mirror.com/', navn: 'hf-mirror.com', token: null },
+    ];
+    for (const up of upstreams) {
+      try {
+        const res = await net.fetch(up.base + relPath, {
+          headers: up.token ? { Authorization: `Bearer ${up.token}` } : {},
+        });
+        aiLog(`hfmodel GET ${relPath} -> ${res.status} (${up.navn})`);
+        if (res.ok) {
+          const buf = Buffer.from(await res.arrayBuffer());
+          mkdirSync(modelCacheDir, { recursive: true });
+          const tmp = `${cacheFile}.tmp-${process.pid}`;
+          writeFileSync(tmp, buf);
+          renameSync(tmp, cacheFile);
+          return new Response(buf, { status: 200, headers: modelHeaders(relPath) });
+        }
+      } catch (err) {
+        aiLog(`hfmodel GET ${relPath} -> netværksfejl (${up.navn}): ${err?.message || err}`);
+      }
+    }
+    return new Response('', { status: 404, headers: modelHeaders(relPath) });
   });
 
   protocol.handle('thumb', async (req) => {

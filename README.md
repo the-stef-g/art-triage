@@ -46,7 +46,7 @@ Driller AI'en, ligger der en logfil med alle detaljer bag Hjælp > Vis AI-log. S
 
 ### Hvis modellen ikke kan hentes
 
-Hugging Face begrænser anonyme downloads, og rammes grænsen, afviser de med "Unauthorized". Appen håndterer det selv i to trin. Første trin: den skifter automatisk til det offentlige spejl hf-mirror.com og prøver igen med stigende ventetid. Andet trin, hvis spejlet heller ikke virker: opret en gratis konto på huggingface.co, gå til Settings > Access Tokens, lav en token af typen Read, og sæt den ind i appen under Hjælp > Hugging Face-token. Så hentes modellen med hævede grænser. Tokenet gemmes kun lokalt på din Mac og bruges kun mod huggingface.co. Når modellen først er hentet én gang, ligger den i lokal cache, og der hentes ikke igen.
+Alle modeldownloads går gennem appens egen downloader, som prøver huggingface.co først og derefter det offentlige spejl hf-mirror.com, logger alle svar i AI-loggen og gemmer filerne i en lokal cache, så der aldrig hentes to gange. Sprogmodellen prøves fra flere alternative arkiver automatisk, hvis det primære er forsvundet. Rammer du alligevel Hugging Faces grænser for anonyme downloads, så opret en gratis konto på huggingface.co, gå til Settings > Access Tokens, lav en token af typen Read, og sæt den ind under Hjælp > Hugging Face-token. Tokenet gemmes kun lokalt på din Mac og sendes kun til huggingface.co, aldrig til spejlet.
 
 ## Udvikling
 
