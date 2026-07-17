@@ -24,7 +24,7 @@ export class AiBridge extends EventEmitter {
   handleMessage(msg) {
     if (msg.type === 'ready') {
       this.ready = true;
-      this.setStatus({ state: 'klar', device: msg.device, progress: 100 });
+      this.setStatus({ state: 'klar', device: msg.device, modelId: msg.modelId || null, progress: 100 });
       this._pump();
       return;
     }

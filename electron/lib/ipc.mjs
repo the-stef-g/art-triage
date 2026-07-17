@@ -27,7 +27,15 @@ export class AppSession {
 
     this.ai.on('status', (status) => {
       this.broadcast('ai', { status });
-      if (status.state === 'klar' && this.indexer) this.indexer.kick();
+      if (status.state === 'klar' && this.indexer) {
+        // AI-vinduet melder hvilken model den faktisk fik indlaest;
+        // katalog og soegeindeks skal foelge med.
+        if (status.modelId) {
+          this.searchIndex.setModel(status.modelId);
+          this.indexer.setModel(status.modelId);
+        }
+        this.indexer.kick();
+      }
     });
   }
 

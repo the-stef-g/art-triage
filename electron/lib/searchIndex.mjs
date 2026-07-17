@@ -7,6 +7,14 @@ export class SearchIndex {
     this.vectors = null; // Map<fileId, Float32Array>
   }
 
+  // Skiftes modellen (AI-vinduet melder hvilken den faktisk fik fat i),
+  // maa gamle vektorer ikke blandes med nye.
+  setModel(model) {
+    if (model === this.model) return;
+    this.model = model;
+    this.vectors = null;
+  }
+
   load() {
     this.vectors = new Map();
     for (const row of this.catalog.allEmbeddings(this.model)) {

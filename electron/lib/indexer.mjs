@@ -5,13 +5,16 @@ import { EventEmitter } from 'node:events';
 import { VOCAB, vocabHash } from './vocab.mjs';
 import { normalize, dot } from './searchIndex.mjs';
 
-export const MODEL_ID = 'clip-vit-b32-multilingual';
+// Standard-model-id; den faktiske model kan afvige naar AI-vinduet
+// falder tilbage til en anden kandidat, og meldes via ready-beskeden.
+export const MODEL_ID = 'siglip-base-patch16-256-multilingual';
 const KEYWORDS_PER_IMAGE = 6;
 const KEYWORD_THRESHOLD = 0.2;
 
 export class Indexer extends EventEmitter {
-  constructor({ catalog, thumbs, ai, searchIndex }) {
+  constructor({ catalog, thumbs, ai, searchIndex, model = MODEL_ID }) {
     super();
+    this.model = model;
     this.catalog = catalog;
     this.thumbs = thumbs;
     this.ai = ai;
@@ -24,6 +27,13 @@ export class Indexer extends EventEmitter {
 
   stop() {
     this.stopped = true;
+  }
+
+  // Kaldes naar AI-vinduet melder hvilken model der faktisk blev indlaest.
+  setModel(model) {
+    if (model === this.model) return;
+    this.model = model;
+    this.vocabVecs = null;
   }
 
   setProgress(patch) {
@@ -47,7 +57,7 @@ export class Indexer extends EventEmitter {
     await this._ensureVocab();
     for (;;) {
       if (this.stopped) return;
-      const pending = this.catalog.filesNeedingEmbedding(MODEL_ID);
+      const pending = this.catalog.filesNeedingEmbedding(this.model);
       if (!pending.length) {
         this.setProgress({ phase: 'faerdig', done: 0, total: 0 });
         return;
@@ -72,11 +82,11 @@ export class Indexer extends EventEmitter {
     }
     if (!vec) {
       // Markering: kan ikke indekseres (ingen preview). dim=0.
-      this.catalog.saveEmbedding(file.id, MODEL_ID, new Float32Array(0));
+      this.catalog.saveEmbedding(file.id, this.model, new Float32Array(0));
       return;
     }
     const norm = normalize(vec);
-    this.catalog.saveEmbedding(file.id, MODEL_ID, norm);
+    this.catalog.saveEmbedding(file.id, this.model, norm);
     this.searchIndex.upsert(file.id, norm);
     this._assignKeywords(file.id, norm);
   }
@@ -94,7 +104,7 @@ export class Indexer extends EventEmitter {
   // Ordlistens embeddings beregnes en gang pr. model/ordliste og caches i DB.
   async _ensureVocab() {
     if (this.vocabVecs) return;
-    const key = `vocab:${MODEL_ID}:${vocabHash()}`;
+    const key = `vocab:${this.model}:${vocabHash()}`;
     const cached = this.catalog.getMeta(key);
     if (cached) {
       const parsed = JSON.parse(cached);

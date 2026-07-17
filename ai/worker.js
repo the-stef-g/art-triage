@@ -1,27 +1,34 @@
-// AI-arbejderen: koerer i et skjult vindue og laver CLIP-embeddings af
-// billeder (via thumb://-previews) og dansk soegetekst. Alle modelfiler
-// hentes gennem hovedprocessens hfmodel://-protokol, som haandterer
-// Hugging Face, spejl-fallback, token og disk-cache uden CORS-bindinger.
-// Inferens koerer enkelttraadet paa WASM: langsommere end traade, men
-// starter altid, ogsaa under appens egen app://-protokol.
-import {
-  env,
-  AutoTokenizer,
-  AutoProcessor,
-  CLIPTextModelWithProjection,
-  CLIPVisionModelWithProjection,
-  RawImage,
-} from '@huggingface/transformers';
+// AI-arbejderen: koerer i et skjult vindue og laver embeddings af
+// billeder (via thumb://-previews) og dansk soegetekst med SigLIP 2,
+// Googles flersprogede billed-og-tekst-encoder (109 sprog inkl. dansk).
+// Den gamle flersprogede CLIP-sprogmodel findes ikke laengere paa
+// Hugging Face i ONNX-form. Alle modelfiler hentes gennem
+// hovedprocessens hfmodel://-protokol (spejl-fallback, token og
+// disk-cache uden CORS-bindinger). Inferens koerer enkelttraadet paa
+// WASM: langsommere end traade, men starter altid.
+import * as hf from '@huggingface/transformers';
 
-const IMG_MODEL = 'Xenova/clip-vit-base-patch32';
-// Sprogmodellens gamle repo er forsvundet fra Hugging Face; proev
-// kandidaterne i raekkefoelge og husk den der virker.
-const TXT_CANDIDATES = [
-  'Xenova/clip-ViT-B-32-multilingual-v1',
-  'onnx-community/clip-ViT-B-32-multilingual-v1-ONNX',
-  'onnx-community/clip-ViT-B-32-multilingual-v1',
+const { env, AutoTokenizer, AutoProcessor, RawImage } = hf;
+
+// Kandidater i prioriteret raekkefoelge; foerste der virker huskes.
+// mSigLIP (den flersprogede SigLIP v1) er foerstevalg, da modeltypen
+// beviseligt er understoettet af transformers.js.
+const MODEL_CANDIDATES = [
+  'Xenova/siglip-base-patch16-256-multilingual',
+  'onnx-community/siglip-base-patch16-256-multilingual-ONNX',
+  'onnx-community/siglip2-base-patch16-224-ONNX',
 ];
-const TXT_KEY = 'billedflow-txt-model';
+const MODEL_KEY = 'billedflow-model-repo';
+// Tolerant klassevalg: Siglip2-klasser hvis biblioteket har dem,
+// ellers Siglip-klasserne (samme arkitekturfamilie).
+const TextModelClass = hf.Siglip2TextModel || hf.SiglipTextModel;
+const VisionModelClass = hf.Siglip2VisionModel || hf.SiglipVisionModel;
+
+// Kort id der identificerer modellen i kataloget (embeddings fra
+// forskellige modeller maa aldrig blandes).
+function modelId(repo) {
+  return repo.split('/').pop().toLowerCase().replace(/-onnx$/, '');
+}
 // Stigende ventetid mellem forsoeg, saa HF's anonyme kvote ikke braendes af.
 const RETRY_DELAYS_S = [30, 60, 120, 300, 600];
 // Ingen aktivitet i saa lang tid under opstart = haenger; afbryd og proev igen.
@@ -83,104 +90,99 @@ function medStallVagt(promise) {
   });
 }
 
-// Kun q8: fp32 kan ikke allokeres i 32-bit WASM. Vision og tekst
-// indlaeses uafhaengigt, saa en fejl paa den ene ikke koster en ny
-// download af den anden.
-async function loadVision() {
-  if (visionModel) return;
-  const progress_callback = progressReporter('Henter billedmodel');
+// Kun q8: fp32 kan ikke allokeres i 32-bit WASM. Alt tildeles foerst
+// naar hele parret er indlaest, saa en halv fejl ikke efterlader rod.
+async function loadModels(repo) {
+  const pv = progressReporter('Henter billedmodel');
   puls();
-  processor = processor || await medStallVagt(
-    AutoProcessor.from_pretrained(IMG_MODEL, { progress_callback })
-  );
+  const proc = await medStallVagt(AutoProcessor.from_pretrained(repo, { progress_callback: pv }));
   puls();
-  visionModel = await medStallVagt(
-    CLIPVisionModelWithProjection.from_pretrained(IMG_MODEL, {
-      device: 'wasm', dtype: 'q8', progress_callback,
-    })
+  const vis = await medStallVagt(
+    VisionModelClass.from_pretrained(repo, { device: 'wasm', dtype: 'q8', progress_callback: pv })
   );
+  send({ type: 'status', state: 'model', progress: 50, detail: 'Henter sprogmodel' });
+  const pt = progressReporter('Henter sprogmodel');
+  puls();
+  const tok = await medStallVagt(AutoTokenizer.from_pretrained(repo, { progress_callback: pt }));
+  puls();
+  const txt = await medStallVagt(
+    TextModelClass.from_pretrained(repo, { device: 'wasm', dtype: 'q8', progress_callback: pt })
+  );
+  processor = proc;
+  visionModel = vis;
+  tokenizer = tok;
+  textModel = txt;
 }
 
-async function loadText() {
-  if (textModel) return;
-  let kandidater = TXT_CANDIDATES;
+// SigLIP-familien afleverer embeddingen i pooler_output; CLIP-familien
+// i text_embeds/image_embeds. Tag det der findes.
+function vecFraOutput(out) {
+  const t = out.text_embeds || out.image_embeds || out.pooler_output;
+  if (!t) throw new Error('Modellen returnerede ingen embedding');
+  return Array.from(t.data);
+}
+
+function kandidatListe() {
   try {
-    const husket = localStorage.getItem(TXT_KEY);
-    if (husket && TXT_CANDIDATES.includes(husket)) {
-      kandidater = [husket, ...TXT_CANDIDATES.filter((c) => c !== husket)];
+    const husket = localStorage.getItem(MODEL_KEY);
+    if (husket && MODEL_CANDIDATES.includes(husket)) {
+      return [husket, ...MODEL_CANDIDATES.filter((c) => c !== husket)];
     }
   } catch {
     // localStorage kan mangle
   }
-  let lastErr = null;
-  for (const repo of kandidater) {
-    try {
-      const progress_callback = progressReporter('Henter sprogmodel');
-      puls();
-      const tok = await medStallVagt(AutoTokenizer.from_pretrained(repo, { progress_callback }));
-      puls();
-      const model = await medStallVagt(
-        CLIPTextModelWithProjection.from_pretrained(repo, {
-          device: 'wasm', dtype: 'q8', progress_callback,
-        })
-      );
-      tokenizer = tok;
-      textModel = model;
-      try {
-        localStorage.setItem(TXT_KEY, repo);
-      } catch {
-        // kun en optimering
-      }
-      console.log(`Sprogmodel indlaest fra ${repo}`);
-      return;
-    } catch (err) {
-      lastErr = err;
-      console.error('Sprogmodel-kandidat fejlede', repo, err);
-    }
-  }
-  throw lastErr;
+  return MODEL_CANDIDATES;
 }
 
 async function init() {
   for (let attempt = 0; ; attempt++) {
-    send({ type: 'status', state: 'model', progress: 0, detail: 'Henter billedmodel' });
-    try {
-      await loadVision();
-      send({ type: 'status', state: 'model', progress: 50, detail: 'Henter sprogmodel' });
-      await loadText();
-      send({ type: 'status', state: 'model', progress: 99, detail: 'Starter modellen' });
-      await medStallVagt(embedText('test'));
-      send({ type: 'ready', device: 'wasm' });
-      return;
-    } catch (err) {
-      console.error('Modelstart fejlede', err);
-      const besked = err?.message || String(err);
-      const tip = /unauthorized/i.test(besked)
-        ? ' Tip: En gratis Hugging Face-token (Hjælp-menuen) løser download-grænsen.'
-        : '';
-      const delay = RETRY_DELAYS_S[Math.min(attempt, RETRY_DELAYS_S.length - 1)];
-      send({
-        type: 'status',
-        state: 'offline',
-        progress: 0,
-        detail: `Kunne ikke hente modellen: ${besked} Prøver igen om ${delay} sekunder.${tip}`,
-      });
-      await new Promise((r) => setTimeout(r, delay * 1000));
+    let lastErr = null;
+    for (const repo of kandidatListe()) {
+      send({ type: 'status', state: 'model', progress: 0, detail: 'Henter billedmodel' });
+      try {
+        await loadModels(repo);
+        send({ type: 'status', state: 'model', progress: 99, detail: 'Starter modellen' });
+        await medStallVagt(embedText('test'));
+        try {
+          localStorage.setItem(MODEL_KEY, repo);
+        } catch {
+          // kun en optimering
+        }
+        console.log(`Model indlaest fra ${repo}`);
+        send({ type: 'ready', device: 'wasm', modelId: modelId(repo) });
+        return;
+      } catch (err) {
+        lastErr = err;
+        console.error('Model-kandidat fejlede', repo, err);
+      }
     }
+    const besked = lastErr?.message || String(lastErr);
+    const tip = /unauthorized/i.test(besked)
+      ? ' Tip: En gratis Hugging Face-token (Hjælp-menuen) løser download-grænsen.'
+      : '';
+    const delay = RETRY_DELAYS_S[Math.min(attempt, RETRY_DELAYS_S.length - 1)];
+    send({
+      type: 'status',
+      state: 'offline',
+      progress: 0,
+      detail: `Kunne ikke hente modellen: ${besked} Prøver igen om ${delay} sekunder.${tip}`,
+    });
+    await new Promise((r) => setTimeout(r, delay * 1000));
   }
 }
 
 async function embedText(text) {
-  const inputs = tokenizer([text], { padding: true, truncation: true });
-  const { text_embeds } = await textModel(inputs);
-  return Array.from(text_embeds.data);
+  // SigLIP er traenet med max_length-padding til 64 tokens.
+  const inputs = tokenizer([text], { padding: 'max_length', truncation: true, max_length: 64 });
+  const out = await textModel(inputs);
+  return vecFraOutput(out);
 }
 
 async function embedImage(url) {
   const image = await RawImage.read(url);
   const inputs = await processor(image);
-  const { image_embeds } = await visionModel(inputs);
-  return Array.from(image_embeds.data);
+  const out = await visionModel(inputs);
+  return vecFraOutput(out);
 }
 
 bridge.onJob(async (job) => {
