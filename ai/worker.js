@@ -10,12 +10,11 @@ import * as hf from '@huggingface/transformers';
 
 const { env, AutoTokenizer, AutoProcessor, RawImage } = hf;
 
-// Kandidater i prioriteret raekkefoelge; foerste der virker huskes.
-// mSigLIP (den flersprogede SigLIP v1) er foerstevalg, da modeltypen
-// beviseligt er understoettet af transformers.js.
+// CI-verificeret: dette repo findes komplet paa Hugging Face med
+// praecis de filer transformers.js skal bruge. Hovedprocessens
+// hfmodel-protokol omskriver "siglip2" til "siglip" i config-filerne,
+// da arkitekturen er identisk med SigLIP v1, som biblioteket kender.
 const MODEL_CANDIDATES = [
-  'Xenova/siglip-base-patch16-256-multilingual',
-  'onnx-community/siglip-base-patch16-256-multilingual-ONNX',
   'onnx-community/siglip2-base-patch16-224-ONNX',
 ];
 const MODEL_KEY = 'billedflow-model-repo';

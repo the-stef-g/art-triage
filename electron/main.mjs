@@ -111,7 +111,21 @@ function registerProtocols() {
         });
         aiLog(`hfmodel GET ${relPath} -> ${res.status} (${up.navn})`);
         if (res.ok) {
-          const buf = Buffer.from(await res.arrayBuffer());
+          let buf = Buffer.from(await res.arrayBuffer());
+          // transformers.js kender ikke modeltypen "siglip2", men
+          // FixRes-arkitekturen er identisk med SigLIP v1. Omskriv
+          // konfigurationsfilerne, saa biblioteket indlaeser modellen
+          // som den v1-arkitektur den reelt er.
+          if (relPath.endsWith('.json')) {
+            const tekst = buf.toString('utf8');
+            const rettet = tekst
+              .replaceAll('"siglip2"', '"siglip"')
+              .replaceAll('Siglip2', 'Siglip');
+            if (rettet !== tekst) {
+              aiLog(`hfmodel: tilpassede siglip2->siglip i ${relPath}`);
+              buf = Buffer.from(rettet, 'utf8');
+            }
+          }
           mkdirSync(modelCacheDir, { recursive: true });
           const tmp = `${cacheFile}.tmp-${process.pid}`;
           writeFileSync(tmp, buf);

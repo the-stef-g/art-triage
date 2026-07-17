@@ -7,7 +7,7 @@ import { normalize, dot } from './searchIndex.mjs';
 
 // Standard-model-id; den faktiske model kan afvige naar AI-vinduet
 // falder tilbage til en anden kandidat, og meldes via ready-beskeden.
-export const MODEL_ID = 'siglip-base-patch16-256-multilingual';
+export const MODEL_ID = 'siglip2-base-patch16-224';
 const KEYWORDS_PER_IMAGE = 6;
 const KEYWORD_THRESHOLD = 0.2;
 
