@@ -34,7 +34,9 @@ const RETRY_DELAYS_S = [30, 60, 120, 300, 600];
 const STALL_MS = 4 * 60 * 1000;
 
 env.allowLocalModels = false;
-env.remoteHost = 'hfmodel://models/';
+// Aegte https-adresse, som hovedprocessen opfanger og besvarer med
+// download-motoren (transformers.js afviser andre schemes).
+env.remoteHost = 'https://billedflow-models.local/';
 // Cache API kan ikke gemme svar fra custom schemes; hovedprocessens
 // disk-cache overtager cachingen.
 env.useBrowserCache = false;

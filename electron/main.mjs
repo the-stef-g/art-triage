@@ -2,6 +2,7 @@
 // (app:// til bundtede filer, thumb:// til previews) og AI-vinduet.
 import {
   app, BrowserWindow, Menu, protocol, ipcMain, net, nativeTheme, screen, shell,
+  session as electronSession,
 } from 'electron';
 import {
   appendFileSync, statSync, renameSync, existsSync, readFileSync,
@@ -57,8 +58,70 @@ function aiLog(line) {
   }
 }
 
-function registerProtocols() {
-  protocol.handle('app', async (req) => {
+// Modellerne serveres for AI-vinduet paa en aegte https-adresse, fordi
+// transformers.js afviser alle andre schemes i sine eksistenstjek.
+const MODEL_HOST = 'billedflow-models.local';
+
+function modelHeaders(relPath) {
+  const headers = new Headers();
+  headers.set('Content-Type', relPath.endsWith('.json') ? 'application/json' : 'application/octet-stream');
+  headers.set('Access-Control-Allow-Origin', '*');
+  headers.set('Cross-Origin-Resource-Policy', 'cross-origin');
+  return headers;
+}
+
+// Modeldownload gennem hovedprocessen: ingen CORS, token ét sted,
+// disk-cache og fuld logning af HTTP-status pr. kilde.
+async function serveModelFile(pathname) {
+  const relPath = String(pathname || '').replace(/^\/+/, '');
+  if (!relPath || relPath.includes('..')) return new Response('', { status: 400 });
+  const modelCacheDir = join(app.getPath('userData'), 'model-cache');
+  const cacheFile = join(modelCacheDir, relPath.split('/').join('__'));
+  if (existsSync(cacheFile)) {
+    return new Response(readFileSync(cacheFile), { status: 200, headers: modelHeaders(relPath) });
+  }
+  const upstreams = [
+    { base: 'https://huggingface.co/', navn: 'huggingface.co', token: settings.data.hfToken || null },
+    { base: 'https://hf-mirror.com/', navn: 'hf-mirror.com', token: null },
+  ];
+  for (const up of upstreams) {
+    try {
+      const res = await net.fetch(up.base + relPath, {
+        bypassCustomProtocolHandlers: true,
+        headers: up.token ? { Authorization: `Bearer ${up.token}` } : {},
+      });
+      aiLog(`hfmodel GET ${relPath} -> ${res.status} (${up.navn})`);
+      if (res.ok) {
+        let buf = Buffer.from(await res.arrayBuffer());
+        // transformers.js kender ikke modeltypen "siglip2", men
+        // FixRes-arkitekturen er identisk med SigLIP v1. Omskriv
+        // konfigurationsfilerne, saa biblioteket indlaeser modellen
+        // som den v1-arkitektur den reelt er.
+        if (relPath.endsWith('.json')) {
+          const tekst = buf.toString('utf8');
+          const rettet = tekst
+            .replaceAll('"siglip2"', '"siglip"')
+            .replaceAll('Siglip2', 'Siglip');
+          if (rettet !== tekst) {
+            aiLog(`hfmodel: tilpassede siglip2->siglip i ${relPath}`);
+            buf = Buffer.from(rettet, 'utf8');
+          }
+        }
+        mkdirSync(modelCacheDir, { recursive: true });
+        const tmp = `${cacheFile}.tmp-${process.pid}`;
+        writeFileSync(tmp, buf);
+        renameSync(tmp, cacheFile);
+        return new Response(buf, { status: 200, headers: modelHeaders(relPath) });
+      }
+    } catch (err) {
+      aiLog(`hfmodel GET ${relPath} -> netværksfejl (${up.navn}): ${err?.message || err}`);
+    }
+  }
+  return new Response('', { status: 404, headers: modelHeaders(relPath) });
+}
+
+function registerProtocols(proto) {
+  proto.handle('app', async (req) => {
     const url = new URL(req.url);
     let p = decodeURIComponent(url.pathname);
     if (p === '/' || p === '') p = '/index.html';
@@ -82,64 +145,12 @@ function registerProtocols() {
     }
   });
 
-  // Modeldownload gennem hovedprocessen: ingen CORS, token ét sted,
-  // disk-cache og fuld logning af HTTP-status pr. kilde.
-  const modelCacheDir = join(app.getPath('userData'), 'model-cache');
-  const modelHeaders = (relPath) => {
-    const headers = new Headers();
-    headers.set('Content-Type', relPath.endsWith('.json') ? 'application/json' : 'application/octet-stream');
-    headers.set('Access-Control-Allow-Origin', '*');
-    headers.set('Cross-Origin-Resource-Policy', 'cross-origin');
-    return headers;
-  };
-  protocol.handle('hfmodel', async (req) => {
+  proto.handle('hfmodel', (req) => {
     const url = new URL(req.url);
-    const relPath = decodeURIComponent(url.pathname).replace(/^\/+/, '');
-    if (!relPath || relPath.includes('..')) return new Response('', { status: 400 });
-    const cacheFile = join(modelCacheDir, relPath.split('/').join('__'));
-    if (existsSync(cacheFile)) {
-      return new Response(readFileSync(cacheFile), { status: 200, headers: modelHeaders(relPath) });
-    }
-    const upstreams = [
-      { base: 'https://huggingface.co/', navn: 'huggingface.co', token: settings.data.hfToken || null },
-      { base: 'https://hf-mirror.com/', navn: 'hf-mirror.com', token: null },
-    ];
-    for (const up of upstreams) {
-      try {
-        const res = await net.fetch(up.base + relPath, {
-          headers: up.token ? { Authorization: `Bearer ${up.token}` } : {},
-        });
-        aiLog(`hfmodel GET ${relPath} -> ${res.status} (${up.navn})`);
-        if (res.ok) {
-          let buf = Buffer.from(await res.arrayBuffer());
-          // transformers.js kender ikke modeltypen "siglip2", men
-          // FixRes-arkitekturen er identisk med SigLIP v1. Omskriv
-          // konfigurationsfilerne, saa biblioteket indlaeser modellen
-          // som den v1-arkitektur den reelt er.
-          if (relPath.endsWith('.json')) {
-            const tekst = buf.toString('utf8');
-            const rettet = tekst
-              .replaceAll('"siglip2"', '"siglip"')
-              .replaceAll('Siglip2', 'Siglip');
-            if (rettet !== tekst) {
-              aiLog(`hfmodel: tilpassede siglip2->siglip i ${relPath}`);
-              buf = Buffer.from(rettet, 'utf8');
-            }
-          }
-          mkdirSync(modelCacheDir, { recursive: true });
-          const tmp = `${cacheFile}.tmp-${process.pid}`;
-          writeFileSync(tmp, buf);
-          renameSync(tmp, cacheFile);
-          return new Response(buf, { status: 200, headers: modelHeaders(relPath) });
-        }
-      } catch (err) {
-        aiLog(`hfmodel GET ${relPath} -> netværksfejl (${up.navn}): ${err?.message || err}`);
-      }
-    }
-    return new Response('', { status: 404, headers: modelHeaders(relPath) });
+    return serveModelFile(decodeURIComponent(url.pathname));
   });
 
-  protocol.handle('thumb', async (req) => {
+  proto.handle('thumb', async (req) => {
     const url = new URL(req.url);
     const fileId = Number(url.pathname.replace(/^\/+/, ''));
     const sizeParam = Number(url.searchParams.get('s'));
@@ -225,6 +236,9 @@ function createAiWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       backgroundThrottling: false,
+      // Egen session, saa https-kald til modelvaerten kan opfanges her
+      // uden at roere hovedvinduets session.
+      partition: 'persist:ai',
     },
   });
   aiWin.loadURL(pageUrl('ai.html'));
@@ -373,7 +387,18 @@ app.whenReady().then(() => {
     restartAiWindow();
   });
 
-  registerProtocols();
+  registerProtocols(protocol);
+  // AI-vinduets egen session: samme protokoller plus https-opfangning
+  // af modelvaerten; alt andet https passerer uroert igennem.
+  const aiSession = electronSession.fromPartition('persist:ai');
+  registerProtocols(aiSession.protocol);
+  aiSession.protocol.handle('https', (req) => {
+    const url = new URL(req.url);
+    if (url.hostname === MODEL_HOST) {
+      return serveModelFile(decodeURIComponent(url.pathname));
+    }
+    return net.fetch(req, { bypassCustomProtocolHandlers: true });
+  });
   session.registerIpc();
   buildMenu();
   createMainWindow();
