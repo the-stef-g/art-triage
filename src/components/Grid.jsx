@@ -53,7 +53,7 @@ function Tile({ row, isSelected, onClick, onDoubleClick, onDragStart }) {
   );
 }
 
-export default function Grid({ rows, selected, setSelected, focusIndex, onOpenPreview, onColumns }) {
+export default function Grid({ rows, selected, setSelected, focusIndex, harSoegning, onOpenPreview, onColumns }) {
   const [ref, size] = useSize();
   const anchorRef = useRef(0);
   const gridRef = useRef(null);
@@ -123,8 +123,17 @@ export default function Grid({ rows, selected, setSelected, focusIndex, onOpenPr
     <section className="grid-omraade" ref={ref}>
       {rows.length === 0 ? (
         <div className="tom-tilstand">
-          <p>Ingen billeder her</p>
-          <p className="tom">Vælg en anden mappe, justér filtrene eller læg billeder i mappen i Finder.</p>
+          {harSoegning ? (
+            <>
+              <p>Ingen billeder matcher søgningen</p>
+              <p className="tom">Prøv et andet ord, eller ryd søgningen for at se alle billeder.</p>
+            </>
+          ) : (
+            <>
+              <p>Ingen billeder her</p>
+              <p className="tom">Vælg en anden mappe, justér filtrene eller læg billeder i mappen i Finder.</p>
+            </>
+          )}
         </div>
       ) : (
         <FixedSizeGrid

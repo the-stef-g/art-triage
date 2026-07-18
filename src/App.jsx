@@ -345,6 +345,7 @@ export default function App() {
           selected={selected}
           setSelected={setSelected}
           focusIndex={rows.findIndex((r) => r.version_id === selected[selected.length - 1])}
+          harSoegning={Boolean((filter.search && filter.search.trim()) || filter.keyword)}
           onOpenPreview={() => setShowPreview(true)}
           onColumns={(c) => { columnsRef.current = c; }}
         />

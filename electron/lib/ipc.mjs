@@ -78,6 +78,13 @@ export class AppSession {
     this.indexer.on('progress', (progress) => this.broadcast('index', { progress }));
 
     this.catalog.sync();
+    // Er noegleordslogikken aendret siden sidst, genberegnes alle
+    // noegleord fra de gemte embeddings (ren matematik, ingen AI).
+    try {
+      this.indexer.rekeywordFromCache();
+    } catch {
+      // noegleord genberegnes ved naeste lejlighed
+    }
     this.watcher = watchLibrary(root, () => {
       try {
         this.catalog.sync();
@@ -134,19 +141,26 @@ export class AppSession {
     return this.catalog;
   }
 
-  // Fritekst-soegning: oversaet teksten til en CLIP-vektor og find de
-  // naermeste billeder i indekset.
+  // Fritekst-soegning: foerst filer hvis noegleord matcher teksten
+  // (auto eller manuelle), dernaest semantiske match fra indekset.
   async runSearch(text) {
-    if (!this.ai.ready) {
-      return { error: 'Søgning er klar når AI-modellen er hentet' };
+    const catalog = this.requireCatalog();
+    const keywordIds = catalog.filesWithKeywordLike(text);
+    let semantiske = [];
+    let advarsel = null;
+    if (this.ai.ready) {
+      this.searchIndex.ensureLoaded();
+      if (this.searchIndex.size()) {
+        const qvec = normalize(await this.ai.embedText(text));
+        semantiske = this.searchIndex.query(qvec).map((h) => h.fileId);
+      }
+    } else if (!keywordIds.length) {
+      advarsel = 'Søgning er klar når AI-modellen er hentet';
     }
-    this.searchIndex.ensureLoaded();
-    if (!this.searchIndex.size()) {
-      return { error: 'Ingen billeder er indekseret endnu' };
-    }
-    const qvec = normalize(await this.ai.embedText(text));
-    const hits = this.searchIndex.query(qvec);
-    return { fileIds: hits.map((h) => h.fileId), scores: hits.map((h) => h.score) };
+    const set = new Set(keywordIds);
+    const fileIds = [...keywordIds, ...semantiske.filter((id) => !set.has(id))];
+    if (!fileIds.length && advarsel) return { error: advarsel };
+    return { fileIds };
   }
 
   registerIpc() {
@@ -178,7 +192,7 @@ export class AppSession {
         } else {
           effective.fileIds = result.fileIds;
           effective.orderByFileIds = true;
-          searchInfo = { matched: result.fileIds.length, indexed: this.searchIndex.size() };
+          searchInfo = { matched: result.fileIds.length };
         }
       }
       const rows = catalog.listVersions(effective);
@@ -268,6 +282,8 @@ export class AppSession {
 
     handle('kw:top', () => this.requireCatalog().topKeywords());
     handle('kw:forFile', ({ fileId }) => this.requireCatalog().keywordsForFile(fileId));
+    handle('kw:add', ({ fileId, word }) => this.requireCatalog().addKeyword(fileId, word));
+    handle('kw:remove', ({ fileId, word }) => this.requireCatalog().removeKeyword(fileId, word));
 
     handle('search:status', () => ({
       ai: this.ai.status,

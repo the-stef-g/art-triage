@@ -6,6 +6,11 @@ export default function Inspector({ row, selectedCount, editors, series, act }) 
   const [versions, setVersions] = useState([]);
   const [keywords, setKeywords] = useState([]);
   const [editorValg, setEditorValg] = useState('');
+  const [nytOrd, setNytOrd] = useState('');
+
+  const loadKeywords = () => {
+    if (row) invoke('kw:forFile', { fileId: row.file_id }).then(setKeywords).catch(() => {});
+  };
 
   useEffect(() => {
     if (!row) {
@@ -14,8 +19,31 @@ export default function Inspector({ row, selectedCount, editors, series, act }) 
       return;
     }
     invoke('img:imageVersions', { imageId: row.image_id }).then(setVersions).catch(() => {});
-    invoke('kw:forFile', { fileId: row.file_id }).then(setKeywords).catch(() => {});
+    loadKeywords();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [row?.version_id, row?.file_id, row?.image_id, row?.mtime]);
+
+  const tilfoejOrd = async () => {
+    const ord = nytOrd.trim();
+    if (!ord || !row) return;
+    try {
+      await invoke('kw:add', { fileId: row.file_id, word: ord });
+      setNytOrd('');
+      loadKeywords();
+    } catch {
+      // ignoreres; chippen dukker ikke op
+    }
+  };
+
+  const fjernOrd = async (word) => {
+    if (!row) return;
+    try {
+      await invoke('kw:remove', { fileId: row.file_id, word });
+      loadKeywords();
+    } catch {
+      // ignoreres
+    }
+  };
 
   if (!row) {
     return (
@@ -171,16 +199,31 @@ export default function Inspector({ row, selectedCount, editors, series, act }) 
         </select>
       </div>
 
-      {keywords.length > 0 && (
-        <>
-          <h4>Nøgleord (automatiske)</h4>
-          <div className="chips">
-            {keywords.map((k) => (
-              <span key={k.word} className="chip">{k.word}</span>
-            ))}
-          </div>
-        </>
-      )}
+      <h4>Nøgleord</h4>
+      <div className="chips">
+        {keywords.map((k) => (
+          <span
+            key={k.word}
+            className={`chip ${k.manual ? 'manuel' : ''}`}
+            title={k.manual ? 'Manuelt nøgleord' : 'Automatisk nøgleord'}
+          >
+            {k.word}
+            <button className="chip-fjern" onClick={() => fjernOrd(k.word)} title="Fjern nøgleord">×</button>
+          </span>
+        ))}
+        {keywords.length === 0 && <span className="tom">Ingen nøgleord endnu</span>}
+      </div>
+      <div className="knapraekke">
+        <input
+          value={nytOrd}
+          placeholder="Tilføj nøgleord"
+          onChange={(e) => setNytOrd(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') tilfoejOrd();
+          }}
+        />
+        <button className="lille" onClick={tilfoejOrd}>Tilføj</button>
+      </div>
     </aside>
   );
 }

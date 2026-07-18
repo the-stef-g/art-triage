@@ -3,13 +3,18 @@
 // saa soegninger og UI altid har foersteprioritet.
 import { EventEmitter } from 'node:events';
 import { VOCAB, vocabHash } from './vocab.mjs';
-import { normalize, dot } from './searchIndex.mjs';
+import { normalize, dot, medianMad, robustZ } from './searchIndex.mjs';
 
 // Standard-model-id; den faktiske model kan afvige naar AI-vinduet
 // falder tilbage til en anden kandidat, og meldes via ready-beskeden.
 export const MODEL_ID = 'siglip2-base-patch16-224';
 const KEYWORDS_PER_IMAGE = 6;
-const KEYWORD_THRESHOLD = 0.2;
+// Selvkalibrerende: et ord tildeles kun hvis det skiller sig tydeligt ud
+// fra resten af ordlisten for netop dette billede (robust z-score).
+const KEYWORD_Z_MIN = 2.5;
+// Bumpes naar tildelingslogikken aendres, saa noegleord genberegnes fra
+// de gemte embeddings ved naeste biblioteksaabning.
+const KEYWORD_LOGIC_VERSION = '2';
 
 export class Indexer extends EventEmitter {
   constructor({ catalog, thumbs, ai, searchIndex, model = MODEL_ID }) {
@@ -93,30 +98,61 @@ export class Indexer extends EventEmitter {
 
   _assignKeywords(fileId, vec) {
     if (!this.vocabVecs) return;
-    const scored = this.vocabVecs
-      .map(({ word, vec: wv }) => ({ word, score: dot(vec, wv) }))
+    const scored = this.vocabVecs.map(({ word, vec: wv }) => ({ word, score: dot(vec, wv) }));
+    const { median, mad } = medianMad(scored.map((s) => s.score));
+    if (mad < 1e-9) {
+      this.catalog.saveKeywords(fileId, []);
+      return;
+    }
+    const valgte = scored
+      .map((s) => ({ word: s.word, score: robustZ(s.score, median, mad) }))
+      .filter((s) => s.score >= KEYWORD_Z_MIN)
       .sort((a, b) => b.score - a.score)
-      .filter((s) => s.score >= KEYWORD_THRESHOLD)
       .slice(0, KEYWORDS_PER_IMAGE);
-    this.catalog.saveKeywords(fileId, scored);
+    this.catalog.saveKeywords(fileId, valgte);
+  }
+
+  // Genberegner alle noegleord fra de allerede gemte embeddings og den
+  // cachede ordliste-matrix. Ren matematik, ingen AI noedvendig; koeres
+  // ved biblioteksaabning naar tildelingslogikken er aendret.
+  rekeywordFromCache() {
+    const flagKey = `kwlogic:${this.model}`;
+    const oensket = `${KEYWORD_LOGIC_VERSION}:${vocabHash()}`;
+    if (this.catalog.getMeta(flagKey) === oensket) return false;
+    if (!this._loadVocabFromCache()) return false; // AI har ikke lavet ordlisten endnu
+    let antal = 0;
+    for (const row of this.catalog.allEmbeddings(this.model)) {
+      if (!row.dim) continue;
+      const buf = row.vec;
+      const vec = new Float32Array(buf.buffer, buf.byteOffset, row.dim);
+      this._assignKeywords(row.file_id, Float32Array.from(vec));
+      antal++;
+    }
+    this.catalog.setMeta(flagKey, oensket);
+    if (antal) this.catalog.emit('changed');
+    return antal > 0;
+  }
+
+  _loadVocabFromCache() {
+    if (this.vocabVecs) return true;
+    const key = `vocab:${this.model}:${vocabHash()}`;
+    const cached = this.catalog.getMeta(key);
+    if (!cached) return false;
+    const parsed = JSON.parse(cached);
+    this.vocabVecs = parsed.map(({ word, vec }) => {
+      const buf = Buffer.from(vec, 'base64');
+      return {
+        word,
+        vec: Float32Array.from(new Float32Array(buf.buffer, buf.byteOffset, buf.byteLength / 4)),
+      };
+    });
+    return true;
   }
 
   // Ordlistens embeddings beregnes en gang pr. model/ordliste og caches i DB.
   async _ensureVocab() {
-    if (this.vocabVecs) return;
+    if (this._loadVocabFromCache()) return;
     const key = `vocab:${this.model}:${vocabHash()}`;
-    const cached = this.catalog.getMeta(key);
-    if (cached) {
-      const parsed = JSON.parse(cached);
-      this.vocabVecs = parsed.map(({ word, vec }) => {
-        const buf = Buffer.from(vec, 'base64');
-        return {
-          word,
-          vec: Float32Array.from(new Float32Array(buf.buffer, buf.byteOffset, buf.byteLength / 4)),
-        };
-      });
-      return;
-    }
     this.setProgress({ phase: 'ordliste', done: 0, total: VOCAB.length });
     const out = [];
     for (let i = 0; i < VOCAB.length; i++) {
@@ -131,6 +167,8 @@ export class Indexer extends EventEmitter {
       word,
       vec: Buffer.from(vec.buffer, vec.byteOffset, vec.byteLength).toString('base64'),
     }))));
+    // Noegleord tildeles fremover med den aktuelle logik.
+    this.catalog.setMeta(`kwlogic:${this.model}`, `${KEYWORD_LOGIC_VERSION}:${vocabHash()}`);
     this.setProgress({ phase: 'venter', done: 0, total: 0 });
   }
 

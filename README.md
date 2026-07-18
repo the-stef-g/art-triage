@@ -36,7 +36,7 @@ Appen er ikke signeret med et Apple-udviklercertifikat, så første gang siger m
 
 **Serier.** Markér et eller flere billeder og vælg "Ny serie" eller en eksisterende serie i Inspektøren. Klik på en serie i sidepanelet for kun at se dens billeder.
 
-**Søgning.** Skriv fx "gule blomster" i søgefeltet, så finder Billedflow billederne ud fra selve billedindholdet. Det kræver ingen manuelle søgeord: appen analyserer selv alle billeder i baggrunden og tildeler samtidig danske nøgleord, som vises som klikbare chips i sidepanelet.
+**Søgning.** Skriv fx "gule blomster" i søgefeltet, så finder Billedflow billederne ud fra selve billedindholdet. Det kræver ingen manuelle søgeord: appen analyserer selv alle billeder i baggrunden og tildeler samtidig danske nøgleord, som vises som klikbare chips i sidepanelet. Kun billeder, der tydeligt matcher, vises; en søgning uden reelle match giver ærligt nul resultater. Hvert billedes nøgleord kan ses og rettes i Inspektøren: fjern et ord med krydset eller tilføj dine egne, som altid bevares og vægtes øverst i søgningen.
 
 ## AI-modellen
 

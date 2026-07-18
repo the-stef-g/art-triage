@@ -8,7 +8,7 @@ const CHANNELS = new Set([
   'ser:list', 'ser:create', 'ser:assign', 'ser:delete',
   'fold:tree', 'fold:create', 'fold:move', 'fold:cleanup',
   'ed:list', 'ed:open', 'ed:pick',
-  'kw:top', 'kw:forFile',
+  'kw:top', 'kw:forFile', 'kw:add', 'kw:remove',
   'search:status', 'app:counts', 'app:undo', 'app:redo',
   'app:info', 'app:setHfToken',
 ]);

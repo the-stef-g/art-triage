@@ -1,5 +1,18 @@
 // Holder alle billed-embeddings i hukommelsen og laver kosinus-soegning.
 // Vektorerne er normaliserede, saa lighed = prikprodukt.
+//
+// Scoringen er selvkalibrerende: i stedet for faste taerskler (som er
+// forskellige fra model til model) maales hvor meget et billede skiller
+// sig ud fra RESTEN af biblioteket for netop denne soegning. Median og
+// MAD (median absolute deviation) bruges frem for gennemsnit/spredning,
+// saa ogsaa soegninger med mange aegte match fungerer: medianen bliver
+// liggende i "ikke-match"-klumpen.
+const ROBUST_Z_MIN = 2.5;
+// Portvagt: er selv det BEDSTE billede ikke markant (z under denne),
+// er soegningen meningsloes, og der returneres nul resultater. Fanger
+// enkelte billeder der ved et tilfaelde sniger sig over ROBUST_Z_MIN.
+const BEST_Z_MIN = 3.5;
+
 export class SearchIndex {
   constructor(catalog, model) {
     this.catalog = catalog;
@@ -43,22 +56,28 @@ export class SearchIndex {
     return this.vectors.size;
   }
 
-  // Returnerer filer sorteret efter relevans. Taersklen er adaptiv: gode
-  // match ligger typisk paa 0,25-0,35 i CLIP-rummet.
-  query(queryVec, { limit = 500 } = {}) {
+  // Returnerer kun billeder der tydeligt skiller sig ud for soegningen,
+  // sorteret efter score. En nonsens-soegning har en flad fordeling og
+  // giver aerligt nul resultater.
+  query(queryVec, { limit = 400, minZ = ROBUST_Z_MIN } = {}) {
     this.ensureLoaded();
     const scored = [];
     for (const [fileId, vec] of this.vectors) {
       scored.push({ fileId, score: dot(queryVec, vec) });
     }
-    scored.sort((a, b) => b.score - a.score);
-    if (!scored.length) return [];
-    const best = scored[0].score;
-    const threshold = Math.max(0.18, best - 0.1);
-    const hits = scored.filter((s) => s.score >= threshold).slice(0, limit);
-    // Faa resultater er bedre end nul: vis altid en haandfuld af de bedste.
-    if (hits.length < 8) return scored.slice(0, Math.min(8, scored.length));
-    return hits;
+    if (scored.length < 4) return [];
+    const { median, mad } = medianMad(scored.map((s) => s.score));
+    if (mad < 1e-9) return [];
+    const hits = [];
+    let bestZ = -Infinity;
+    for (const s of scored) {
+      const z = robustZ(s.score, median, mad);
+      if (z > bestZ) bestZ = z;
+      if (z >= minZ) hits.push({ ...s, z });
+    }
+    if (bestZ < BEST_Z_MIN) return [];
+    hits.sort((a, b) => b.score - a.score);
+    return hits.slice(0, limit);
   }
 }
 
@@ -76,4 +95,28 @@ export function normalize(vec) {
   const out = new Float32Array(vec.length);
   for (let i = 0; i < vec.length; i++) out[i] = vec[i] / norm;
   return out;
+}
+
+// Spredningen maales kun paa den nederste halvdel af fordelingen: match
+// ligger altid i toppen, saa den nederste halvdel er ren stoej. Dermed
+// blaeses skalaen ikke op, selv naar en stor andel af billederne matcher.
+export function medianMad(values) {
+  const sorted = [...values].sort((a, b) => a - b);
+  const med = kvantil(sorted);
+  const nedre = sorted.filter((v) => v <= med);
+  const afvigelser = nedre.map((v) => Math.abs(v - med)).sort((a, b) => a - b);
+  return { median: med, mad: kvantil(afvigelser) };
+}
+
+// Modificeret z-score: 1.4826 * MAD svarer til én standardafvigelse for
+// normalfordelte data, saa taersklen kan taenkes som "antal spredninger".
+export function robustZ(value, median, mad) {
+  return (value - median) / (1.4826 * mad);
+}
+
+function kvantil(sorted) {
+  const n = sorted.length;
+  if (!n) return 0;
+  const mid = Math.floor(n / 2);
+  return n % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
 }

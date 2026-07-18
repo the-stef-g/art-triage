@@ -52,6 +52,7 @@ CREATE TABLE IF NOT EXISTS keywords(
   file_id INTEGER NOT NULL REFERENCES files(id) ON DELETE CASCADE,
   word TEXT NOT NULL,
   score REAL NOT NULL,
+  manual INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY(file_id, word)
 );
 CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT);
@@ -66,6 +67,15 @@ export class Catalog extends EventEmitter {
     this.db = db;
     this.root = root;
     db.exec(SCHEMA);
+    this._migrate();
+  }
+
+  // Skemamigreringer for biblioteker oprettet med aeldre versioner.
+  _migrate() {
+    const kolonner = this.db.all('PRAGMA table_info(keywords)').map((k) => k.name);
+    if (!kolonner.includes('manual')) {
+      this.db.exec('ALTER TABLE keywords ADD COLUMN manual INTEGER NOT NULL DEFAULT 0');
+    }
   }
 
   abs(rel) {
@@ -567,23 +577,53 @@ export class Catalog extends EventEmitter {
     );
   }
 
+  // Gemmer automatiske noegleord; manuelt tilfoejede ord roeres aldrig.
   saveKeywords(fileId, entries) {
     this.db.transaction(() => {
-      this.db.run('DELETE FROM keywords WHERE file_id=?', fileId);
+      this.db.run('DELETE FROM keywords WHERE file_id=? AND manual=0', fileId);
       for (const { word, score } of entries) {
         this.db.run(
-          'INSERT OR REPLACE INTO keywords(file_id, word, score) VALUES(?,?,?)',
+          'INSERT INTO keywords(file_id, word, score, manual) VALUES(?,?,?,0) ON CONFLICT(file_id, word) DO NOTHING',
           fileId, word, score
         );
       }
     });
   }
 
+  addKeyword(fileId, word) {
+    const trimmed = String(word || '').trim();
+    if (!trimmed) throw new Error('Noegleordet er tomt');
+    this.db.run(
+      `INSERT INTO keywords(file_id, word, score, manual) VALUES(?,?,1000,1)
+       ON CONFLICT(file_id, word) DO UPDATE SET manual=1, score=1000`,
+      fileId, trimmed
+    );
+    this.emit('changed');
+  }
+
+  removeKeyword(fileId, word) {
+    this.db.run('DELETE FROM keywords WHERE file_id=? AND word=?', fileId, word);
+    this.emit('changed');
+  }
+
   keywordsForFile(fileId) {
     return this.db.all(
-      'SELECT word, score FROM keywords WHERE file_id=? ORDER BY score DESC',
+      'SELECT word, score, manual FROM keywords WHERE file_id=? ORDER BY manual DESC, score DESC',
       fileId
     );
+  }
+
+  // Filer hvis noegleord (auto eller manuelle) indeholder teksten.
+  filesWithKeywordLike(text) {
+    const soegning = String(text || '').trim().toLowerCase();
+    if (!soegning) return [];
+    return this.db.all(
+      `SELECT DISTINCT k.file_id FROM keywords k
+       JOIN files f ON f.id = k.file_id
+       WHERE f.present=1 AND lower(k.word) LIKE ? ESCAPE '\\'
+       ORDER BY k.file_id`,
+      `%${escapeLike(soegning)}%`
+    ).map((r) => r.file_id);
   }
 
   topKeywords(limit = 40) {
