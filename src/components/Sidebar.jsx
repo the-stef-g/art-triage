@@ -51,7 +51,7 @@ function FolderNode({ node, depth, filter, setFilter, onMoveTo }) {
   );
 }
 
-export default function Sidebar({ tree, series, topKeywords, filter, setFilter, onMoveTo }) {
+export default function Sidebar({ tree, series, topKeywords, filter, setFilter, onMoveTo, onRemoveKeywordEverywhere }) {
   return (
     <aside className="sidebar">
       <section>
@@ -79,13 +79,24 @@ export default function Sidebar({ tree, series, topKeywords, filter, setFilter, 
         {topKeywords.length === 0 && <p className="tom">Kommer når billederne er analyseret</p>}
         <div className="chips">
           {topKeywords.map((k) => (
-            <button
+            <span
               key={k.word}
-              className={`chip ${filter.keyword === k.word ? 'aktiv' : ''}`}
-              onClick={() => setFilter((f) => ({ ...f, keyword: f.keyword === k.word ? null : k.word }))}
+              className={`chip kw-chip ${filter.keyword === k.word ? 'aktiv' : ''}`}
             >
-              {k.word} <span className="antal">{k.antal}</span>
-            </button>
+              <button
+                className="kw-vaelg"
+                onClick={() => setFilter((f) => ({ ...f, keyword: f.keyword === k.word ? null : k.word }))}
+              >
+                {k.word} <span className="antal">{k.antal}</span>
+              </button>
+              <button
+                className="chip-fjern"
+                title="Fjern nøgleordet fra alle billeder"
+                onClick={() => onRemoveKeywordEverywhere(k.word)}
+              >
+                ×
+              </button>
+            </span>
           ))}
         </div>
       </section>

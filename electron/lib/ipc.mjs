@@ -77,11 +77,20 @@ export class AppSession {
     });
     this.indexer.on('progress', (progress) => this.broadcast('index', { progress }));
 
+    // Genberegner noegleord fra de gemte embeddings naar logik eller
+    // feedback er aendret (ren matematik, ingen AI). Debounced, saa hurtige
+    // rettelser i traek ikke koerer den mange gange.
+    this._recompute = debounce(() => {
+      try {
+        this.indexer?.recomputeKeywords();
+      } catch {
+        // noegleord genberegnes ved naeste lejlighed
+      }
+    }, 400);
+
     this.catalog.sync();
-    // Er noegleordslogikken aendret siden sidst, genberegnes alle
-    // noegleord fra de gemte embeddings (ren matematik, ingen AI).
     try {
-      this.indexer.rekeywordFromCache();
+      this.indexer.recomputeKeywords();
     } catch {
       // noegleord genberegnes ved naeste lejlighed
     }
@@ -282,8 +291,19 @@ export class AppSession {
 
     handle('kw:top', () => this.requireCatalog().topKeywords());
     handle('kw:forFile', ({ fileId }) => this.requireCatalog().keywordsForFile(fileId));
-    handle('kw:add', ({ fileId, word }) => this.requireCatalog().addKeyword(fileId, word));
-    handle('kw:remove', ({ fileId, word }) => this.requireCatalog().removeKeyword(fileId, word));
+    handle('kw:add', ({ fileId, word }) => {
+      this.requireCatalog().addKeyword(fileId, word);
+      this._recompute?.();
+    });
+    handle('kw:remove', ({ fileId, word }) => {
+      this.requireCatalog().removeKeyword(fileId, word);
+      this._recompute?.();
+    });
+    handle('kw:removeAll', ({ word }) => {
+      const n = this.requireCatalog().removeKeywordEverywhere(word);
+      this._recompute?.();
+      return n;
+    });
 
     handle('search:status', () => ({
       ai: this.ai.status,

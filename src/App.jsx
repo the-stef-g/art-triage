@@ -269,6 +269,14 @@ export default function App() {
         },
       });
     },
+    removeKeywordEverywhere: async (word) => {
+      const ok = window.confirm(`Fjern nøgleordet "${word}" fra alle billeder? Appen holder op med at foreslå det.`);
+      if (!ok) return;
+      try {
+        await invoke('kw:removeAll', { word });
+        if (filterRef.current.keyword === word) setFilter((f) => ({ ...f, keyword: null }));
+      } catch (err) { visFejl(err); }
+    },
   };
 
   // ---------- Tastaturgenveje ----------
@@ -339,6 +347,7 @@ export default function App() {
           filter={filter}
           setFilter={setFilter}
           onMoveTo={(fileIds, rel) => act.moveTo(fileIds, rel)}
+          onRemoveKeywordEverywhere={act.removeKeywordEverywhere}
         />
         <Grid
           rows={rows}

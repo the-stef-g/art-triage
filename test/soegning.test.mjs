@@ -149,7 +149,7 @@ describe('noegleord', () => {
     expect(catalog.filesWithKeywordLike('hest')).toEqual([]);
   });
 
-  it('rekeywordFromCache genberegner fra gemte embeddings og koerer kun en gang', () => {
+  it('recomputeKeywords genberegner fra gemte embeddings og koerer kun en gang', () => {
     const rand = lcg(11);
     const model = 'test-model';
     const indexer = new Indexer({ catalog, thumbs: null, ai: null, searchIndex: null, model });
@@ -166,8 +166,8 @@ describe('noegleord', () => {
       vec: Buffer.from(vec.buffer, vec.byteOffset, vec.byteLength).toString('base64'),
     }))));
 
-    expect(indexer.rekeywordFromCache()).toBe(true);
+    expect(indexer.recomputeKeywords()).toBe(true);
     expect(catalog.keywordsForFile(rows[0].file_id).map((k) => k.word)).toContain('match');
-    expect(indexer.rekeywordFromCache()).toBe(false);
+    expect(indexer.recomputeKeywords()).toBe(false);
   });
 });

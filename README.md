@@ -36,7 +36,9 @@ Appen er ikke signeret med et Apple-udviklercertifikat, så første gang siger m
 
 **Serier.** Markér et eller flere billeder og vælg "Ny serie" eller en eksisterende serie i Inspektøren. Klik på en serie i sidepanelet for kun at se dens billeder.
 
-**Søgning.** Skriv fx "gule blomster" i søgefeltet, så finder Billedflow billederne ud fra selve billedindholdet. Det kræver ingen manuelle søgeord: appen analyserer selv alle billeder i baggrunden og tildeler samtidig danske nøgleord, som vises som klikbare chips i sidepanelet. Kun billeder, der tydeligt matcher, vises; en søgning uden reelle match giver ærligt nul resultater. Hvert billedes nøgleord kan ses og rettes i Inspektøren: fjern et ord med krydset eller tilføj dine egne, som altid bevares og vægtes øverst i søgningen.
+**Søgning.** Skriv fx "gule blomster" i søgefeltet, så finder Billedflow billederne ud fra selve billedindholdet. Det kræver ingen manuelle søgeord: appen analyserer selv alle billeder i baggrunden og tildeler samtidig danske nøgleord, som vises som klikbare chips i sidepanelet. Kun billeder, der tydeligt matcher, vises; en søgning uden reelle match giver ærligt nul resultater. Tallet ved et nøgleord i sidepanelet svarer til det antal billeder, et klik viser.
+
+**Nøgleord der lærer.** Hvert billedes nøgleord kan ses og rettes i Inspektøren. Fjern et forkert ord med krydset, så kommer det aldrig igen på det billede. Er et ord forkert overalt, kan du fjerne det fra alle billeder på én gang med krydset på chippen i sidepanelet, og så holder appen op med at foreslå det. Tilføjer du dine egne ord (fx "Seagully") på et par billeder, lærer appen hvordan de ser ud og foreslår dem på visuelt lignende billeder, som du selv kan beholde eller fjerne. Alt sker lokalt på din Mac, og appen bliver bedre jo mere du retter.
 
 ## AI-modellen
 

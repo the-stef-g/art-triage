@@ -12,9 +12,18 @@ const KEYWORDS_PER_IMAGE = 6;
 // Selvkalibrerende: et ord tildeles kun hvis det skiller sig tydeligt ud
 // fra resten af ordlisten for netop dette billede (robust z-score).
 const KEYWORD_Z_MIN = 2.5;
+// Staerk-port: er selv det bedste ord ikke markant, faar billedet ingen
+// noegleord (undgaar forkerte ord paa intetsigende billeder).
+const KEYWORD_BEST_Z = 3.0;
+// Antal bekraeftede eksempler foer et af Stefs egne ord foreslaas paa
+// andre billeder (konservativt, saa enkelttilfaelde ikke spreder stoej).
+const PROPAGATE_MIN_EXAMPLES = 2;
+// Blandingsvaegt: v = norm(alpha*prompt + (1-alpha)*prototype), hvor
+// alpha = K/(K+n). Jo flere af Stefs eksempler, jo mere styrer de.
+const BLEND_K = 3;
 // Bumpes naar tildelingslogikken aendres, saa noegleord genberegnes fra
 // de gemte embeddings ved naeste biblioteksaabning.
-const KEYWORD_LOGIC_VERSION = '2';
+const KEYWORD_LOGIC_VERSION = '3';
 
 export class Indexer extends EventEmitter {
   constructor({ catalog, thumbs, ai, searchIndex, model = MODEL_ID }) {
@@ -27,7 +36,9 @@ export class Indexer extends EventEmitter {
     this.running = false;
     this.stopped = false;
     this.progress = { done: 0, total: 0, phase: 'venter' };
-    this.vocabVecs = null; // [{word, vec}]
+    this.vocabVecs = null; // [{word, vec}] raa ordliste-embeddings
+    this.candidates = null; // [{word, vec}] blandet med laerte prototyper
+    this.candidatesRev = -1; // feedback-revision candidates blev bygget for
   }
 
   stop() {
@@ -39,6 +50,8 @@ export class Indexer extends EventEmitter {
     if (model === this.model) return;
     this.model = model;
     this.vocabVecs = null;
+    this.candidates = null;
+    this.candidatesRev = -1;
   }
 
   setProgress(patch) {
@@ -97,29 +110,97 @@ export class Indexer extends EventEmitter {
   }
 
   _assignKeywords(fileId, vec) {
-    if (!this.vocabVecs) return;
-    const scored = this.vocabVecs.map(({ word, vec: wv }) => ({ word, score: dot(vec, wv) }));
+    if (!this._ensureCandidates()) return;
+    const rejected = this.catalog.rejectedWordsForFile(fileId);
+    const scored = this.candidates
+      .filter((c) => !rejected.has(c.word))
+      .map(({ word, vec: wv }) => ({ word, score: dot(vec, wv) }));
+    if (scored.length < 2) {
+      this.catalog.saveKeywords(fileId, []);
+      return;
+    }
     const { median, mad } = medianMad(scored.map((s) => s.score));
     if (mad < 1e-9) {
       this.catalog.saveKeywords(fileId, []);
       return;
     }
-    const valgte = scored
+    const medZ = scored
       .map((s) => ({ word: s.word, score: robustZ(s.score, median, mad) }))
-      .filter((s) => s.score >= KEYWORD_Z_MIN)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, KEYWORDS_PER_IMAGE);
+      .sort((a, b) => b.score - a.score);
+    // Staerk-port: er selv toppen ikke markant, faar billedet ingen ord.
+    if (!medZ.length || medZ[0].score < KEYWORD_BEST_Z) {
+      this.catalog.saveKeywords(fileId, []);
+      return;
+    }
+    const valgte = medZ.filter((s) => s.score >= KEYWORD_Z_MIN).slice(0, KEYWORDS_PER_IMAGE);
     this.catalog.saveKeywords(fileId, valgte);
   }
 
-  // Genberegner alle noegleord fra de allerede gemte embeddings og den
-  // cachede ordliste-matrix. Ren matematik, ingen AI noedvendig; koeres
-  // ved biblioteksaabning naar tildelingslogikken er aendret.
-  rekeywordFromCache() {
+  // Bygger kandidat-vektorerne: ordlisten blandet med de prototyper appen
+  // har laert af Stefs bekraeftelser, plus hans egne ord. Genopbygges naar
+  // feedback-revisionen aendrer sig. Returnerer false hvis ordlisten ikke
+  // er beregnet endnu (AI har ikke koert).
+  _ensureCandidates() {
+    if (!this._loadVocabFromCache()) return false;
+    const rev = this.catalog.feedbackRevision();
+    if (this.candidates && this.candidatesRev === rev) return true;
+
+    const globalRej = this.catalog.globallyRejectedWords();
+    const confirmed = this.catalog.confirmedExamples();
+    // Embeddings som opslag, saa prototyper kan beregnes.
+    const embByFile = new Map();
+    for (const row of this.catalog.allEmbeddings(this.model)) {
+      if (!row.dim) continue;
+      const buf = row.vec;
+      embByFile.set(row.file_id, Float32Array.from(new Float32Array(buf.buffer, buf.byteOffset, row.dim)));
+    }
+    const prototype = (fileIds) => {
+      const vecs = fileIds.map((id) => embByFile.get(id)).filter(Boolean);
+      if (!vecs.length) return null;
+      const dim = vecs[0].length;
+      const sum = new Float32Array(dim);
+      for (const v of vecs) for (let i = 0; i < dim; i++) sum[i] += v[i];
+      return { vec: normalize(sum), n: vecs.length };
+    };
+
+    const cands = [];
+    const vocabWords = new Set(this.vocabVecs.map((v) => v.word));
+    // Ordliste-ord: promptvektor blandet med evt. laert prototype.
+    for (const { word, vec } of this.vocabVecs) {
+      if (globalRej.has(word)) continue;
+      const ex = confirmed.get(word);
+      const proto = ex ? prototype(ex) : null;
+      if (proto) {
+        const alpha = BLEND_K / (BLEND_K + proto.n);
+        const blended = new Float32Array(vec.length);
+        for (let i = 0; i < vec.length; i++) blended[i] = alpha * vec[i] + (1 - alpha) * proto.vec[i];
+        cands.push({ word, vec: normalize(blended) });
+      } else {
+        cands.push({ word, vec });
+      }
+    }
+    // Stefs egne ord (ikke i ordlisten): foreslaas naar der er nok eksempler.
+    for (const [word, ex] of confirmed) {
+      if (vocabWords.has(word) || globalRej.has(word)) continue;
+      if (ex.length < PROPAGATE_MIN_EXAMPLES) continue;
+      const proto = prototype(ex);
+      if (proto) cands.push({ word, vec: proto.vec });
+    }
+
+    this.candidates = cands;
+    this.candidatesRev = rev;
+    return true;
+  }
+
+  // Genberegner alle noegleord fra de gemte embeddings og de aktuelle
+  // kandidat-vektorer. Ren matematik, ingen AI noedvendig; koeres ved
+  // biblioteksaabning og efter enhver rettelse (naar logik- eller
+  // feedback-versionen er aendret siden sidst).
+  recomputeKeywords() {
+    if (!this._ensureCandidates()) return false; // AI har ikke lavet ordlisten endnu
     const flagKey = `kwlogic:${this.model}`;
-    const oensket = `${KEYWORD_LOGIC_VERSION}:${vocabHash()}`;
+    const oensket = `${KEYWORD_LOGIC_VERSION}:${vocabHash()}:${this.catalog.feedbackRevision()}`;
     if (this.catalog.getMeta(flagKey) === oensket) return false;
-    if (!this._loadVocabFromCache()) return false; // AI har ikke lavet ordlisten endnu
     let antal = 0;
     for (const row of this.catalog.allEmbeddings(this.model)) {
       if (!row.dim) continue;
@@ -167,8 +248,8 @@ export class Indexer extends EventEmitter {
       word,
       vec: Buffer.from(vec.buffer, vec.byteOffset, vec.byteLength).toString('base64'),
     }))));
-    // Noegleord tildeles fremover med den aktuelle logik.
-    this.catalog.setMeta(`kwlogic:${this.model}`, `${KEYWORD_LOGIC_VERSION}:${vocabHash()}`);
+    // recomputeKeywords ejer kwlogic-flaget; her noejes vi med at cache
+    // ordlisten, saa en fuld genberegning koerer mindst en gang bagefter.
     this.setProgress({ phase: 'venter', done: 0, total: 0 });
   }
 

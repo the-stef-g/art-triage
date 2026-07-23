@@ -55,6 +55,17 @@ CREATE TABLE IF NOT EXISTS keywords(
   manual INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY(file_id, word)
 );
+-- Stefs bekraeftelser og afvisninger af noegleord. Varigt laeringssignal:
+-- verdict 'confirm' (tilfoejet manuelt) eller 'reject' (slettet). file_id=0
+-- er en global afvisning der udelukker ordet fra alle forslag.
+CREATE TABLE IF NOT EXISTS keyword_feedback(
+  file_id INTEGER NOT NULL,
+  word TEXT NOT NULL,
+  verdict TEXT NOT NULL,
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY(file_id, word)
+);
+CREATE INDEX IF NOT EXISTS idx_kwfb_word ON keyword_feedback(word);
 CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT);
 CREATE INDEX IF NOT EXISTS idx_versions_image ON versions(image_id);
 CREATE INDEX IF NOT EXISTS idx_versions_file ON versions(file_id);
@@ -565,7 +576,8 @@ export class Catalog extends EventEmitter {
 
   clearEmbedding(fileId) {
     this.db.run('DELETE FROM embeddings WHERE file_id=?', fileId);
-    this.db.run('DELETE FROM keywords WHERE file_id=?', fileId);
+    // Kun automatiske noegleord ryddes; manuelle ord og feedback bevares.
+    this.db.run('DELETE FROM keywords WHERE file_id=? AND manual=0', fileId);
   }
 
   allEmbeddings(model) {
@@ -590,20 +602,89 @@ export class Catalog extends EventEmitter {
     });
   }
 
+  // ---------- Noegleords-feedback (laeringssignal) ----------
+
+  _recordFeedback(fileId, word, verdict) {
+    this.db.run(
+      `INSERT INTO keyword_feedback(file_id, word, verdict, updated_at) VALUES(?,?,?,?)
+       ON CONFLICT(file_id, word) DO UPDATE SET verdict=excluded.verdict, updated_at=excluded.updated_at`,
+      fileId, word, verdict, this.now()
+    );
+    this._bumpFeedbackRev();
+  }
+
+  _bumpFeedbackRev() {
+    const n = Number(this.getMeta('kwfeedback_rev') || '0') + 1;
+    this.setMeta('kwfeedback_rev', String(n));
+  }
+
+  feedbackRevision() {
+    return Number(this.getMeta('kwfeedback_rev') || '0');
+  }
+
+  // Ord Stef har afvist for netop denne fil (kommer aldrig igen der).
+  rejectedWordsForFile(fileId) {
+    return new Set(this.db.all(
+      "SELECT word FROM keyword_feedback WHERE file_id=? AND verdict='reject'", fileId
+    ).map((r) => r.word));
+  }
+
+  // Ord der er afvist globalt (udelukkes fra alle forslag).
+  globallyRejectedWords() {
+    return new Set(this.db.all(
+      "SELECT word FROM keyword_feedback WHERE file_id=0 AND verdict='reject'"
+    ).map((r) => r.word));
+  }
+
+  // Bekraeftede eksempler pr. ord: {word -> [file_id, ...]}. Grundlaget for
+  // de laerte prototyper.
+  confirmedExamples() {
+    const map = new Map();
+    for (const r of this.db.all(
+      "SELECT file_id, word FROM keyword_feedback WHERE verdict='confirm' AND file_id>0"
+    )) {
+      if (!map.has(r.word)) map.set(r.word, []);
+      map.get(r.word).push(r.file_id);
+    }
+    return map;
+  }
+
+  // ---------- Noegleord ----------
+
   addKeyword(fileId, word) {
     const trimmed = String(word || '').trim();
     if (!trimmed) throw new Error('Noegleordet er tomt');
-    this.db.run(
-      `INSERT INTO keywords(file_id, word, score, manual) VALUES(?,?,1000,1)
-       ON CONFLICT(file_id, word) DO UPDATE SET manual=1, score=1000`,
-      fileId, trimmed
-    );
+    this.db.transaction(() => {
+      this.db.run(
+        `INSERT INTO keywords(file_id, word, score, manual) VALUES(?,?,1000,1)
+         ON CONFLICT(file_id, word) DO UPDATE SET manual=1, score=1000`,
+        fileId, trimmed
+      );
+      this._recordFeedback(fileId, trimmed, 'confirm');
+    });
     this.emit('changed');
   }
 
   removeKeyword(fileId, word) {
-    this.db.run('DELETE FROM keywords WHERE file_id=? AND word=?', fileId, word);
+    this.db.transaction(() => {
+      this.db.run('DELETE FROM keywords WHERE file_id=? AND word=?', fileId, word);
+      // Varigt: ordet kommer aldrig igen paa dette billede.
+      this._recordFeedback(fileId, word, 'reject');
+    });
     this.emit('changed');
+  }
+
+  // Fjerner et ord fra alle billeder og udelukker det fra fremtidige forslag.
+  removeKeywordEverywhere(word) {
+    const trimmed = String(word || '').trim();
+    if (!trimmed) return 0;
+    let antal = 0;
+    this.db.transaction(() => {
+      antal = this.db.run('DELETE FROM keywords WHERE word=?', trimmed).changes;
+      this._recordFeedback(0, trimmed, 'reject');
+    });
+    this.emit('changed');
+    return antal;
   }
 
   keywordsForFile(fileId) {
@@ -626,11 +707,20 @@ export class Catalog extends EventEmitter {
     ).map((r) => r.file_id);
   }
 
+  // Tallet skal matche hvad et klik viser: kun filer der er den effektive
+  // fil for mindst én ikke-kasseret version taelles med.
   topKeywords(limit = 40) {
     return this.db.all(
-      `SELECT word, COUNT(*) AS antal FROM keywords k
-       JOIN files f ON f.id=k.file_id
-       WHERE f.present=1 GROUP BY word ORDER BY antal DESC, word LIMIT ?`,
+      `SELECT k.word, COUNT(DISTINCT k.file_id) AS antal
+       FROM keywords k
+       JOIN files f ON f.id = k.file_id
+       WHERE f.present=1
+         AND EXISTS (
+           SELECT 1 FROM versions v JOIN images i ON i.id = v.image_id
+           WHERE COALESCE(v.file_id, i.master_file_id) = k.file_id
+             AND v.rating != 'kasseret'
+         )
+       GROUP BY k.word ORDER BY antal DESC, k.word LIMIT ?`,
       limit
     );
   }

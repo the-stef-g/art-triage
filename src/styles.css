@@ -137,6 +137,18 @@ input:focus, select:focus { outline: 1px solid var(--accent); }
 .serie.aktiv { background: var(--bg-aktiv); }
 .chips { display: flex; flex-wrap: wrap; gap: 5px; padding: 0 8px; }
 .chip.manuel { border-color: var(--accent); color: var(--accent); }
+/* Sidepanelets noegleords-chip: vaelg-knap + fjern-fra-alle-kryds. */
+.kw-chip { display: inline-flex; align-items: center; padding: 0; overflow: hidden; }
+.kw-chip .kw-vaelg {
+  background: none;
+  border: none;
+  border-radius: 0;
+  padding: 3px 4px 3px 11px;
+  color: inherit;
+  font-size: 12px;
+}
+.kw-chip.aktiv { background: var(--accent); border-color: var(--accent); color: #fff; }
+.kw-chip .chip-fjern { padding: 3px 8px 3px 4px; }
 .chip-fjern {
   background: none;
   border: none;
