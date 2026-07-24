@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { invoke, thumbUrl } from '../api';
 import { formatBytes, formatDate, fileName } from '../util';
 
-export default function Inspector({ row, selectedCount, editors, series, act }) {
+export default function Inspector({ row, selectedCount, activeKeyword, editors, series, act }) {
   const [versions, setVersions] = useState([]);
   const [keywords, setKeywords] = useState([]);
   const [editorValg, setEditorValg] = useState('');
@@ -67,6 +67,20 @@ export default function Inspector({ row, selectedCount, editors, series, act }) 
     return (
       <aside className="inspector">
         <h3>{selectedCount} valgt</h3>
+        {activeKeyword && (
+          <>
+            <h4>Nøgleord</h4>
+            <div className="knapraekke">
+              <button
+                className="fjern-fra-noegleord"
+                onClick={() => act.removeKeywordFromSelected(activeKeyword)}
+                title={`Fjern nøgleordet "${activeKeyword}" fra de valgte billeder`}
+              >
+                Fjern «{activeKeyword}» fra de {selectedCount} valgte
+              </button>
+            </div>
+          </>
+        )}
         <div className="knapraekke">
           <button onClick={() => act.setRating('godkendt')}>Godkend</button>
           <button onClick={() => act.setRating('kasseret')}>Kassér</button>
@@ -200,6 +214,17 @@ export default function Inspector({ row, selectedCount, editors, series, act }) 
       </div>
 
       <h4>Nøgleord</h4>
+      {activeKeyword && keywords.some((k) => k.word === activeKeyword) && (
+        <div className="knapraekke">
+          <button
+            className="fjern-fra-noegleord"
+            onClick={() => fjernOrd(activeKeyword)}
+            title={`Fjern dette billede fra nøgleordet "${activeKeyword}"`}
+          >
+            Hører ikke til «{activeKeyword}»
+          </button>
+        </div>
+      )}
       <div className="chips">
         {keywords.map((k) => (
           <span

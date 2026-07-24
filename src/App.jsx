@@ -277,6 +277,14 @@ export default function App() {
         if (filterRef.current.keyword === word) setFilter((f) => ({ ...f, keyword: null }));
       } catch (err) { visFejl(err); }
     },
+    // Fjern et nøgleord fra de aktuelt markerede billeder (fx dem der
+    // ikke hører til under det søgeord man kigger på).
+    removeKeywordFromSelected: (word) => {
+      const fileIds = [...new Set(rowsRef.current
+        .filter((r) => selectedRef.current.includes(r.version_id))
+        .map((r) => r.file_id))];
+      if (fileIds.length) invoke('kw:removeFromFiles', { fileIds, word }).catch(visFejl);
+    },
   };
 
   // ---------- Tastaturgenveje ----------
@@ -361,6 +369,7 @@ export default function App() {
         <Inspector
           row={focusedRow}
           selectedCount={selected.length}
+          activeKeyword={filter.keyword}
           editors={editors}
           series={series}
           act={act}

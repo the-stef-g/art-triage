@@ -109,6 +109,31 @@ describe('permanent sletning', () => {
     catalog.clearEmbedding(fid);
     expect(ordFor(fid)).toContain('seagully');
   });
+
+  it('fjerner et nøgleord fra udvalgte billeder og holder det væk der', () => {
+    const target = tilfaeldigVektor(rand);
+    const a = nytBillede('a.png', taetPaa(rand, target, 0.05));
+    const b = nytBillede('b.png', taetPaa(rand, target, 0.05));
+    const c = nytBillede('c.png', taetPaa(rand, target, 0.05));
+    saetVocab([
+      { word: 'strand', vec: taetPaa(rand, target, 0.05) },
+      ...Array.from({ length: 60 }, (_, i) => ({ word: `x${i}`, vec: tilfaeldigVektor(rand) })),
+    ]);
+    indexer.recomputeKeywords();
+    for (const id of [a, b, c]) expect(ordFor(id)).toContain('strand');
+
+    // a og c hoerer ikke til: fjern dem fra soegeordet.
+    expect(catalog.removeKeywordFromFiles([a, c], 'strand')).toBe(2);
+    expect(ordFor(a)).not.toContain('strand');
+    expect(ordFor(c)).not.toContain('strand');
+    expect(ordFor(b)).toContain('strand');
+
+    // Genberegning maa ikke bringe ordet tilbage paa a og c.
+    indexer.recomputeKeywords();
+    expect(ordFor(a)).not.toContain('strand');
+    expect(ordFor(c)).not.toContain('strand');
+    expect(ordFor(b)).toContain('strand');
+  });
 });
 
 describe('læring af egne ord (prototyper)', () => {

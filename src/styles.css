@@ -137,6 +137,8 @@ input:focus, select:focus { outline: 1px solid var(--accent); }
 .serie.aktiv { background: var(--bg-aktiv); }
 .chips { display: flex; flex-wrap: wrap; gap: 5px; padding: 0 8px; }
 .chip.manuel { border-color: var(--accent); color: var(--accent); }
+.fjern-fra-noegleord { flex: 1; border-color: var(--kasseret); color: var(--kasseret); }
+.fjern-fra-noegleord:hover { background: var(--kasseret); border-color: var(--kasseret); color: #fff; }
 /* Sidepanelets noegleords-chip: vaelg-knap + fjern-fra-alle-kryds. */
 .kw-chip { display: inline-flex; align-items: center; padding: 0; overflow: hidden; }
 .kw-chip .kw-vaelg {

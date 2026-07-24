@@ -674,6 +674,23 @@ export class Catalog extends EventEmitter {
     this.emit('changed');
   }
 
+  // Fjerner et ord fra en bunke valgte billeder (fx dem der ikke hoerer
+  // under et soegeord). Hver fjernelse registreres som reject, saa ordet
+  // ikke kommer igen paa de billeder.
+  removeKeywordFromFiles(fileIds, word) {
+    const trimmed = String(word || '').trim();
+    if (!trimmed || !fileIds || !fileIds.length) return 0;
+    let n = 0;
+    this.db.transaction(() => {
+      for (const id of fileIds) {
+        n += this.db.run('DELETE FROM keywords WHERE file_id=? AND word=?', id, trimmed).changes;
+        this._recordFeedback(id, trimmed, 'reject');
+      }
+    });
+    this.emit('changed');
+    return n;
+  }
+
   // Fjerner et ord fra alle billeder og udelukker det fra fremtidige forslag.
   removeKeywordEverywhere(word) {
     const trimmed = String(word || '').trim();

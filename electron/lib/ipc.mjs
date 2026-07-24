@@ -299,6 +299,11 @@ export class AppSession {
       this.requireCatalog().removeKeyword(fileId, word);
       this._recompute?.();
     });
+    handle('kw:removeFromFiles', ({ fileIds, word }) => {
+      const n = this.requireCatalog().removeKeywordFromFiles(fileIds, word);
+      this._recompute?.();
+      return n;
+    });
     handle('kw:removeAll', ({ word }) => {
       const n = this.requireCatalog().removeKeywordEverywhere(word);
       this._recompute?.();
