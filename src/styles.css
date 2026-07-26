@@ -154,6 +154,13 @@ input:focus, select:focus { outline: 1px solid var(--accent); }
 }
 .kandidatliste:hover { background: var(--bg-hover); }
 .kandidatliste.aktiv { background: var(--bg-aktiv); }
+/* Kontrolpanel for cloud-noegleordene, oven over selve ordene. */
+.kw-koe { padding: 0 8px 8px; display: flex; flex-direction: column; gap: 5px; }
+.kw-raekke { display: flex; gap: 5px; align-items: center; }
+.kw-raekke select { flex: 1; min-width: 0; }
+.kw-fremdrift { color: var(--tekst-svag); font-size: 11px; margin: 0; }
+.kw-igen { align-self: flex-start; }
+.kw-status { color: var(--accent); }
 .chips { display: flex; flex-wrap: wrap; gap: 5px; padding: 0 8px; }
 .chip.manuel { border-color: var(--accent); color: var(--accent); }
 .fjern-fra-noegleord { flex: 1; border-color: var(--kasseret); color: var(--kasseret); }

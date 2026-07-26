@@ -108,6 +108,19 @@ At kandidater holdes udenfor trækker beløbet yderligere ned, og det er den
 egentlige grund til reglen: der betales først, når et billede er afgjort. En
 kandidat der ender som kasseret, har så ikke kostet noget.
 
+Status: udført på nær Batch. Modellen kan vælges i appen, ikke låst til Haiku:
+det var dårlig ordkvalitet der væltede den forrige mekanisme, så valget mellem
+pris og kvalitet hører hjemme hos Stef og ikke i koden. Haiku 4.5 står som
+standard, Sonnet 5 og Opus 5 kan vælges ved siden af knappen. Forbruget vises
+løbende i statuslinjen mens en kørsel står på, så beløbet kan ses mens det
+bruges og ikke først på regningen.
+
+Batch er bevidst udeladt i denne omgang. Besparelsen på Stefs 1200 godkendte
+billeder er omkring 8 kroner, og prisen er en kø der skal overleve at appen
+lukkes, med et batch-id gemt på disken, statuspolling og delvise svar der skal
+samles op bagefter. Det kan bygges, hvis der senere skal 15.000 billeder
+igennem; ved den størrelse er besparelsen omkring 50 kroner og besværet værd.
+
 ## Status- og import-fejlen (skal med i samme runde)
 
 To ting, fundet i koden:
@@ -158,7 +171,7 @@ kontrollere, at man har den udgave man tror.
 2. Kandidat-status i katalog, genvej, farve og filtre, plus kandidatlisten i
    sidepanelet.
 3. Cloud-nøgleord: API-nøgle-opsætning, Haiku-kald på thumbnail, kø kun på
-   godkendte, batch-mulighed.
+   godkendte, batch-mulighed. Udført på nær batch, se afsnittet om pris.
 4. Engelsk UI og engelske nøgleord. UI-delen er udført; nøgleordene hører til
    punkt 3, da de først findes når Claude laver dem.
 5. Omdøbninger samlet: udført. Flaget hedder nu redigeres (being edited), og
@@ -166,8 +179,24 @@ kontrollere, at man har den udgave man tror.
    og README.
 6. README og tests opdateres, version til ~0.2.8: udført.
 
-Tilbage står kun punkt 3, cloud-nøgleordene, som kræver en API-nøgle fra
-console.anthropic.com.
+Alle punkter er nu bygget. Kun Batch-kørslen står tilbage som et bevidst fravalg,
+beskrevet under pris og betaling.
+
+## Hvor grænsen mellem godkendt og resten håndhæves
+
+Reglen om at kun godkendte billeder sendes afsted står ét sted: forespørgslen
+catalog.filesNeedingKeywords. Den er skrevet sådan med vilje. Havde udvælgelsen
+ligget i UI'et eller i køren, ville et nyt filter eller en ny knap kunne komme
+til at sende kandidater med uden at nogen opdagede det. Nu skal selve
+forespørgslen laves om, og syv tests falder, hvis den bliver løsnet.
+
+En fil kan være den effektive fil for flere versioner. Er bare én af dem
+godkendt, hører filen med: det er motivet der beskrives, og versionerne deler
+motiv.
+
+Tabellen keyword_runs er kvitteringen for at en fil har været afsted. Uden den
+kunne en fil der ikke gav nogen ord ikke skelnes fra en der aldrig er sendt, og
+den ville blive betalt for igen ved hver eneste kørsel.
 
 ## Hvad der bevidst ikke blev oversat
 

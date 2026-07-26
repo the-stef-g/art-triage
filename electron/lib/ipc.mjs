@@ -9,6 +9,9 @@ import { watchLibrary } from './watcher.mjs';
 import { detectEditors, openInApp } from './editors.mjs';
 import { SearchIndex, normalize } from './searchIndex.mjs';
 import { Indexer, MODEL_ID } from './indexer.mjs';
+import {
+  ClaudeKeywords, KeywordRunner, KEYWORD_MODELS, DEFAULT_KEYWORD_MODEL,
+} from './keywords.mjs';
 import { UndoManager } from './undo.mjs';
 import { debounce, dataDirFor } from './util.mjs';
 
@@ -40,6 +43,8 @@ export class AppSession {
     this.watcher = null;
     this.searchIndex = null;
     this.indexer = null;
+    this.kwRunner = null;
+    this.kwService = null;
     this.scanTimer = null;
     this.scanning = false;
     this.driveMissing = false;
@@ -176,6 +181,8 @@ export class AppSession {
   closeQuick() {
     this._stopScanTimer();
     try { this.indexer?.stop(); } catch { /* ligegyldigt ved quit */ }
+    try { this.kwRunner?.stop(); } catch { /* ligegyldigt ved quit */ }
+    this.kwRunner = null;
     if (this.watcher) {
       this.watcher.close().catch(() => {});
       this.watcher = null;
@@ -198,6 +205,12 @@ export class AppSession {
       this.indexer.stop();
       this.indexer = null;
     }
+    // Koeren peger paa det gamle katalog og skal ikke skrive videre i det
+    // efter et biblioteksskift.
+    if (this.kwRunner) {
+      this.kwRunner.stop();
+      this.kwRunner = null;
+    }
     if (this.db) {
       try {
         this.db.close();
@@ -215,6 +228,52 @@ export class AppSession {
   requireCatalog() {
     if (!this.catalog) throw new Error('No library is open');
     return this.catalog;
+  }
+
+  // ---------- Cloud-noegleord ----------
+
+  keywordModel() {
+    const valgt = this.settings.data.claudeModel;
+    return KEYWORD_MODELS.some((m) => m.id === valgt) ? valgt : DEFAULT_KEYWORD_MODEL;
+  }
+
+  // Kaldes naar noeglen eller modellen skifter, saa naeste koersel bygger
+  // en ny klient i stedet for at bruge den gamle noegle.
+  resetKeywordService() {
+    this.kwService = null;
+  }
+
+  _keywordRunner() {
+    const catalog = this.requireCatalog();
+    const apiKey = this.settings.data.claudeKey;
+    if (!apiKey) throw new Error('No Claude API key yet. Add it under Help.');
+    if (!this.kwService || this.kwService.model !== this.keywordModel()) {
+      this.kwService = new ClaudeKeywords({ apiKey, model: this.keywordModel() });
+    }
+    if (!this.kwRunner) {
+      this.kwRunner = new KeywordRunner({ catalog, thumbs: this.thumbs, service: this.kwService });
+      // Noegleordene skrives loebende, saa chips og soegning skal med.
+      // Opdateringen daempes her i stedet for i kataloget, saa 1200
+      // gemte ord ikke bliver til 1200 gennemtegninger af UI'et.
+      const sendChanged = debounce(() => this.broadcast('changed'), 400);
+      this.kwRunner.on('progress', (progress) => {
+        this.broadcast('kw', { progress });
+        if (progress.phase === 'koerer' || progress.phase === 'faerdig') sendChanged();
+      });
+    }
+    this.kwRunner.service = this.kwService;
+    return this.kwRunner;
+  }
+
+  keywordStatus() {
+    return {
+      harKey: Boolean(this.settings.data.claudeKey),
+      model: this.keywordModel(),
+      modeller: KEYWORD_MODELS.map((m) => ({ id: m.id, navn: m.navn })),
+      koe: this.catalog ? this.catalog.keywordQueueSize() : 0,
+      koerer: Boolean(this.kwRunner?.running),
+      progress: this.kwRunner?.progress ?? null,
+    };
   }
 
   // Fritekst-soegning: foerst filer hvis noegleord matcher teksten
@@ -367,6 +426,32 @@ export class AppSession {
       if (res.canceled || !res.filePaths.length) return null;
       this.settings.addCustomEditor(res.filePaths[0]);
       return res.filePaths[0];
+    });
+
+    // Cloud-noegleord. Kun godkendte billeder kommer med; udvaelgelsen
+    // sker i catalog.filesNeedingKeywords, saa der ikke findes en vej
+    // udenom herfra.
+    handle('kw:status', () => this.keywordStatus());
+    handle('kw:run', () => {
+      this._keywordRunner().start();
+      return this.keywordStatus();
+    });
+    handle('kw:stop', () => {
+      this.kwRunner?.stop();
+      return this.keywordStatus();
+    });
+    handle('kw:setModel', ({ model }) => {
+      if (!KEYWORD_MODELS.some((m) => m.id === model)) throw new Error(`Unknown model: ${model}`);
+      this.settings.data.claudeModel = model;
+      this.settings.save();
+      this.resetKeywordService();
+      return this.keywordStatus();
+    });
+    // Kør alt godkendt igennem igen, fx efter et modelskift. De gamle ord
+    // bliver staaende til de bliver overskrevet.
+    handle('kw:reanalyse', () => {
+      const antal = this.requireCatalog().clearKeywordRuns();
+      return { antal, ...this.keywordStatus() };
     });
 
     handle('kw:top', () => this.requireCatalog().topKeywords());

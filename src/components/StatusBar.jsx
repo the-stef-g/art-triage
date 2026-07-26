@@ -1,5 +1,5 @@
 export default function StatusBar({
-  counts, aiStatus, indexProgress, searchInfo, fejl, library, version, drevMangler,
+  counts, aiStatus, indexProgress, searchInfo, fejl, library, version, drevMangler, kwStatus,
 }) {
   const aiTekst = (() => {
     if (!aiStatus) return '';
@@ -20,6 +20,14 @@ export default function StatusBar({
     if (!indexProgress) return '';
     if (indexProgress.phase === 'billeder') return `Analysing images ${indexProgress.done}/${indexProgress.total}`;
     return '';
+  })();
+
+  // Koersler koster penge, saa baade fremdrift og beloeb staar fremme
+  // mens det sker, ikke foerst paa regningen bagefter.
+  const kwTekst = (() => {
+    const p = kwStatus?.progress;
+    if (!kwStatus?.koerer || !p) return '';
+    return `Keywords ${p.done}/${p.total} · $${p.cost.toFixed(2)}`;
   })();
 
   return (
@@ -44,6 +52,7 @@ export default function StatusBar({
           Drive not connected
         </span>
       )}
+      {kwTekst && <span className="kw-status">{kwTekst}</span>}
       {indexTekst && <span className="index-status">{indexTekst}</span>}
       <span className={`ai-status ${aiStatus?.state || ''}`}>{aiTekst}</span>
       {fejl && <span className="fejl">{fejl}</span>}

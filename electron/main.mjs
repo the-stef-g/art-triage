@@ -357,6 +357,10 @@ function buildMenu() {
           label: 'Hugging Face token …',
           click: () => mainWin?.webContents.send('evt', { type: 'genvej', cmd: 'hf-token' }),
         },
+        {
+          label: 'Claude API key …',
+          click: () => mainWin?.webContents.send('evt', { type: 'genvej', cmd: 'claude-key' }),
+        },
       ],
     },
   ];
@@ -379,12 +383,23 @@ app.whenReady().then(() => {
   ipcMain.handle('app:info', () => ({
     version: app.getVersion(),
     hfToken: settings.data.hfToken || null,
+    // Noeglen selv sendes aldrig til UI'et. Der er kun brug for at vide,
+    // om der staar en, saa knappen kan sige det rigtige.
+    harClaudeKey: Boolean(settings.data.claudeKey),
   }));
   ipcMain.handle('app:setHfToken', (_event, payload) => {
     settings.data.hfToken = String(payload?.token || '').trim() || null;
     settings.save();
     aiLog(`Hugging Face-token ${settings.data.hfToken ? 'sat' : 'fjernet'}`);
     restartAiWindow();
+  });
+  ipcMain.handle('app:setClaudeKey', (_event, payload) => {
+    settings.data.claudeKey = String(payload?.key || '').trim() || null;
+    settings.save();
+    // Noeglen skrives aldrig i loggen, kun om der nu er en.
+    aiLog(`Claude-API-noegle ${settings.data.claudeKey ? 'sat' : 'fjernet'}`);
+    session.resetKeywordService();
+    return { harClaudeKey: Boolean(settings.data.claudeKey) };
   });
 
   registerProtocols(protocol);

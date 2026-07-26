@@ -67,6 +67,15 @@ CREATE TABLE IF NOT EXISTS keyword_feedback(
   PRIMARY KEY(file_id, word)
 );
 CREATE INDEX IF NOT EXISTS idx_kwfb_word ON keyword_feedback(word);
+-- Kvittering for at en fil har vaeret sendt til Claude. Uden den kan en
+-- fil der ikke gav nogen ord ikke skelnes fra en der aldrig er sendt, og
+-- koeren ville sende den igen hver gang og betale for det hver gang.
+CREATE TABLE IF NOT EXISTS keyword_runs(
+  file_id INTEGER PRIMARY KEY REFERENCES files(id) ON DELETE CASCADE,
+  model TEXT NOT NULL,
+  words INTEGER NOT NULL,
+  run_at INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT);
 CREATE INDEX IF NOT EXISTS idx_versions_image ON versions(image_id);
 CREATE INDEX IF NOT EXISTS idx_versions_file ON versions(file_id);
@@ -611,6 +620,61 @@ export class Catalog extends EventEmitter {
        WHERE e.model=? AND f.present=1`,
       model
     );
+  }
+
+  // ---------- Koe til cloud-noegleord ----------
+
+  // Kun godkendte billeder. Kandidater, kasserede og ubedoemte kommer
+  // aldrig med, og det er her reglen haandhaeves: findes filen ikke i det
+  // her resultat, bliver den heller ikke sendt afsted.
+  //
+  // En fil kan vaere den effektive fil for flere versioner. Er bare én af
+  // dem godkendt, hoerer filen med; det er billedet der beskrives, og
+  // versionerne deler motiv.
+  filesNeedingKeywords(limit = 5000) {
+    return this.db.all(
+      `SELECT f.id, f.rel_path, f.mtime FROM files f
+       WHERE f.present=1
+         AND EXISTS (
+           SELECT 1 FROM versions v JOIN images i ON i.id = v.image_id
+           WHERE COALESCE(v.file_id, i.master_file_id) = f.id
+             AND v.rating = 'godkendt'
+         )
+         AND NOT EXISTS (SELECT 1 FROM keyword_runs r WHERE r.file_id = f.id)
+       ORDER BY f.id LIMIT ?`,
+      limit
+    );
+  }
+
+  // Antal godkendte filer der venter. Bruges til knappen, saa der staar
+  // hvor mange der bliver sendt, foer der trykkes.
+  keywordQueueSize() {
+    return this.db.get(
+      `SELECT COUNT(*) AS c FROM files f
+       WHERE f.present=1
+         AND EXISTS (
+           SELECT 1 FROM versions v JOIN images i ON i.id = v.image_id
+           WHERE COALESCE(v.file_id, i.master_file_id) = f.id
+             AND v.rating = 'godkendt'
+         )
+         AND NOT EXISTS (SELECT 1 FROM keyword_runs r WHERE r.file_id = f.id)`
+    ).c;
+  }
+
+  markKeywordRun(fileId, model, words) {
+    this.db.run(
+      `INSERT INTO keyword_runs(file_id, model, words, run_at) VALUES(?,?,?,?)
+       ON CONFLICT(file_id) DO UPDATE SET model=excluded.model, words=excluded.words,
+         run_at=excluded.run_at`,
+      fileId, model, words, this.now()
+    );
+  }
+
+  // Nulstiller kvitteringerne, saa alt godkendt kan koeres igennem igen,
+  // fx paa en anden model. Ordene fra sidste koersel bliver staaende til
+  // de bliver overskrevet, saa der ikke er et hul undervejs.
+  clearKeywordRuns() {
+    return this.db.run('DELETE FROM keyword_runs').changes;
   }
 
   // Gemmer automatiske noegleord; manuelt tilfoejede ord roeres aldrig.

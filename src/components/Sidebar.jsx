@@ -62,9 +62,65 @@ function FolderNode({ node, depth, filter, setFilter, onMoveTo }) {
   );
 }
 
+// Kontrolpanelet for cloud-noegleordene. Det staar oven over ordene, saa
+// det er tydeligt hvor de kommer fra, og hvad en koersel koster.
+function Noegleordskoe({ status, act }) {
+  if (!status) return null;
+  const { harKey, koe, koerer, model, modeller, progress } = status;
+
+  if (!harKey) {
+    return (
+      <p className="kw-koe tom">
+        Keywords come from Claude. Add your API key under Help to switch it on.
+      </p>
+    );
+  }
+
+  return (
+    <div className="kw-koe">
+      <div className="kw-raekke">
+        <select
+          value={model}
+          onChange={(e) => act.kwSetModel(e.target.value)}
+          disabled={koerer}
+          title="Haiku is the cheapest. Opus writes the most precise keywords and costs about five times as much."
+        >
+          {modeller.map((m) => <option key={m.id} value={m.id}>{m.navn}</option>)}
+        </select>
+        {koerer ? (
+          <button className="lille" onClick={act.kwStop}>Stop</button>
+        ) : (
+          <button
+            className="lille"
+            onClick={act.kwRun}
+            disabled={koe === 0}
+            title="Send the approved images that have not been analysed yet. Candidates and discarded images are never sent."
+          >
+            {koe > 0 ? `Analyse ${koe}` : 'Nothing waiting'}
+          </button>
+        )}
+      </div>
+      {koerer && progress && (
+        <p className="kw-fremdrift">
+          {progress.done}/{progress.total} · ${progress.cost.toFixed(2)}
+        </p>
+      )}
+      {!koerer && progress?.phase === 'stoppet' && (
+        <p className="kw-fremdrift">Stopped after {progress.done} images · ${progress.cost.toFixed(2)}</p>
+      )}
+      {!koerer && progress?.phase === 'faerdig' && progress.done > 0 && (
+        <p className="kw-fremdrift">Done: {progress.done} images · ${progress.cost.toFixed(2)}</p>
+      )}
+      {!koerer && koe === 0 && (
+        <button className="lille kw-igen" onClick={act.kwReanalyse}>Analyse everything again</button>
+      )}
+    </div>
+  );
+}
+
 export default function Sidebar({
   tree, series, topKeywords, filter, setFilter, onMoveTo, onRemoveKeywordEverywhere,
-  antalKandidater, onRenameSeries, onDeleteSeries,
+  antalKandidater, onRenameSeries, onDeleteSeries, kwStatus, act,
 }) {
   // Arbejdslisten skal kunne aabnes med et klik. Ud over de andre
   // visninger ryddes ogsaa de filtre i vaerktoejslinjen der ellers ville
@@ -132,6 +188,7 @@ export default function Sidebar({
       </section>
       <section>
         <h3>Keywords</h3>
+        <Noegleordskoe status={kwStatus} act={act} />
         {topKeywords.length === 0 && <p className="tom">Add your own words to an image in the right column</p>}
         <div className="chips">
           {topKeywords.map((k) => (

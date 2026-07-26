@@ -1,7 +1,7 @@
 {
   "name": "art-triage",
   "productName": "Art Triage",
-  "version": "0.2.9",
+  "version": "0.3.0",
   "description": "Sort and organise image files on macOS",
   "author": "Steffen Graumann",
   "license": "UNLICENSED",
@@ -17,6 +17,7 @@
     "dist:mac": "npm run build && electron-builder --mac zip --x64 --publish never"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.115.0",
     "chokidar": "^4.0.3",
     "sql.js": "^1.13.0"
   },

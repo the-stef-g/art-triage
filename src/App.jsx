@@ -34,6 +34,7 @@ export default function App() {
   const [appInfo, setAppInfo] = useState(null);
   const [drev, setDrev] = useState(null); // {missing, root} naar drevet skifter tilstand
   const [skanner, setSkanner] = useState(false);
+  const [kwStatus, setKwStatus] = useState(null); // cloud-noegleord: noegle, model, koe
 
   const filterRef = useRef(filter);
   filterRef.current = filter;
@@ -76,21 +77,24 @@ export default function App() {
     }
   }, [visFejl]);
 
+  // Hver del af sidepanelet hentes for sig. Med et samlet Promise.all
+  // ville ét fejlende kald tage mappetraeet, serierne og noegleordene med
+  // sig og efterlade panelet halvtomt uden at sige hvorfor.
   const refreshMeta = useCallback(async () => {
-    try {
-      const [t, s, kw, ed] = await Promise.all([
-        invoke('fold:tree'),
-        invoke('ser:list'),
-        invoke('kw:top'),
-        invoke('ed:list'),
-      ]);
-      setTree(t);
-      setSeries(s);
-      setTopKeywords(kw);
-      setEditors(ed);
-    } catch (err) {
-      visFejl(err);
-    }
+    const dele = [
+      ['fold:tree', setTree],
+      ['ser:list', setSeries],
+      ['kw:top', setTopKeywords],
+      ['ed:list', setEditors],
+      ['kw:status', setKwStatus],
+    ];
+    const svar = await Promise.allSettled(dele.map(([kanal]) => invoke(kanal)));
+    let foersteFejl = null;
+    svar.forEach((r, i) => {
+      if (r.status === 'fulfilled') dele[i][1](r.value);
+      else if (!foersteFejl) foersteFejl = r.reason;
+    });
+    if (foersteFejl) visFejl(foersteFejl);
   }, [visFejl]);
 
   // Ved opstart: genaabn seneste bibliotek hvis muligt.
@@ -130,6 +134,20 @@ export default function App() {
         }).catch(visFejl);
         return;
       }
+      if (evt.cmd === 'claude-key') {
+        // Noeglen vises aldrig igen efter den er gemt: den ligger i
+        // indstillingerne, ikke i UI'et. Feltet starter derfor tomt, og
+        // en tom indtastning fjerner den, der staar.
+        setModal({
+          title: 'Claude API key',
+          value: '',
+          placeholder: 'sk-ant-...',
+          onSubmit: (key) => invoke('app:setClaudeKey', { key })
+            .then(() => invoke('kw:status').then(setKwStatus))
+            .catch(visFejl),
+        });
+        return;
+      }
       // Cmd+Z / Skift+Cmd+Z fra menuen: tekstfelter faar tekst-fortryd,
       // ellers fortrydes seneste katalog-handling.
       const el = document.activeElement;
@@ -144,6 +162,10 @@ export default function App() {
       if (evt.progress?.phase === 'faerdig') refreshMeta();
     } else if (evt.type === 'ai') {
       setAiStatus(evt.status);
+    } else if (evt.type === 'kw') {
+      setKwStatus((s) => (s ? { ...s, progress: evt.progress, koerer: evt.progress.phase === 'koerer' } : s));
+      if (evt.progress?.phase === 'fejl' && evt.progress.fejl) visFejl(evt.progress.fejl);
+      if (evt.progress?.phase === 'faerdig') invoke('kw:status').then(setKwStatus).catch(() => {});
     } else if (evt.type === 'drev') {
       setDrev({ missing: evt.missing, root: evt.root });
     } else if (evt.type === 'besked') {
@@ -152,7 +174,7 @@ export default function App() {
     } else if (evt.type === 'library') {
       setLibrary({ root: evt.root });
     }
-  }), [refresh, refreshMeta]);
+  }), [refresh, refreshMeta, visFejl]);
 
   useEffect(() => {
     if (!library) return;
@@ -333,6 +355,35 @@ export default function App() {
         .map((r) => r.file_id))];
       if (fileIds.length) invoke('kw:removeFromFiles', { fileIds, word }).catch(visFejl);
     },
+    // ---- Cloud-noegleord ----
+    kwRun: async () => {
+      try {
+        setKwStatus(await invoke('kw:run'));
+      } catch (err) { visFejl(err); }
+    },
+    kwStop: async () => {
+      try {
+        setKwStatus(await invoke('kw:stop'));
+      } catch (err) { visFejl(err); }
+    },
+    kwSetModel: async (model) => {
+      try {
+        setKwStatus(await invoke('kw:setModel', { model }));
+      } catch (err) { visFejl(err); }
+    },
+    kwReanalyse: async () => {
+      const ok = window.confirm(
+        'Send every approved image to Claude again?\n\n'
+        + 'This costs money once more. The words you typed yourself are not touched.'
+      );
+      if (!ok) return;
+      try {
+        const res = await invoke('kw:reanalyse');
+        setKwStatus(res);
+        setFejl(`${res.antal} images are queued again`);
+        setTimeout(() => setFejl(null), 6000);
+      } catch (err) { visFejl(err); }
+    },
   };
 
   // ---------- Tastaturgenveje ----------
@@ -410,6 +461,8 @@ export default function App() {
           antalKandidater={counts?.byRating?.kandidat}
           onRenameSeries={act.renameSeries}
           onDeleteSeries={act.deleteSeries}
+          kwStatus={kwStatus}
+          act={act}
         />
         <Grid
           rows={rows}
@@ -438,6 +491,7 @@ export default function App() {
         library={library}
         version={appInfo?.version}
         drevMangler={Boolean(drev?.missing)}
+        kwStatus={kwStatus}
       />
       {showPreview && focusedRow && (
         <PreviewOverlay

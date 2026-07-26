@@ -120,6 +120,16 @@ try {
     { timeout: 10000 }
   );
 
+  // Cloud-noegleordene har deres eget panel over ordene. Uden API-noegle
+  // skal det sige hvor noeglen saettes, ikke bare vaere tomt. Kanalen
+  // 'kw:status' skal ogsaa staa paa preloadens liste; gjorde den ikke det,
+  // fejlede hele metadata-hentningen i tavshed.
+  await page.waitForSelector('.kw-koe', { timeout: 10000 });
+  const koeTekst = await page.locator('.kw-koe').innerText();
+  if (!/API key/i.test(koeTekst)) {
+    throw new Error(`Noegleordspanelet siger ikke hvor noeglen saettes: ${koeTekst}`);
+  }
+
   // Tilbage til foerste billede, saa resten af flowet staar som foer.
   await page.locator('.tile').first().click();
 

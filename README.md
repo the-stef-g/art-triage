@@ -46,15 +46,27 @@ The app is not signed with an Apple developer certificate, so macOS refuses the 
 
 **Search.** Type for example "yellow flowers" in the search field and art-triage finds the images from the picture content itself. It needs no keywords: the app analyses every image in the background. Only images that clearly match are shown; a search with no real matches honestly returns nothing. The number next to a keyword in the sidebar matches how many images a click will show.
 
-**Keywords.** The app does not guess keywords. It used to, by scoring each image against a Danish word list, but that comparison was the wrong way round: words were held up against each other image by image, so a phrasing that generally scored high won on everything. In practice 'kirke' ended up on 1170 out of 1200 images. That mechanism is gone, and the old guesses are cleared automatically the first time you open the library. Your own words stay.
+**Keywords.** Keywords come from Claude. The app used to guess them itself by scoring each image against a Danish word list, but that comparison was the wrong way round: words were held up against each other image by image, so a phrasing that generally scored high won on everything. In practice 'kirke' ended up on 1170 out of 1200 images. That mechanism is gone, and the old guesses are cleared automatically the first time you open the library. Your own words stay.
 
 You can add your own keywords to an image in the Inspector, and they appear as clickable chips in the sidebar. Click a keyword and the grid shows every image with that word. Select the ones that do not belong (click, cmd-click or shift-click for several) and remove them from the keyword with the button in the Inspector. The cross on the chip in the sidebar removes the word from every image at once, including ones you typed yourself, and it cannot be undone.
 
-Automatic keywords will come back when Claude makes them instead. That is point 3 in `docs/plan-cloud-noegleord.md`. Until then the semantic search works as before and for free, because it is built on the image analysis rather than on keywords.
+## Keywords from Claude
 
-## The AI model
+**Only approved images are sent.** Candidates, discarded and unrated images never leave the machine. A candidate has not been decided yet, and there is no reason to pay for an image that may end up discarded. The rule lives in the catalogue query that builds the queue, so there is no way round it from the interface.
 
-Image analysis runs 100% locally on your Mac using Google's multilingual SigLIP model. The first time the app starts it downloads the model (about 250 MB) from Hugging Face and stores it locally. After that, analysis and search work without internet. The status bar at the bottom shows progress for both the download and the indexing. A large collection takes a while the first time; search works along the way on the images that have already been analysed.
+**Getting started.** Create an API key at `console.anthropic.com` — that is a separate pay-as-you-go account from a Claude Pro subscription, which does not cover programmatic API use. Add money under Billing and set a spending limit while you are there. Then paste the key into Help > Claude API key. The key is stored in the app's settings and is never shown again, never written to the log and never sent to the interface.
+
+**Running it.** The Keywords section in the sidebar says how many approved images are waiting. Click Analyse and it works through them one at a time while you carry on. Progress and the running dollar amount show in the status bar, so you can see what it costs while it happens rather than on the bill. Stop halts it; nothing already done is lost, and the rest is still queued next time.
+
+**Model.** Haiku 4.5 is the default and the cheapest. Sonnet 5 and Opus 5 write more precise keywords and cost roughly three and five times as much. The picker sits next to the Analyse button. "Analyse everything again" clears the receipts so the whole approved set runs once more, which is what you want after changing model. Old words stay until they are overwritten.
+
+**What is written.** Claude's words go in as automatic keywords (`manual=0`), so they can be cleared as a group without touching anything you typed yourself. Your own words always sort first in the Inspector.
+
+The fixed instruction sent with every image is cached, so it is only paid for in full on the first image of a run. The image itself goes as a 512-pixel thumbnail, the same one the search index already made, not the full RAW.
+
+## The local AI model
+
+The semantic search runs 100% locally on your Mac using Google's multilingual SigLIP model. The first time the app starts it downloads the model (about 250 MB) from Hugging Face and stores it locally. After that, analysis and search work without internet. The status bar at the bottom shows progress for both the download and the indexing. A large collection takes a while the first time; search works along the way on the images that have already been analysed.
 
 If the AI misbehaves, there is a log file with all the details under Help > Show AI log. Send the contents and the fault can be pinned down precisely.
 
