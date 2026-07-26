@@ -40,7 +40,7 @@ export class AiBridge extends EventEmitter {
       this.current = null;
       if (job && job.id === msg.id) {
         if (msg.type === 'result') job.resolve(msg);
-        else job.reject(new Error(msg.message || 'AI-fejl'));
+        else job.reject(new Error(msg.message || 'AI error'));
       }
       this._pump();
     }
@@ -48,9 +48,9 @@ export class AiBridge extends EventEmitter {
 
   windowGone() {
     this.ready = false;
-    this.setStatus({ state: 'fejl', detail: 'AI-processen stoppede; genstarter' });
+    this.setStatus({ state: 'fejl', detail: 'The AI process stopped; restarting' });
     if (this.current) {
-      this.current.reject(new Error('AI-processen genstartede'));
+      this.current.reject(new Error('The AI process restarted'));
       this.current = null;
     }
   }

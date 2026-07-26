@@ -14,7 +14,7 @@ const CHANNELS = new Set([
   'app:info', 'app:setHfToken',
 ]);
 
-contextBridge.exposeInMainWorld('billedflow', {
+contextBridge.exposeInMainWorld('artTriage', {
   invoke(channel, payload) {
     if (!CHANNELS.has(channel)) {
       return Promise.reject(new Error(`Ukendt kanal: ${channel}`));

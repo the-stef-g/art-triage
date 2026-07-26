@@ -1,5 +1,5 @@
 // Tynd adgang til preload-broen. Alt UI gaar gennem invoke/onEvent.
-const bridge = window.billedflow;
+const bridge = window.artTriage;
 
 export const harBro = Boolean(bridge);
 

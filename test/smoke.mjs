@@ -33,7 +33,7 @@ async function lavTestbilleder(dir) {
     .toFile(join(dir, 'undermappe', 'groen.png'));
 }
 
-const lib = mkdtempSync(join(tmpdir(), 'billedflow-smoke-'));
+const lib = mkdtempSync(join(tmpdir(), 'art-triage-smoke-'));
 await lavTestbilleder(lib);
 
 const app = await electron.launch({
@@ -42,8 +42,8 @@ const app = await electron.launch({
   timeout: 60000,
   env: {
     ...process.env,
-    BILLEDFLOW_OPEN: lib,
-    BILLEDFLOW_DISABLE_AI: '1',
+    ART_TRIAGE_OPEN: lib,
+    ART_TRIAGE_DISABLE_AI: '1',
     ELECTRON_DISABLE_SANDBOX: '1',
   },
 });
@@ -113,7 +113,7 @@ try {
     null,
     { timeout: 10000 }
   );
-  await page.locator('.mappe', { hasText: 'Alle billeder' }).click();
+  await page.locator('.mappe', { hasText: 'All images' }).click();
   await page.waitForFunction(
     () => document.querySelectorAll('.tile').length === 4,
     null,

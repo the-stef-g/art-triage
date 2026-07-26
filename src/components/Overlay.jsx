@@ -17,7 +17,9 @@ export function PreviewOverlay({ row, onClose }) {
       <div className="overlay-info">
         {fileName(row.rel_path)}
         {!row.is_master ? ` · ${row.version_name}` : ''}
-        {row.rating === 'godkendt' ? ' · Godkendt' : row.rating === 'kasseret' ? ' · Kasseret' : ''}
+        {row.rating === 'godkendt' ? ' · Approved'
+          : row.rating === 'kandidat' ? ' · Candidate'
+            : row.rating === 'kasseret' ? ' · Discarded' : ''}
       </div>
     </div>
   );
@@ -53,7 +55,7 @@ export function NameModal({ title, value, placeholder, onSubmit, onClose }) {
         />
         <div className="knapraekke">
           <button onClick={submit}>OK</button>
-          <button className="lille" onClick={onClose}>Annullér</button>
+          <button className="lille" onClick={onClose}>Cancel</button>
         </div>
       </div>
     </div>

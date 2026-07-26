@@ -10,7 +10,7 @@ import { detectEditors, openInApp } from './editors.mjs';
 import { SearchIndex, normalize } from './searchIndex.mjs';
 import { Indexer, MODEL_ID } from './indexer.mjs';
 import { UndoManager } from './undo.mjs';
-import { debounce } from './util.mjs';
+import { debounce, dataDirFor } from './util.mjs';
 
 // Mappe-overvaageren (chokidar) faar sjaeldent fil-system-haendelser fra
 // eksterne drev paa macOS, og Stefs billeder ligger netop eksternt. Den
@@ -121,7 +121,7 @@ export class AppSession {
 
   async openLibrary(root) {
     await this.closeLibrary();
-    const dataDir = join(root, '.billedflow');
+    const dataDir = dataDirFor(root);
     this.db = await openDatabase(join(dataDir, 'katalog.sqlite'));
     this.catalog = new Catalog(this.db, root);
     this.thumbs = new Thumbnailer({
@@ -157,7 +157,7 @@ export class AppSession {
       try {
         const antal = this.catalog.clearAutoKeywords();
         this.catalog.setMeta(AUTOKW_RYDDET, '1');
-        if (antal) this.broadcast('besked', { tekst: `Fjernede ${antal} automatiske nøgleord` });
+        if (antal) this.broadcast('besked', { tekst: `Removed ${antal} automatic keywords` });
       } catch {
         // proever igen ved naeste aabning; flaget er ikke sat
       }
@@ -213,7 +213,7 @@ export class AppSession {
   }
 
   requireCatalog() {
-    if (!this.catalog) throw new Error('Intet bibliotek er åbent');
+    if (!this.catalog) throw new Error('No library is open');
     return this.catalog;
   }
 
@@ -231,7 +231,7 @@ export class AppSession {
         semantiske = this.searchIndex.query(qvec).map((h) => h.fileId);
       }
     } else if (!keywordIds.length) {
-      advarsel = 'Søgning er klar når AI-modellen er hentet';
+      advarsel = 'Search is ready once the AI model has downloaded';
     }
     const set = new Set(keywordIds);
     const fileIds = [...keywordIds, ...semantiske.filter((id) => !set.has(id))];
@@ -246,7 +246,7 @@ export class AppSession {
 
     handle('lib:choose', async () => {
       const res = await dialog.showOpenDialog(this.win, {
-        title: 'Vælg billedmappe',
+        title: 'Choose image folder',
         properties: ['openDirectory', 'createDirectory'],
       });
       if (res.canceled || !res.filePaths.length) return null;
@@ -349,17 +349,17 @@ export class AppSession {
     handle('ed:open', async ({ versionId, appPath }) => {
       const catalog = this.requireCatalog();
       const v = catalog.getVersion(versionId);
-      if (!v) throw new Error('Versionen findes ikke');
+      if (!v) throw new Error('That version does not exist');
       const filePath = (!v.is_master && !v.file_id)
         ? catalog.materializeVersion(versionId)
         : catalog.filePathForVersion(versionId);
-      if (!filePath) throw new Error('Filen findes ikke på disken');
+      if (!filePath) throw new Error('The file does not exist on disk');
       await openInApp(appPath || null, filePath);
       return { filePath };
     });
     handle('ed:pick', async () => {
       const res = await dialog.showOpenDialog(this.win, {
-        title: 'Vælg app',
+        title: 'Choose app',
         defaultPath: '/Applications',
         properties: ['openFile'],
         filters: process.platform === 'darwin' ? [{ name: 'Apps', extensions: ['app'] }] : [],

@@ -361,7 +361,7 @@ export class Catalog extends EventEmitter {
   // kandidater aldrig til betalt analyse.
   setRating(versionIds, rating) {
     if (!['ubedomt', 'godkendt', 'kandidat', 'kasseret'].includes(rating)) {
-      throw new Error(`Ukendt bedømmelse: ${rating}`);
+      throw new Error(`Unknown rating: ${rating}`);
     }
     this.db.transaction(() => {
       for (const id of versionIds) {
@@ -413,7 +413,7 @@ export class Catalog extends EventEmitter {
       return this.filePathForVersion(versionId);
     }
     const master = this.getFile(v.master_file_id);
-    if (!master || !master.present) throw new Error('Masterfilen mangler på disken');
+    if (!master || !master.present) throw new Error('The master file is missing from disk');
     const srcAbs = this.abs(master.rel_path);
     const ext = extname(master.rel_path);
     const stem = stemOf(basename(master.rel_path));
@@ -473,7 +473,7 @@ export class Catalog extends EventEmitter {
 
   createSeries(name) {
     const trimmed = String(name || '').trim();
-    if (!trimmed) throw new Error('Serien skal have et navn');
+    if (!trimmed) throw new Error('The series needs a name');
     const existing = this.db.get('SELECT id FROM series WHERE name=?', trimmed);
     if (existing) return existing.id;
     return this.db.run('INSERT INTO series(name) VALUES(?)', trimmed).lastInsertRowid;
@@ -490,9 +490,9 @@ export class Catalog extends EventEmitter {
 
   renameSeries(seriesId, name) {
     const trimmed = String(name || '').trim();
-    if (!trimmed) throw new Error('Serien skal have et navn');
+    if (!trimmed) throw new Error('The series needs a name');
     const optaget = this.db.get('SELECT id FROM series WHERE name=? AND id<>?', trimmed, seriesId);
-    if (optaget) throw new Error(`Der findes allerede en serie der hedder "${trimmed}"`);
+    if (optaget) throw new Error(`A series called "${trimmed}" already exists`);
     this.db.run('UPDATE series SET name=? WHERE id=?', trimmed, seriesId);
     this.emit('changed');
   }
@@ -677,7 +677,7 @@ export class Catalog extends EventEmitter {
 
   addKeyword(fileId, word) {
     const trimmed = String(word || '').trim();
-    if (!trimmed) throw new Error('Noegleordet er tomt');
+    if (!trimmed) throw new Error('The keyword is empty');
     this.db.transaction(() => {
       this.db.run(
         `INSERT INTO keywords(file_id, word, score, manual) VALUES(?,?,1000,1)

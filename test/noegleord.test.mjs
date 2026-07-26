@@ -32,8 +32,8 @@ function ordFor(fileId) {
 }
 
 beforeEach(async () => {
-  root = mkdtempSync(join(tmpdir(), 'billedflow-kw-'));
-  db = await openDatabase(join(root, '.billedflow', 'katalog.sqlite'));
+  root = mkdtempSync(join(tmpdir(), 'art-triage-kw-'));
+  db = await openDatabase(join(root, '.art-triage', 'katalog.sqlite'));
   catalog = new Catalog(db, root);
 });
 

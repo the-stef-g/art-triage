@@ -9,7 +9,7 @@ export function watchLibrary(root, onChange) {
     ignored: (path) => {
       const name = basename(path);
       if (name.startsWith('.') && path !== root) return true;
-      return path.includes('/.billedflow');
+      return path.includes('/.art-triage') || path.includes('/.billedflow');
     },
     ignoreInitial: true,
     awaitWriteFinish: { stabilityThreshold: 900, pollInterval: 200 },

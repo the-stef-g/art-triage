@@ -1,4 +1,4 @@
-name: Billedflow
+name: Build art-triage
 
 on:
   push:
@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: billedflow-${{ github.ref }}
+  group: art-triage-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -21,7 +21,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
-      - name: Verificér at mindst én AI-modelkandidat findes på Hugging Face
+      - name: Verify at least one AI model candidate exists on Hugging Face
         run: |
           kandidater="onnx-community/siglip2-base-patch16-224-ONNX"
           ok=0
@@ -59,23 +59,23 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
-      - name: Tjek at alle ORT-wasm-filer er bundtet
+      - name: Check that every ORT wasm file is bundled
         run: node scripts/check-ort-assets.mjs
       - name: Smoke test (Electron under Xvfb)
         run: xvfb-run --auto-servernum npm run smoke
         timeout-minutes: 8
         env:
           ELECTRON_DISABLE_SANDBOX: '1'
-      - name: Upload smoke-skaermbillede
+      - name: Upload smoke screenshots
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: smoke-skaermbilleder
+          name: smoke-screenshots
           path: smoke-*.png
           if-no-files-found: ignore
 
   build-mac:
-    name: Byg macOS-app (Intel x64)
+    name: Build macOS app (Intel x64)
     runs-on: macos-latest
     timeout-minutes: 25
     needs: test
@@ -88,8 +88,8 @@ jobs:
           cache-dependency-path: package-lock.json
       - run: npm ci
       - run: npm run dist:mac
-      - name: Upload app-artifact
+      - name: Upload app artifact
         uses: actions/upload-artifact@v7
         with:
-          name: Billedflow-mac-x64
-          path: release/Billedflow-mac-x64.zip
+          name: art-triage-mac-x64
+          path: release/art-triage-mac-x64.zip

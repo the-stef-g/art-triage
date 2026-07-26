@@ -24,8 +24,8 @@ function versionFor(relPath) {
 }
 
 beforeEach(async () => {
-  root = mkdtempSync(join(tmpdir(), 'billedflow-kandidat-'));
-  db = await openDatabase(join(root, '.billedflow', 'katalog.sqlite'));
+  root = mkdtempSync(join(tmpdir(), 'art-triage-kandidat-'));
+  db = await openDatabase(join(root, '.art-triage', 'katalog.sqlite'));
   catalog = new Catalog(db, root);
   skriv('a.png');
   skriv('b.png');
@@ -47,7 +47,7 @@ describe('kandidat som bedoemmelse', () => {
 
   it('afviser stadig ukendte bedoemmelser', () => {
     const a = versionFor('a.png');
-    expect(() => catalog.setRating([a.version_id], 'maaske')).toThrow(/Ukendt bedømmelse/);
+    expect(() => catalog.setRating([a.version_id], 'maaske')).toThrow(/Unknown rating/);
   });
 
   it('kan skiftes videre til godkendt naar billedet er rettet', () => {

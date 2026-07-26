@@ -1,8 +1,8 @@
 {
-  "name": "billedflow",
-  "productName": "Billedflow",
-  "version": "0.7.1",
-  "description": "Sortering og organisering af billedfiler til macOS",
+  "name": "art-triage",
+  "productName": "art-triage",
+  "version": "0.2.8",
+  "description": "Sort and organise image files on macOS",
   "author": "Steffen Graumann",
   "license": "UNLICENSED",
   "private": true,
@@ -35,8 +35,8 @@
     "vitest": "^3.2.3"
   },
   "build": {
-    "appId": "dk.stefs.billedflow",
-    "productName": "Billedflow",
+    "appId": "dk.stefs.art-triage",
+    "productName": "art-triage",
     "asar": true,
     "files": [
       "dist/**",
@@ -59,7 +59,7 @@
         }
       ],
       "minimumSystemVersion": "11.0.0",
-      "artifactName": "Billedflow-mac-x64.zip"
+      "artifactName": "art-triage-mac-x64.zip"
     }
   }
 }

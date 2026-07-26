@@ -35,7 +35,23 @@ export function quickHash(absPath, size) {
   return h.digest('hex');
 }
 
-export const IGNORED_DIRS = new Set(['.billedflow', 'node_modules']);
+export const IGNORED_DIRS = new Set(['.art-triage', '.billedflow', 'node_modules']);
+
+// Hvor katalogdata ligger ved siden af billederne.
+//
+// Appen hed Billedflow indtil den skiftede navn, og de biblioteker der
+// blev lavet dengang har en .billedflow-mappe med bedoemmelser, serier og
+// virtuelle kopier. Den flyttes ikke: at omdoebe en mappe med rigtige
+// data er en unoedig risiko, og gaar det galt midtvejs, er arbejdet paa
+// tusindvis af billeder tabt. I stedet bruges den gamle mappe videre naar
+// den findes, og kun nye biblioteker faar .art-triage.
+export function dataDirFor(root) {
+  const nyt = join(root, '.art-triage');
+  if (existsSync(nyt)) return nyt;
+  const gammelt = join(root, '.billedflow');
+  if (existsSync(gammelt)) return gammelt;
+  return nyt;
+}
 
 // Er biblioteksroden tilgaengelig lige nu?
 //

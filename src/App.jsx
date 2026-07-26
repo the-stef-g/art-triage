@@ -122,7 +122,7 @@ export default function App() {
         invoke('app:info').then((info) => {
           setAppInfo(info);
           setModal({
-            title: 'Hugging Face-token',
+            title: 'Hugging Face token',
             value: info?.hfToken || '',
             placeholder: 'hf_...',
             onSubmit: (token) => invoke('app:setHfToken', { token }).catch(visFejl),
@@ -230,20 +230,20 @@ export default function App() {
       if (f) invoke('img:reveal', { versionId: f.version_id }).catch(visFejl);
     },
     deleteVersion: (versionId) => {
-      const ok = window.confirm('Slet den virtuelle kopi? En evt. fysisk kopi lægges i papirkurven.');
+      const ok = window.confirm('Delete the virtual copy? Any physical copy goes to the Trash.');
       if (ok) invoke('img:deleteVersion', { versionId }).catch(visFejl);
     },
     renameVersion: (versionId, currentName) => {
       setModal({
-        title: 'Omdøb version',
+        title: 'Rename version',
         value: currentName,
         onSubmit: (name) => invoke('img:renameVersion', { versionId, name }).catch(visFejl),
       });
     },
     newFolder: () => {
       setModal({
-        title: 'Ny mappe',
-        placeholder: 'Mappenavn',
+        title: 'New folder',
+        placeholder: 'Folder name',
         onSubmit: (name) =>
           invoke('fold:create', { parentRel: filterRef.current.folder || '', name }).catch(visFejl),
       });
@@ -256,11 +256,11 @@ export default function App() {
       try {
         const res = await invoke('lib:rescan');
         if (res?.unavailable) {
-          setFejl('Drevet er ikke tilsluttet. Billederne er ikke væk, kataloget står urørt.');
+          setFejl('The drive is not connected. Your images are not gone, the catalogue is untouched.');
         } else if (res?.skipped) {
-          setFejl('En skanning er allerede i gang');
+          setFejl('A scan is already running');
         } else {
-          setFejl(res?.changed ? `Fandt ${res.changed} nye eller ændrede filer` : 'Ingen ændringer fundet');
+          setFejl(res?.changed ? `Found ${res.changed} new or changed files` : 'No changes found');
         }
         setTimeout(() => setFejl(null), 5000);
       } catch (err) { visFejl(err); } finally { setSkanner(false); }
@@ -280,9 +280,9 @@ export default function App() {
     },
     renameSeries: (serie) => {
       setModal({
-        title: 'Omdøb serie',
+        title: 'Rename series',
         value: serie.name,
-        placeholder: 'Serienavn',
+        placeholder: 'Series name',
         onSubmit: (name) => invoke('ser:rename', { seriesId: serie.id, name })
           .then(() => refreshMeta())
           .catch(visFejl),
@@ -290,8 +290,8 @@ export default function App() {
     },
     deleteSeries: async (serie) => {
       const ok = window.confirm(
-        `Slet serien "${serie.name}"?\n\n`
-        + `Billederne bliver liggende og bliver ikke rørt. De mister kun deres tilknytning til serien.`
+        `Delete the series "${serie.name}"?\n\n`
+        + `The images stay where they are and are not touched. They only lose their link to the series.`
       );
       if (!ok) return;
       try {
@@ -303,8 +303,8 @@ export default function App() {
     },
     newSeries: () => {
       setModal({
-        title: 'Ny serie',
-        placeholder: 'Serienavn',
+        title: 'New series',
+        placeholder: 'Series name',
         onSubmit: async (name) => {
           try {
             const id = await invoke('ser:create', { name });
@@ -314,7 +314,11 @@ export default function App() {
       });
     },
     removeKeywordEverywhere: async (word) => {
-      const ok = window.confirm(`Fjern nøgleordet "${word}" fra alle billeder? Appen holder op med at foreslå det.`);
+      const ok = window.confirm(
+        `Remove the keyword "${word}" from ALL images?\n\n`
+        + `This also removes words you typed yourself, it cannot be undone, `
+        + `and the app will never suggest "${word}" again.`
+      );
       if (!ok) return;
       try {
         await invoke('kw:removeAll', { word });
@@ -376,7 +380,7 @@ export default function App() {
   }, []);
 
   if (!harBro) {
-    return <div className="velkomst"><h1>Billedflow</h1><p>Appen skal køres i Electron.</p></div>;
+    return <div className="velkomst"><h1>art-triage</h1><p>This app must run inside Electron.</p></div>;
   }
   if (!library) {
     return <Welcome recent={recent} onChoose={act.chooseLibrary} onOpen={act.openLibrary} />;

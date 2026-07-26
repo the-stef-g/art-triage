@@ -8,7 +8,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { openDatabase } from '../electron/lib/db.mjs';
 import { Catalog } from '../electron/lib/catalog.mjs';
-import { libraryAvailable } from '../electron/lib/util.mjs';
+import { libraryAvailable, dataDirFor } from '../electron/lib/util.mjs';
 
 let root;
 let db;
@@ -30,8 +30,8 @@ function afmonter() {
 }
 
 beforeEach(async () => {
-  root = mkdtempSync(join(tmpdir(), 'billedflow-drev-'));
-  db = await openDatabase(join(root, '.billedflow', 'katalog.sqlite'));
+  root = mkdtempSync(join(tmpdir(), 'art-triage-drev-'));
+  db = await openDatabase(join(root, '.art-triage', 'katalog.sqlite'));
   catalog = new Catalog(db, root);
 });
 
@@ -107,5 +107,39 @@ describe('synkronisering med frakoblet drev', () => {
     const res = catalog.sync();
     expect(res.unavailable).toBe(false);
     expect(catalog.listVersions({}).map((r) => r.rel_path).sort()).toEqual(['a.png', 'c.png']);
+  });
+});
+
+describe('katalogmappen ved navneskiftet', () => {
+  // Egen tom mappe pr. test: den faelles root har allerede et katalog
+  // fra beforeEach, og saa ville svaret vaere givet paa forhaand.
+  let tom;
+  beforeEach(() => { tom = mkdtempSync(join(tmpdir(), 'art-triage-dir-')); });
+  afterEach(() => rmSync(tom, { recursive: true, force: true }));
+
+  it('bruger .art-triage i et nyt bibliotek', () => {
+    expect(dataDirFor(tom)).toBe(join(tom, '.art-triage'));
+  });
+
+  it('bliver ved med at bruge .billedflow hvis den findes', () => {
+    // Et bibliotek fra dengang appen hed Billedflow. Bedoemmelser paa
+    // tusindvis af billeder ligger her og maa ikke blive vaek.
+    mkdirSync(join(tom, '.billedflow'), { recursive: true });
+    expect(dataDirFor(tom)).toBe(join(tom, '.billedflow'));
+  });
+
+  it('foretraekker .art-triage hvis begge findes', () => {
+    mkdirSync(join(tom, '.billedflow'), { recursive: true });
+    mkdirSync(join(tom, '.art-triage'), { recursive: true });
+    expect(dataDirFor(tom)).toBe(join(tom, '.art-triage'));
+  });
+
+  it('holder begge mapper ude af billedskanningen', () => {
+    mkdirSync(join(root, '.billedflow'), { recursive: true });
+    writeFileSync(join(root, '.billedflow', 'gammel.png'), 'x');
+    writeFileSync(join(root, '.art-triage', 'ny.png'), 'x');
+    skriv('rigtig.png', 'billede');
+    catalog.sync();
+    expect(catalog.listVersions({}).map((r) => r.rel_path)).toEqual(['rigtig.png']);
   });
 });

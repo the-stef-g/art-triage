@@ -20,11 +20,11 @@ export default function Toolbar({
 
   return (
     <header className="toolbar">
-      <div className="titel">Billedflow</div>
+      <div className="titel">art-triage</div>
       <div className="soegefelt">
         <input
           type="search"
-          placeholder="Søg i billederne, fx gule blomster"
+          placeholder="Search your images, e.g. yellow flowers"
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
@@ -36,37 +36,37 @@ export default function Toolbar({
             className="lille"
             onClick={() => { setText(''); setFilter((f) => ({ ...f, search: '', keyword: null })); }}
           >
-            Ryd
+            Clear
           </button>
         )}
       </div>
       {searchInfo?.error && <span className="soegebesked">{searchInfo.error}</span>}
       <div className="filtre">
-        <button className={filter.kunGodkendte ? 'chip aktiv' : 'chip'} onClick={() => toggle('kunGodkendte')} title="Vis kun godkendte">Godkendte</button>
-        <button className={filter.kunKandidater ? 'chip aktiv' : 'chip'} onClick={() => toggle('kunKandidater')} title="Vis kun kandidater, altså dem der venter på en tur i editoren">Kandidater</button>
-        <button className={filter.kunRedigerede ? 'chip aktiv' : 'chip'} onClick={() => toggle('kunRedigerede')} title="Vis kun redigerede">Redigerede</button>
-        <button className={filter.kunFaerdige ? 'chip aktiv' : 'chip'} onClick={() => toggle('kunFaerdige')} title="Vis kun færdige">Færdige</button>
-        <button className={filter.visKasserede ? 'chip aktiv' : 'chip'} onClick={() => toggle('visKasserede')} title="Vis også kasserede billeder">Vis kasserede</button>
+        <button className={filter.kunGodkendte ? 'chip aktiv' : 'chip'} onClick={() => toggle('kunGodkendte')} title="Show approved only">Approved</button>
+        <button className={filter.kunKandidater ? 'chip aktiv' : 'chip'} onClick={() => toggle('kunKandidater')} title="Show candidates only, the ones waiting for a round in the editor">Candidates</button>
+        <button className={filter.kunRedigerede ? 'chip aktiv' : 'chip'} onClick={() => toggle('kunRedigerede')} title="Show only images being edited">Being edited</button>
+        <button className={filter.kunFaerdige ? 'chip aktiv' : 'chip'} onClick={() => toggle('kunFaerdige')} title="Show finished only">Finished</button>
+        <button className={filter.visKasserede ? 'chip aktiv' : 'chip'} onClick={() => toggle('visKasserede')} title="Also show discarded images">Show discarded</button>
         <select
           value={filter.sort}
           onChange={(e) => setFilter((f) => ({ ...f, sort: e.target.value }))}
-          title="Sortering"
+          title="Sort order"
         >
-          <option value="navn">Navn</option>
-          <option value="dato">Ændret</option>
+          <option value="navn">Name</option>
+          <option value="dato">Modified</option>
         </select>
       </div>
       <div className="vaerktoejer">
-        <button onClick={onNewFolder}>Ny mappe</button>
+        <button onClick={onNewFolder}>New folder</button>
         <button
           onClick={onRescan}
           disabled={skanner}
-          title="Gennemgå mappen for nye og ændrede filer med det samme"
+          title="Go through the folder for new and changed files right now"
         >
-          {skanner ? 'Skanner …' : 'Skan igen'}
+          {skanner ? 'Scanning …' : 'Scan again'}
         </button>
-        <button onClick={onCleanup} title="Flyt filer hvor alle versioner er kasseret til mappen _kasseret">Ryd op</button>
-        <button onClick={onChooseLibrary} title="Skift til en anden billedmappe">Skift bibliotek</button>
+        <button onClick={onCleanup} title="Move files where every version is discarded to the _kasseret folder">Clean up</button>
+        <button onClick={onChooseLibrary} title="Switch to a different image folder">Switch library</button>
       </div>
     </header>
   );

@@ -119,7 +119,7 @@ function medStallVagt(promise) {
     const timer = setInterval(() => {
       if (Date.now() - lastActivity > STALL_MS) {
         clearInterval(timer);
-        reject(new Error('Modellen svarede ikke under start'));
+        reject(new Error('The model did not respond during start-up'));
       }
     }, 10000);
     promise.then(
@@ -132,15 +132,15 @@ function medStallVagt(promise) {
 // Kun q8: fp32 kan ikke allokeres i 32-bit WASM. Alt tildeles foerst
 // naar hele parret er indlaest, saa en halv fejl ikke efterlader rod.
 async function loadModels(repo) {
-  const pv = progressReporter('Henter billedmodel', 'Klargør billedmodel');
+  const pv = progressReporter('Downloading image model', 'Preparing image model');
   puls();
   const proc = await medStallVagt(AutoProcessor.from_pretrained(repo, { progress_callback: pv }));
   puls();
   const vis = await medStallVagt(
     VisionModelClass.from_pretrained(repo, { device: 'wasm', dtype: 'q8', progress_callback: pv })
   );
-  saetFase('Henter sprogmodel', 50);
-  const pt = progressReporter('Henter sprogmodel', 'Klargør sprogmodel');
+  saetFase('Downloading text model', 50);
+  const pt = progressReporter('Downloading text model', 'Preparing text model');
   puls();
   const tok = await medStallVagt(AutoTokenizer.from_pretrained(repo, { progress_callback: pt }));
   puls();
@@ -157,7 +157,7 @@ async function loadModels(repo) {
 // i text_embeds/image_embeds. Tag det der findes.
 function vecFraOutput(out) {
   const t = out.text_embeds || out.image_embeds || out.pooler_output;
-  if (!t) throw new Error('Modellen returnerede ingen embedding');
+  if (!t) throw new Error('The model returned no embedding');
   return Array.from(t.data);
 }
 
@@ -177,13 +177,13 @@ async function init() {
   for (let attempt = 0; ; attempt++) {
     let lastErr = null;
     for (const repo of kandidatListe()) {
-      saetFase('Henter billedmodel', 0);
+      saetFase('Downloading image model', 0);
       try {
         await loadModels(repo);
         // Foerste inferens varmer WASM op og er den tungeste enkeltdel paa
         // en aeldre Mac. Pulsen koerer videre her, saa linjen ikke staar
         // stille netop hvor ventetiden er laengst.
-        saetFase('Starter modellen');
+        saetFase('Starting the model');
         await medStallVagt(embedText('test'));
         stopPuls();
         try {
@@ -202,14 +202,14 @@ async function init() {
     }
     const besked = lastErr?.message || String(lastErr);
     const tip = /unauthorized/i.test(besked)
-      ? ' Tip: En gratis Hugging Face-token (Hjælp-menuen) løser download-grænsen.'
+      ? ' Tip: a free Hugging Face token (Help menu) lifts the download limit.'
       : '';
     const delay = RETRY_DELAYS_S[Math.min(attempt, RETRY_DELAYS_S.length - 1)];
     send({
       type: 'status',
       state: 'offline',
       progress: 0,
-      detail: `Kunne ikke hente modellen: ${besked} Prøver igen om ${delay} sekunder.${tip}`,
+      detail: `Could not download the model: ${besked} Trying again in ${delay} seconds.${tip}`,
     });
     await new Promise((r) => setTimeout(r, delay * 1000));
   }
@@ -234,7 +234,7 @@ bridge.onJob(async (job) => {
     let vec;
     if (job.type === 'embed-text') vec = await embedText(job.text);
     else if (job.type === 'embed-image') vec = await embedImage(job.url);
-    else throw new Error(`Ukendt jobtype: ${job.type}`);
+    else throw new Error(`Unknown job type: ${job.type}`);
     send({ id: job.id, type: 'result', vec });
   } catch (err) {
     send({ id: job.id, type: 'error', message: err?.message || String(err) });

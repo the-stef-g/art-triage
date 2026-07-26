@@ -18,8 +18,8 @@ function skriv(rel, indhold) {
 }
 
 beforeEach(async () => {
-  root = mkdtempSync(join(tmpdir(), 'billedflow-undo-'));
-  db = await openDatabase(join(root, '.billedflow', 'katalog.sqlite'));
+  root = mkdtempSync(join(tmpdir(), 'art-triage-undo-'));
+  db = await openDatabase(join(root, '.art-triage', 'katalog.sqlite'));
   catalog = new Catalog(db, root);
   undoMgr = new UndoManager(catalog);
   skriv('a.png', 'indhold-a');

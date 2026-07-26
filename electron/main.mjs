@@ -1,4 +1,4 @@
-// Billedflow: hovedproces. Ejer vinduerne, de to custom-protokoller
+// art-triage: hovedproces. Ejer vinduerne, de to custom-protokoller
 // (app:// til bundtede filer, thumb:// til previews) og AI-vinduet.
 import {
   app, BrowserWindow, Menu, protocol, ipcMain, net, nativeTheme, screen, shell,
@@ -268,7 +268,7 @@ function restartAiWindow() {
     dead.destroy();
   }
   ai.windowGone();
-  if (!process.env.BILLEDFLOW_DISABLE_AI) createAiWindow();
+  if (!process.env.ART_TRIAGE_DISABLE_AI) createAiWindow();
 }
 
 // SVG-previews rasteriseres af Chromium i et usynligt vindue.
@@ -295,66 +295,66 @@ function buildMenu() {
   const template = [
     ...(process.platform === 'darwin'
       ? [{
-          label: 'Billedflow',
+          label: 'art-triage',
           submenu: [
-            { role: 'about', label: 'Om Billedflow' },
+            { role: 'about', label: 'About art-triage' },
             { type: 'separator' },
-            { role: 'hide', label: 'Skjul Billedflow' },
-            { role: 'quit', label: 'Slut Billedflow' },
+            { role: 'hide', label: 'Hide art-triage' },
+            { role: 'quit', label: 'Quit art-triage' },
           ],
         }]
       : []),
     {
-      label: 'Rediger',
+      label: 'Edit',
       submenu: [
         // Egne handlers: i tekstfelter laves tekst-fortryd, ellers
         // fortrydes seneste katalog-handling. Renderer afgoer.
         {
-          label: 'Fortryd',
+          label: 'Undo',
           accelerator: 'CmdOrCtrl+Z',
           click: () => mainWin?.webContents.send('evt', { type: 'genvej', cmd: 'undo' }),
         },
         {
-          label: 'Gentag',
+          label: 'Redo',
           accelerator: 'Shift+CmdOrCtrl+Z',
           click: () => mainWin?.webContents.send('evt', { type: 'genvej', cmd: 'redo' }),
         },
         { type: 'separator' },
-        { role: 'cut', label: 'Klip' },
-        { role: 'copy', label: 'Kopier' },
-        { role: 'paste', label: 'Sæt ind' },
-        { role: 'selectAll', label: 'Vælg alt' },
+        { role: 'cut', label: 'Cut' },
+        { role: 'copy', label: 'Copy' },
+        { role: 'paste', label: 'Paste' },
+        { role: 'selectAll', label: 'Select All' },
       ],
     },
 
     {
-      label: 'Vis',
+      label: 'View',
       submenu: [
-        { role: 'reload', label: 'Genindlæs' },
-        { role: 'toggleDevTools', label: 'Udviklerværktøjer' },
+        { role: 'reload', label: 'Reload' },
+        { role: 'toggleDevTools', label: 'Developer Tools' },
         { type: 'separator' },
-        { role: 'togglefullscreen', label: 'Fuld skærm' },
+        { role: 'togglefullscreen', label: 'Full Screen' },
       ],
     },
     {
-      label: 'Vindue',
+      label: 'Window',
       submenu: [
-        { role: 'minimize', label: 'Minimer' },
-        { role: 'close', label: 'Luk vindue' },
+        { role: 'minimize', label: 'Minimise' },
+        { role: 'close', label: 'Close Window' },
       ],
     },
     {
-      label: 'Hjælp',
+      label: 'Help',
       role: 'help',
       submenu: [
         {
-          label: 'Vis AI-log',
+          label: 'Show AI log',
           click: () => {
             if (aiLogPath) shell.showItemInFolder(aiLogPath);
           },
         },
         {
-          label: 'Hugging Face-token …',
+          label: 'Hugging Face token …',
           click: () => mainWin?.webContents.send('evt', { type: 'genvej', cmd: 'hf-token' }),
         },
       ],
@@ -366,10 +366,10 @@ function buildMenu() {
 app.whenReady().then(() => {
   nativeTheme.themeSource = 'dark';
   settings = new Settings(app.getPath('userData'));
-  aiLogPath = join(app.getPath('userData'), 'billedflow-ai.log');
+  aiLogPath = join(app.getPath('userData'), 'art-triage-ai.log');
   ai = new AiBridge(null);
   ai.on('status', (s) => aiLog(`status: ${s.state} ${s.progress ?? 0}% ${s.detail || ''}`));
-  aiLog(`--- Billedflow ${app.getVersion()} startet (${process.platform}, Electron ${process.versions.electron}) ---`);
+  aiLog(`--- art-triage ${app.getVersion()} startet (${process.platform}, Electron ${process.versions.electron}) ---`);
   session = new AppSession({ settings, ai, rasterizeSvg });
 
   ipcMain.on('ai:msg', (event, msg) => {
@@ -402,11 +402,11 @@ app.whenReady().then(() => {
   session.registerIpc();
   buildMenu();
   createMainWindow();
-  // BILLEDFLOW_DISABLE_AI=1 bruges i CI, hvor modeldownload ikke giver mening.
-  if (!process.env.BILLEDFLOW_DISABLE_AI) createAiWindow();
-  // BILLEDFLOW_OPEN aabner et bibliotek direkte uden dialog (tests).
-  if (process.env.BILLEDFLOW_OPEN) {
-    session.openLibrary(process.env.BILLEDFLOW_OPEN).catch(() => {});
+  // ART_TRIAGE_DISABLE_AI=1 bruges i CI, hvor modeldownload ikke giver mening.
+  if (!process.env.ART_TRIAGE_DISABLE_AI) createAiWindow();
+  // ART_TRIAGE_OPEN aabner et bibliotek direkte uden dialog (tests).
+  if (process.env.ART_TRIAGE_OPEN) {
+    session.openLibrary(process.env.ART_TRIAGE_OPEN).catch(() => {});
   }
 
   app.on('activate', () => {

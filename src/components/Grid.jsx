@@ -10,18 +10,18 @@ const CELL_H = 264;
 function Badges({ row }) {
   return (
     <div className="badges">
-      {row.rating === 'godkendt' && <span className="badge godkendt" title="Godkendt">✓</span>}
+      {row.rating === 'godkendt' && <span className="badge godkendt" title="Approved">✓</span>}
       {row.rating === 'kandidat' && (
-        <span className="badge kandidat" title="Kandidat: god på motivet, skal redigeres før den kan afgøres">K</span>
+        <span className="badge kandidat" title="Candidate: good subject, needs editing before it can be decided">K</span>
       )}
-      {row.rating === 'kasseret' && <span className="badge kasseret" title="Kasseret">✕</span>}
-      {Boolean(row.edited) && <span className="badge redigeret" title="Redigeres">R</span>}
-      {Boolean(row.finished) && <span className="badge faerdig" title="Færdig">F</span>}
-      {!row.is_master && <span className="badge kopi" title={`Virtuel kopi: ${row.version_name}`}>{row.version_name}</span>}
+      {row.rating === 'kasseret' && <span className="badge kasseret" title="Discarded">✕</span>}
+      {Boolean(row.edited) && <span className="badge redigeret" title="Being edited">R</span>}
+      {Boolean(row.finished) && <span className="badge faerdig" title="Finished">F</span>}
+      {!row.is_master && <span className="badge kopi" title={`Virtual copy: ${row.version_name}`}>{row.version_name}</span>}
       {row.is_master && row.version_count > 1 && (
-        <span className="badge stak" title={`${row.version_count} versioner`}>⧉ {row.version_count}</span>
+        <span className="badge stak" title={`${row.version_count} versions`}>⧉ {row.version_count}</span>
       )}
-      {row.series_name && <span className="badge serie" title={`Serie: ${row.series_name}`}>{row.series_name}</span>}
+      {row.series_name && <span className="badge serie" title={`Series: ${row.series_name}`}>{row.series_name}</span>}
     </div>
   );
 }
@@ -99,7 +99,7 @@ export default function Grid({ rows, selected, setSelected, focusIndex, harSoegn
     const fileIds = [...new Set(rows
       .filter((r) => ids.includes(r.version_id))
       .map((r) => r.file_id))];
-    e.dataTransfer.setData('application/x-billedflow-files', JSON.stringify(fileIds));
+    e.dataTransfer.setData('application/x-art-triage-files', JSON.stringify(fileIds));
     e.dataTransfer.effectAllowed = 'move';
   }, [rows, selected, selectedSet]);
 
@@ -128,13 +128,13 @@ export default function Grid({ rows, selected, setSelected, focusIndex, harSoegn
         <div className="tom-tilstand">
           {harSoegning ? (
             <>
-              <p>Ingen billeder matcher søgningen</p>
-              <p className="tom">Prøv et andet ord, eller ryd søgningen for at se alle billeder.</p>
+              <p>No images match the search</p>
+              <p className="tom">Try another word, or clear the search to see every image.</p>
             </>
           ) : (
             <>
-              <p>Ingen billeder her</p>
-              <p className="tom">Vælg en anden mappe, justér filtrene eller læg billeder i mappen i Finder.</p>
+              <p>No images here</p>
+              <p className="tom">Pick another folder, adjust the filters, or put images in the folder in Finder.</p>
             </>
           )}
         </div>

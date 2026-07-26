@@ -48,17 +48,17 @@ export default function Inspector({ row, selectedCount, activeKeyword, editors, 
   if (!row) {
     return (
       <aside className="inspector">
-        <p className="tom">Vælg et billede for at se detaljer</p>
+        <p className="tom">Select an image to see details</p>
         <ul className="genvejsliste">
-          <li><b>G</b> godkend</li>
-          <li><b>K</b> kandidat</li>
-          <li><b>X</b> kassér</li>
-          <li><b>U</b> nulstil bedømmelse</li>
-          <li><b>R</b> redigeres til/fra</li>
-          <li><b>F</b> færdig til/fra</li>
-          <li><b>V</b> ny virtuel kopi</li>
-          <li><b>Mellemrum</b> stort preview</li>
-          <li><b>Cmd+Z</b> fortryd</li>
+          <li><b>G</b> approve</li>
+          <li><b>K</b> candidate</li>
+          <li><b>X</b> discard</li>
+          <li><b>U</b> clear rating</li>
+          <li><b>R</b> being edited on/off</li>
+          <li><b>F</b> finished on/off</li>
+          <li><b>V</b> new virtual copy</li>
+          <li><b>Space</b> large preview</li>
+          <li><b>Cmd+Z</b> undo</li>
         </ul>
       </aside>
     );
@@ -67,32 +67,32 @@ export default function Inspector({ row, selectedCount, activeKeyword, editors, 
   if (selectedCount > 1) {
     return (
       <aside className="inspector">
-        <h3>{selectedCount} valgt</h3>
+        <h3>{selectedCount} selected</h3>
         {activeKeyword && (
           <>
-            <h4>Nøgleord</h4>
+            <h4>Keywords</h4>
             <div className="knapraekke">
               <button
                 className="fjern-fra-noegleord"
                 onClick={() => act.removeKeywordFromSelected(activeKeyword)}
-                title={`Fjern nøgleordet "${activeKeyword}" fra de valgte billeder`}
+                title={`Remove the keyword "${activeKeyword}" from the selected images`}
               >
-                Fjern «{activeKeyword}» fra de {selectedCount} valgte
+                Remove «{activeKeyword}» from the {selectedCount} selected
               </button>
             </div>
           </>
         )}
         <div className="knapraekke">
-          <button onClick={() => act.setRating('godkendt')}>Godkend</button>
-          <button onClick={() => act.setRating('kandidat')}>Kandidat</button>
-          <button onClick={() => act.setRating('kasseret')}>Kassér</button>
-          <button onClick={() => act.setRating('ubedomt')}>Nulstil</button>
+          <button onClick={() => act.setRating('godkendt')}>Approve</button>
+          <button onClick={() => act.setRating('kandidat')}>Candidate</button>
+          <button onClick={() => act.setRating('kasseret')}>Discard</button>
+          <button onClick={() => act.setRating('ubedomt')}>Clear</button>
         </div>
         <div className="knapraekke">
-          <button onClick={() => act.toggleFlag('edited')}>Redigeres til/fra</button>
-          <button onClick={() => act.toggleFlag('finished')}>Færdig til/fra</button>
+          <button onClick={() => act.toggleFlag('edited')}>Being edited on/off</button>
+          <button onClick={() => act.toggleFlag('finished')}>Finished on/off</button>
         </div>
-        <h4>Serie</h4>
+        <h4>Series</h4>
         <div className="knapraekke">
           <select
             value=""
@@ -103,10 +103,10 @@ export default function Inspector({ row, selectedCount, activeKeyword, editors, 
               else if (v) act.assignSeries(Number(v));
             }}
           >
-            <option value="">Sæt serie …</option>
+            <option value="">Set series …</option>
             {series.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-            <option value="ny">Ny serie …</option>
-            <option value="fjern">Fjern fra serie</option>
+            <option value="ny">New series …</option>
+            <option value="fjern">Remove from series</option>
           </select>
         </div>
       </aside>
@@ -115,7 +115,7 @@ export default function Inspector({ row, selectedCount, activeKeyword, editors, 
 
   const editorList = editors.length
     ? editors
-    : [{ appPath: '', label: 'Standardprogram' }];
+    : [{ appPath: '', label: 'Default app' }];
 
   return (
     <aside className="inspector">
@@ -125,21 +125,21 @@ export default function Inspector({ row, selectedCount, activeKeyword, editors, 
       <h3 title={row.rel_path}>{fileName(row.rel_path)}</h3>
       <p className="detaljer">
         {formatBytes(row.size)} · {formatDate(row.mtime)}
-        {row.series_name ? ` · Serie: ${row.series_name}` : ''}
+        {row.series_name ? ` · Series: ${row.series_name}` : ''}
       </p>
 
-      <h4>Bedømmelse</h4>
+      <h4>Rating</h4>
       <div className="knapraekke">
         <button
           className={row.rating === 'godkendt' ? 'aktiv-godkendt' : ''}
           onClick={() => act.setRating('godkendt')}
         >
-          Godkendt
+          Approved
         </button>
         <button
           className={row.rating === 'kandidat' ? 'aktiv-kandidat' : ''}
           onClick={() => act.setRating('kandidat')}
-          title="God på motivet, men skal redigeres før den kan afgøres"
+          title="Good subject, but needs editing before it can be decided"
         >
           Kandidat
         </button>
@@ -147,22 +147,22 @@ export default function Inspector({ row, selectedCount, activeKeyword, editors, 
           className={row.rating === 'kasseret' ? 'aktiv-kasseret' : ''}
           onClick={() => act.setRating('kasseret')}
         >
-          Kasseret
+          Discarded
         </button>
-        <button onClick={() => act.setRating('ubedomt')}>Nulstil</button>
+        <button onClick={() => act.setRating('ubedomt')}>Clear</button>
       </div>
       <div className="knapraekke">
         <label className="tjek">
           <input type="checkbox" checked={Boolean(row.edited)} onChange={() => act.toggleFlag('edited')} />
-          Redigeres
+          Being edited
         </label>
         <label className="tjek">
           <input type="checkbox" checked={Boolean(row.finished)} onChange={() => act.toggleFlag('finished')} />
-          Færdig
+          Finished
         </label>
       </div>
 
-      <h4>Redigér i</h4>
+      <h4>Edit in</h4>
       <div className="knapraekke">
         <select value={editorValg} onChange={(e) => setEditorValg(e.target.value)}>
           {editorList.map((ed) => (
@@ -171,17 +171,17 @@ export default function Inspector({ row, selectedCount, activeKeyword, editors, 
         </select>
         <button
           onClick={() => act.editIn(editorValg || editorList[0]?.appPath || null)}
-          title="Åbn filen i den valgte app. Når du gemmer, opdager Billedflow det og markerer billedet som redigeres."
+          title="Open the file in the chosen app. When you save, art-triage notices and marks the image as being edited."
         >
-          Åbn
+          Open
         </button>
       </div>
       <div className="knapraekke">
-        <button className="lille" onClick={act.editInOther}>Anden app …</button>
-        <button className="lille" onClick={act.reveal}>Vis i Finder</button>
+        <button className="lille" onClick={act.editInOther}>Other app …</button>
+        <button className="lille" onClick={act.reveal}>Reveal in Finder</button>
       </div>
 
-      <h4>Versioner</h4>
+      <h4>Versions</h4>
       <div className="versionsliste">
         {versions.map((v) => (
           <div key={v.id} className={`version ${v.id === row.version_id ? 'aktiv' : ''}`}>
@@ -193,20 +193,20 @@ export default function Inspector({ row, selectedCount, activeKeyword, editors, 
             </span>
             {!v.is_master && (
               <span className="versionsknapper">
-                <button className="lille" onClick={() => act.renameVersion(v.id, v.name)} title="Omdøb">✎</button>
-                <button className="lille" onClick={() => act.deleteVersion(v.id)} title="Slet">🗑</button>
+                <button className="lille" onClick={() => act.renameVersion(v.id, v.name)} title="Rename">✎</button>
+                <button className="lille" onClick={() => act.deleteVersion(v.id)} title="Delete">🗑</button>
               </span>
             )}
           </div>
         ))}
       </div>
       <div className="knapraekke">
-        <button onClick={act.virtualCopy} title="Opret en virtuel kopi, fx til en anden beskæring">
-          Ny virtuel kopi
+        <button onClick={act.virtualCopy} title="Create a virtual copy, e.g. for a different crop">
+          New virtual copy
         </button>
       </div>
 
-      <h4>Serie</h4>
+      <h4>Series</h4>
       <div className="knapraekke">
         <select
           value={row.series_id || ''}
@@ -216,21 +216,21 @@ export default function Inspector({ row, selectedCount, activeKeyword, editors, 
             else act.assignSeries(v ? Number(v) : null);
           }}
         >
-          <option value="">Ingen serie</option>
+          <option value="">No series</option>
           {series.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-          <option value="ny">Ny serie …</option>
+          <option value="ny">New series …</option>
         </select>
       </div>
 
-      <h4>Nøgleord</h4>
+      <h4>Keywords</h4>
       {activeKeyword && keywords.some((k) => k.word === activeKeyword) && (
         <div className="knapraekke">
           <button
             className="fjern-fra-noegleord"
             onClick={() => fjernOrd(activeKeyword)}
-            title={`Fjern dette billede fra nøgleordet "${activeKeyword}"`}
+            title={`Remove this image from the keyword "${activeKeyword}"`}
           >
-            Hører ikke til «{activeKeyword}»
+            Does not belong to «{activeKeyword}»
           </button>
         </div>
       )}
@@ -239,24 +239,24 @@ export default function Inspector({ row, selectedCount, activeKeyword, editors, 
           <span
             key={k.word}
             className={`chip ${k.manual ? 'manuel' : ''}`}
-            title={k.manual ? 'Manuelt nøgleord' : 'Automatisk nøgleord'}
+            title={k.manual ? 'Your own keyword' : 'Automatic keyword'}
           >
             {k.word}
-            <button className="chip-fjern" onClick={() => fjernOrd(k.word)} title="Fjern nøgleord">×</button>
+            <button className="chip-fjern" onClick={() => fjernOrd(k.word)} title="Remove keyword">×</button>
           </span>
         ))}
-        {keywords.length === 0 && <span className="tom">Ingen nøgleord endnu</span>}
+        {keywords.length === 0 && <span className="tom">No keywords yet</span>}
       </div>
       <div className="knapraekke">
         <input
           value={nytOrd}
-          placeholder="Tilføj nøgleord"
+          placeholder="Add keyword"
           onChange={(e) => setNytOrd(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter') tilfoejOrd();
           }}
         />
-        <button className="lille" onClick={tilfoejOrd}>Tilføj</button>
+        <button className="lille" onClick={tilfoejOrd}>Add</button>
       </div>
     </aside>
   );

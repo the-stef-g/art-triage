@@ -145,6 +145,12 @@ omstændigheder.
 Nulstil til patch-stil, cirka 0.2.8, som Stef ønsker, og brug patch-spring for
 fixes fremover.
 
+Status: udført. Nummeret stod på 0.7.1 gennem fem runder uden at blive rørt,
+hvilket Stef med rette kaldte noget rod, og det er nu sat til 0.2.8 sammen med
+navneskiftet. Reglen herfra: hver ændring der kan ses i appen, hæver patch-tallet
+i package.json i samme commit. Nummeret står i statuslinjen, så det er til at
+kontrollere, at man har den udgave man tror.
+
 ## Rækkefølge når der bygges
 
 1. Status- og watcher-fix. Rykket op som det første, fordi biblioteket ligger på
@@ -153,9 +159,28 @@ fixes fremover.
    sidepanelet.
 3. Cloud-nøgleord: API-nøgle-opsætning, Haiku-kald på thumbnail, kø kun på
    godkendte, batch-mulighed.
-4. Engelsk UI og engelske nøgleord.
-5. Omdøbninger samlet: flaget redigeret bliver til redigeres (being edited), og
-   appen skifter navn fra Billedflow til art-triage i package.json, artifact-navn,
-   byggeopskrift og README. Tages her, så teksten kun laves om én gang, og så
-   byggeriet kan testes bagefter.
-6. README og tests opdateres, version til ~0.2.8.
+4. Engelsk UI og engelske nøgleord. UI-delen er udført; nøgleordene hører til
+   punkt 3, da de først findes når Claude laver dem.
+5. Omdøbninger samlet: udført. Flaget hedder nu redigeres (being edited), og
+   appen hedder art-triage i package.json, artifact-navn, byggeopskrift, menuer
+   og README.
+6. README og tests opdateres, version til ~0.2.8: udført.
+
+Tilbage står kun punkt 3, cloud-nøgleordene, som kræver en API-nøgle fra
+console.anthropic.com.
+
+## Hvad der bevidst ikke blev oversat
+
+Databasens værdier for bedømmelse (godkendt, kandidat, kasseret, ubedomt) står
+stadig på dansk, og det samme gør CSS-klasser, feltnavne og kodekommentarer. De
+er ikke synlige for brugeren, og at oversætte de gemte bedømmelser ville kræve en
+migrering af hvert eneste eksisterende katalog uden at nogen kunne se forskel.
+
+Mappen `_kasseret` på disken beholder også sit navn. Den indeholder rigtige
+billedfiler, og et navneskifte ville enten efterlade Stefs kasserede billeder i
+en mappe appen ikke længere kigger i, eller sprede dem over to mapper.
+
+Katalogmappen hedder `.art-triage` i nye biblioteker. Findes en `.billedflow` fra
+tidligere, bruges den videre i stedet. Der flyttes ingen data: at omdøbe en mappe
+med bedømmelser på tusindvis af billeder er en unødig risiko, og fejler det
+midtvejs, er arbejdet tabt.

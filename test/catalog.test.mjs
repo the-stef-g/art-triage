@@ -17,13 +17,13 @@ function skriv(rel, indhold) {
 }
 
 async function nyCatalog() {
-  db = await openDatabase(join(root, '.billedflow', 'katalog.sqlite'));
+  db = await openDatabase(join(root, '.art-triage', 'katalog.sqlite'));
   catalog = new Catalog(db, root);
   return catalog;
 }
 
 beforeEach(async () => {
-  root = mkdtempSync(join(tmpdir(), 'billedflow-test-'));
+  root = mkdtempSync(join(tmpdir(), 'art-triage-test-'));
   await nyCatalog();
 });
 
@@ -362,8 +362,8 @@ describe('serier', () => {
     toBilleder();
     const a = catalog.createSeries('Allura');
     catalog.createSeries('Seagully');
-    expect(() => catalog.renameSeries(a, '   ')).toThrow(/navn/);
-    expect(() => catalog.renameSeries(a, 'Seagully')).toThrow(/findes allerede/);
+    expect(() => catalog.renameSeries(a, '   ')).toThrow(/needs a name/);
+    expect(() => catalog.renameSeries(a, 'Seagully')).toThrow(/already exists/);
     expect(catalog.listSeries().map((s) => s.name).sort()).toEqual(['Allura', 'Seagully']);
   });
 
