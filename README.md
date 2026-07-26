@@ -28,17 +28,19 @@ Appen er ikke signeret med et Apple-udviklercertifikat, så første gang siger m
 
 **Nye filer og eksterne drev.** Ligger biblioteket på et eksternt drev, får appen sjældent besked fra macOS om, at der er kommet nye filer. Derfor gennemgår Billedflow selv mappen med jævne mellemrum, og du kan altid klikke "Skan igen" i værktøjslinjen for at få det gjort med det samme. Tager du drevet ud mens appen kører, skriver statuslinjen at drevet ikke er tilsluttet, og kataloget står urørt: bedømmelser, serier og virtuelle kopier venter, til drevet er tilbage.
 
-**Bedømmelse og status.** Hvert billede kan være godkendt, kandidat, kasseret eller ubedømt, og har derudover flagene redigeret og færdig. Kasserede billeder skjules som standard og kan vises igen med "Vis kasserede". Genveje: **G** godkend, **K** kandidat, **X** kassér, **U** nulstil, **R** redigeret til/fra, **F** færdig til/fra, **V** ny virtuel kopi, **mellemrum** stort preview, **piletaster** flytter markeringen, **Cmd+Z** fortryder seneste handling (bedømmelse, flag, serie, omdøbning, virtuel kopi og flytning), **Skift+Cmd+Z** gentager.
+**Bedømmelse og status.** Hvert billede kan være godkendt, kandidat, kasseret eller ubedømt, og har derudover flagene redigeres og færdig. Kasserede billeder skjules som standard og kan vises igen med "Vis kasserede". Genveje: **G** godkend, **K** kandidat, **X** kassér, **U** nulstil, **R** redigeres til/fra, **F** færdig til/fra, **V** ny virtuel kopi, **mellemrum** stort preview, **piletaster** flytter markeringen, **Cmd+Z** fortryder seneste handling (bedømmelse, flag, serie, omdøbning, virtuel kopi og flytning), **Skift+Cmd+Z** gentager.
 
 **Kandidat.** Brug kandidat, når motivet er godt, men noget teknisk står i vejen: uskarphed, forkerte farver og lignende. Det er ikke en dom, men en beslutning der venter, til billedet har været en tur i editoren. Kandidater har deres egen lilla farve i grid'et og deres eget punkt i sidepanelet, hvor arbejdslisten over det der venter kan åbnes med ét klik. De vises som almindelige billeder i grid'et, i modsætning til kasserede. Når du har rettet billedet, bedømmer du det igen: godkendt eller kasseret. Kandidater sendes aldrig til betalt analyse, netop fordi de ikke er afgjort endnu.
 
 **Virtuelle kopier.** "Ny virtuel kopi" opretter en ekstra version af samme motiv, fx til en anden beskæring. Kopien fylder ingenting på disken, før du sender den til redigering. I det øjeblik laver Billedflow en fysisk kopi ved siden af originalen og åbner den i din editor.
 
-**Redigér i.** Vælg app i Inspektøren og klik Åbn. Billedflow finder selv Luminar Neo, Topaz Photo AI, Gigapixel, Photoshop, Affinity Photo og Pixelmator Pro i Programmer, og du kan altid vælge en anden app. Når du gemmer i editoren, opdager Billedflow ændringen, markerer versionen som redigeret og opdaterer previewet. Gemmer editoren en ny fil ved siden af originalen (fx `IMG_1234-gigapixel.tif`), stables den automatisk som en version af samme billede.
+**Redigér i.** Vælg app i Inspektøren og klik Åbn. Billedflow finder selv Luminar Neo, Topaz Photo AI, Gigapixel, Photoshop, Affinity Photo og Pixelmator Pro i Programmer, og du kan altid vælge en anden app. Når du gemmer i editoren, opdager Billedflow ændringen, markerer versionen som redigeres og opdaterer previewet. Gemmer editoren en ny fil ved siden af originalen (fx `IMG_1234-gigapixel.tif`), stables den automatisk som en version af samme billede.
 
 **Mapper.** Mappetræet til venstre viser hele biblioteket. "Ny mappe" opretter en mappe, og du kan trække billeder fra gridden til en mappe for at flytte filerne på disken. "Ryd op" flytter alle filer, hvor samtlige versioner er kasseret, til mappen `_kasseret`.
 
-**Serier.** Markér et eller flere billeder og vælg "Ny serie" eller en eksisterende serie i Inspektøren. Klik på en serie i sidepanelet for kun at se dens billeder.
+**Serier.** Markér et eller flere billeder og vælg "Ny serie" eller en eksisterende serie i Inspektøren. Klik på en serie i sidepanelet for kun at se dens billeder. Hold musen over en serie i sidepanelet, så dukker to knapper op: blyanten omdøber, og skraldespanden sletter serien. At slette en serie rører ikke billederne, de mister kun deres tilknytning.
+
+**Sidepanelet er navigation.** Mapper, kandidatlisten, serier og nøgleord er fire visninger, og der er én ad gangen. Klikker du et nyt sted, går du direkte derhen, uden først at skulle klikke dig ud af den forrige.
 
 **Søgning.** Skriv fx "gule blomster" i søgefeltet, så finder Billedflow billederne ud fra selve billedindholdet. Det kræver ingen søgeord: appen analyserer selv alle billeder i baggrunden. Kun billeder, der tydeligt matcher, vises; en søgning uden reelle match giver ærligt nul resultater. Tallet ved et nøgleord i sidepanelet svarer til det antal billeder, et klik viser.
 
@@ -77,6 +79,6 @@ Katalogdata pr. bibliotek ligger i `.billedflow/katalog.sqlite`, previews i `.bi
 2. Tjek at der kommer previews på det hele, også RAW og PSD.
 3. Godkend et par billeder med G og kassér et med X. Luk appen, åbn igen og se at det huskes.
 4. Lav en virtuel kopi med V, vælg kopien og klik Åbn i Gigapixel. Tjek at der ligger en ny fysisk kopi ved siden af originalen.
-5. Gem fra editoren og se at versionen bliver markeret som redigeret, og at previewet opdateres.
+5. Gem fra editoren og se at versionen bliver markeret som redigeres, og at previewet opdateres.
 6. Vent til statuslinjen siger at analysen er færdig, og søg så på noget du ved findes i billederne, fx "gule blomster".
 7. Træk et billede til en anden mappe i sidepanelet og tjek i Finder at filen er flyttet.

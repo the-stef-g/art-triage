@@ -325,6 +325,7 @@ export class AppSession {
       this.undoMgr.beforeSeries(imageIds);
       catalog.assignSeries(imageIds, seriesId ?? null);
     });
+    handle('ser:rename', ({ seriesId, name }) => this.requireCatalog().renameSeries(seriesId, name));
     handle('ser:delete', ({ seriesId }) => this.requireCatalog().deleteSeries(seriesId));
 
     handle('fold:tree', () => this.requireCatalog().folderTree());

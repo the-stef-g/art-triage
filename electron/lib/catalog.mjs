@@ -488,6 +488,17 @@ export class Catalog extends EventEmitter {
     this.emit('changed');
   }
 
+  renameSeries(seriesId, name) {
+    const trimmed = String(name || '').trim();
+    if (!trimmed) throw new Error('Serien skal have et navn');
+    const optaget = this.db.get('SELECT id FROM series WHERE name=? AND id<>?', trimmed, seriesId);
+    if (optaget) throw new Error(`Der findes allerede en serie der hedder "${trimmed}"`);
+    this.db.run('UPDATE series SET name=? WHERE id=?', trimmed, seriesId);
+    this.emit('changed');
+  }
+
+  // Billederne beholdes; series_id nulstilles af sig selv, da images
+  // peger paa series med ON DELETE SET NULL.
   deleteSeries(seriesId) {
     this.db.run('DELETE FROM series WHERE id=?', seriesId);
     this.emit('changed');

@@ -338,3 +338,43 @@ describe('embeddings og noegleord', () => {
     expect(catalog.keywordsForFile(rows[0].file_id)).toHaveLength(2);
   });
 });
+
+describe('serier', () => {
+  function toBilleder() {
+    skriv('a.png', 'a');
+    skriv('b.png', 'bb');
+    catalog.sync();
+    return catalog.listVersions({});
+  }
+
+  it('kan omdoebes, og billederne foelger med', () => {
+    const rows = toBilleder();
+    const id = catalog.createSeries('Circular Blues');
+    catalog.assignSeries([rows[0].image_id], id);
+    catalog.renameSeries(id, 'Glazz');
+    const serier = catalog.listSeries();
+    expect(serier).toHaveLength(1);
+    expect(serier[0]).toMatchObject({ name: 'Glazz', image_count: 1 });
+    expect(catalog.listVersions({ serieId: id })).toHaveLength(1);
+  });
+
+  it('afviser et tomt navn og et navn der allerede findes', () => {
+    toBilleder();
+    const a = catalog.createSeries('Allura');
+    catalog.createSeries('Seagully');
+    expect(() => catalog.renameSeries(a, '   ')).toThrow(/navn/);
+    expect(() => catalog.renameSeries(a, 'Seagully')).toThrow(/findes allerede/);
+    expect(catalog.listSeries().map((s) => s.name).sort()).toEqual(['Allura', 'Seagully']);
+  });
+
+  it('at slette en serie lader billederne vaere i fred', () => {
+    const rows = toBilleder();
+    const id = catalog.createSeries('Circular Blues');
+    catalog.assignSeries([rows[0].image_id, rows[1].image_id], id);
+    catalog.deleteSeries(id);
+    expect(catalog.listSeries()).toEqual([]);
+    // Billederne bliver liggende; de mister kun tilknytningen.
+    expect(catalog.listVersions({})).toHaveLength(2);
+    expect(catalog.listVersions({ serieId: id })).toEqual([]);
+  });
+});

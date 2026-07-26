@@ -1,5 +1,16 @@
 import { useState } from 'react';
 
+// Sidepanelet er navigation: en visning ad gangen. Uden det her skulle
+// man klikke sig ud af fx kandidatlisten, foer man kunne gaa til en
+// serie, og det foeltes som at sidde fast. Et klik hvor som helst i
+// panelet fører nu direkte derhen.
+const KUN_EN_VISNING = {
+  folder: null,
+  serieId: null,
+  keyword: null,
+  kunKandidater: false,
+};
+
 function FolderNode({ node, depth, filter, setFilter, onMoveTo }) {
   const [open, setOpen] = useState(depth < 1);
   const [dragOver, setDragOver] = useState(false);
@@ -21,7 +32,7 @@ function FolderNode({ node, depth, filter, setFilter, onMoveTo }) {
       <div
         className={`mappe ${aktiv ? 'aktiv' : ''} ${dragOver ? 'dragover' : ''}`}
         style={{ paddingLeft: `${depth * 14 + 8}px` }}
-        onClick={() => setFilter((f) => ({ ...f, folder: node.rel || null }))}
+        onClick={() => setFilter((f) => ({ ...f, ...KUN_EN_VISNING, folder: node.rel || null }))}
         onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
         onDragLeave={() => setDragOver(false)}
         onDrop={onDrop}
@@ -52,20 +63,23 @@ function FolderNode({ node, depth, filter, setFilter, onMoveTo }) {
 }
 
 export default function Sidebar({
-  tree, series, topKeywords, filter, setFilter, onMoveTo, onRemoveKeywordEverywhere, antalKandidater,
+  tree, series, topKeywords, filter, setFilter, onMoveTo, onRemoveKeywordEverywhere,
+  antalKandidater, onRenameSeries, onDeleteSeries,
 }) {
-  // Arbejdslisten skal kunne aabnes med et klik, uden at man foerst
-  // skal stille paa filtre. Derfor ryddes de filtre der ellers ville
-  // skaere kandidater fra, i stedet for bare at slaa et flag til.
+  // Arbejdslisten skal kunne aabnes med et klik. Ud over de andre
+  // visninger ryddes ogsaa de filtre i vaerktoejslinjen der ellers ville
+  // skaere kandidater fra, saa listen viser det den lover.
   const visKandidater = () => setFilter((f) => ({
     ...f,
-    kunKandidater: !f.kunKandidater,
+    ...KUN_EN_VISNING,
+    kunKandidater: true,
     kunGodkendte: false,
     kunFaerdige: false,
     visKasserede: false,
-    keyword: null,
-    serieId: null,
   }));
+
+  const visSerie = (id) => setFilter((f) => ({ ...f, ...KUN_EN_VISNING, serieId: id }));
+  const visNoegleord = (word) => setFilter((f) => ({ ...f, ...KUN_EN_VISNING, keyword: word }));
 
   return (
     <aside className="sidebar">
@@ -93,16 +107,32 @@ export default function Sidebar({
           <div
             key={s.id}
             className={`serie ${filter.serieId === s.id ? 'aktiv' : ''}`}
-            onClick={() => setFilter((f) => ({ ...f, serieId: f.serieId === s.id ? null : s.id }))}
+            onClick={() => visSerie(s.id)}
           >
-            <span>{s.name}</span>
+            <span className="serienavn">{s.name}</span>
             <span className="antal">{s.image_count}</span>
+            <span className="serieknapper">
+              <button
+                className="lille"
+                title="Omdøb serien"
+                onClick={(e) => { e.stopPropagation(); onRenameSeries(s); }}
+              >
+                ✎
+              </button>
+              <button
+                className="lille"
+                title="Slet serien. Billederne bliver liggende."
+                onClick={(e) => { e.stopPropagation(); onDeleteSeries(s); }}
+              >
+                🗑
+              </button>
+            </span>
           </div>
         ))}
       </section>
       <section>
         <h3>Nøgleord</h3>
-        {topKeywords.length === 0 && <p className="tom">Kommer når billederne er analyseret</p>}
+        {topKeywords.length === 0 && <p className="tom">Skriv dine egne ord på et billede i højre kolonne</p>}
         <div className="chips">
           {topKeywords.map((k) => (
             <span
@@ -111,7 +141,7 @@ export default function Sidebar({
             >
               <button
                 className="kw-vaelg"
-                onClick={() => setFilter((f) => ({ ...f, keyword: f.keyword === k.word ? null : k.word }))}
+                onClick={() => visNoegleord(k.word)}
               >
                 {k.word} <span className="antal">{k.antal}</span>
               </button>

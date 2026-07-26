@@ -105,8 +105,23 @@ try {
     null,
     { timeout: 10000 }
   );
+  // Sidepanelet er navigation: et klik et nyt sted skal foere derhen, uden
+  // at man foerst skal klikke sig ud af den forrige visning.
+  await page.locator('.kandidatliste').click();
+  await page.waitForFunction(
+    () => document.querySelectorAll('.tile').length === 1,
+    null,
+    { timeout: 10000 }
+  );
+  await page.locator('.mappe', { hasText: 'Alle billeder' }).click();
+  await page.waitForFunction(
+    () => document.querySelectorAll('.tile').length === 4,
+    null,
+    { timeout: 10000 }
+  );
+
   // Tilbage til foerste billede, saa resten af flowet staar som foer.
-  await page.keyboard.press('ArrowLeft');
+  await page.locator('.tile').first().click();
 
   // Ny virtuel kopi med V: en ekstra flise dukker op.
   await page.keyboard.press('v');

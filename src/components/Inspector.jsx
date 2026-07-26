@@ -51,9 +51,10 @@ export default function Inspector({ row, selectedCount, activeKeyword, editors, 
         <p className="tom">Vælg et billede for at se detaljer</p>
         <ul className="genvejsliste">
           <li><b>G</b> godkend</li>
+          <li><b>K</b> kandidat</li>
           <li><b>X</b> kassér</li>
           <li><b>U</b> nulstil bedømmelse</li>
-          <li><b>R</b> redigeret til/fra</li>
+          <li><b>R</b> redigeres til/fra</li>
           <li><b>F</b> færdig til/fra</li>
           <li><b>V</b> ny virtuel kopi</li>
           <li><b>Mellemrum</b> stort preview</li>
@@ -88,7 +89,7 @@ export default function Inspector({ row, selectedCount, activeKeyword, editors, 
           <button onClick={() => act.setRating('ubedomt')}>Nulstil</button>
         </div>
         <div className="knapraekke">
-          <button onClick={() => act.toggleFlag('edited')}>Redigeret til/fra</button>
+          <button onClick={() => act.toggleFlag('edited')}>Redigeres til/fra</button>
           <button onClick={() => act.toggleFlag('finished')}>Færdig til/fra</button>
         </div>
         <h4>Serie</h4>
@@ -153,7 +154,7 @@ export default function Inspector({ row, selectedCount, activeKeyword, editors, 
       <div className="knapraekke">
         <label className="tjek">
           <input type="checkbox" checked={Boolean(row.edited)} onChange={() => act.toggleFlag('edited')} />
-          Redigeret
+          Redigeres
         </label>
         <label className="tjek">
           <input type="checkbox" checked={Boolean(row.finished)} onChange={() => act.toggleFlag('finished')} />
@@ -170,7 +171,7 @@ export default function Inspector({ row, selectedCount, activeKeyword, editors, 
         </select>
         <button
           onClick={() => act.editIn(editorValg || editorList[0]?.appPath || null)}
-          title="Åbn filen i den valgte app. Når du gemmer, opdager Billedflow det og markerer billedet som redigeret."
+          title="Åbn filen i den valgte app. Når du gemmer, opdager Billedflow det og markerer billedet som redigeres."
         >
           Åbn
         </button>

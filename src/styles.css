@@ -93,8 +93,10 @@ input:focus, select:focus { outline: 1px solid var(--accent); }
 
 /* ---------- Sidebar ---------- */
 .sidebar {
-  width: 230px;
-  min-width: 180px;
+  /* Samme bredde som inspektoeren, saa de to kolonner staar symmetrisk
+     om grid'et. */
+  width: 290px;
+  min-width: 240px;
   border-right: 1px solid var(--kant);
   background: var(--bg-panel);
   overflow-y: auto;
@@ -137,6 +139,11 @@ input:focus, select:focus { outline: 1px solid var(--accent); }
 }
 .serie:hover { background: var(--bg-hover); }
 .serie.aktiv { background: var(--bg-aktiv); }
+.serie .serienavn { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Omdoeb og slet dukker foerst op naar musen er paa raekken, saa listen
+   staar rolig naar man bare kigger. */
+.serie .serieknapper { display: none; gap: 2px; }
+.serie:hover .serieknapper { display: flex; }
 .kandidatliste {
   display: flex;
   justify-content: space-between;

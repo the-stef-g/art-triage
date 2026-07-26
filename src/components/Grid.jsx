@@ -15,7 +15,7 @@ function Badges({ row }) {
         <span className="badge kandidat" title="Kandidat: god på motivet, skal redigeres før den kan afgøres">K</span>
       )}
       {row.rating === 'kasseret' && <span className="badge kasseret" title="Kasseret">✕</span>}
-      {Boolean(row.edited) && <span className="badge redigeret" title="Redigeret">R</span>}
+      {Boolean(row.edited) && <span className="badge redigeret" title="Redigeres">R</span>}
       {Boolean(row.finished) && <span className="badge faerdig" title="Færdig">F</span>}
       {!row.is_master && <span className="badge kopi" title={`Virtuel kopi: ${row.version_name}`}>{row.version_name}</span>}
       {row.is_master && row.version_count > 1 && (

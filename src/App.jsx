@@ -278,6 +278,29 @@ export default function App() {
         .map((r) => r.image_id))];
       if (imageIds.length) invoke('ser:assign', { imageIds, seriesId }).catch(visFejl);
     },
+    renameSeries: (serie) => {
+      setModal({
+        title: 'Omdøb serie',
+        value: serie.name,
+        placeholder: 'Serienavn',
+        onSubmit: (name) => invoke('ser:rename', { seriesId: serie.id, name })
+          .then(() => refreshMeta())
+          .catch(visFejl),
+      });
+    },
+    deleteSeries: async (serie) => {
+      const ok = window.confirm(
+        `Slet serien "${serie.name}"?\n\n`
+        + `Billederne bliver liggende og bliver ikke rørt. De mister kun deres tilknytning til serien.`
+      );
+      if (!ok) return;
+      try {
+        await invoke('ser:delete', { seriesId: serie.id });
+        // Stod man i den slettede serie, ville grid'et ellers staa tomt.
+        setFilter((f) => (f.serieId === serie.id ? { ...f, serieId: null } : f));
+        refreshMeta();
+      } catch (err) { visFejl(err); }
+    },
     newSeries: () => {
       setModal({
         title: 'Ny serie',
@@ -381,6 +404,8 @@ export default function App() {
           onMoveTo={(fileIds, rel) => act.moveTo(fileIds, rel)}
           onRemoveKeywordEverywhere={act.removeKeywordEverywhere}
           antalKandidater={counts?.byRating?.kandidat}
+          onRenameSeries={act.renameSeries}
+          onDeleteSeries={act.deleteSeries}
         />
         <Grid
           rows={rows}

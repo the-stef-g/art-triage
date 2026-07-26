@@ -6,7 +6,7 @@ const CHANNELS = new Set([
   'lib:rescan', 'lib:driveStatus',
   'img:list', 'img:imageVersions', 'img:setRating', 'img:setFlag',
   'img:virtualCopy', 'img:renameVersion', 'img:deleteVersion', 'img:reveal',
-  'ser:list', 'ser:create', 'ser:assign', 'ser:delete',
+  'ser:list', 'ser:create', 'ser:assign', 'ser:rename', 'ser:delete',
   'fold:tree', 'fold:create', 'fold:move', 'fold:cleanup',
   'ed:list', 'ed:open', 'ed:pick',
   'kw:top', 'kw:forFile', 'kw:add', 'kw:remove', 'kw:removeAll', 'kw:removeFromFiles',
