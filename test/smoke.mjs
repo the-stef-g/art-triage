@@ -11,9 +11,9 @@ const projectRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 // Haard deadline: uanset hvad der haenger, doer processen her.
 setTimeout(() => {
-  console.error('SMOKE FEJL: haard timeout efter 4 minutter');
+  console.error('SMOKE FEJL: haard timeout efter 5 minutter');
   process.exit(1);
-}, 240000);
+}, 300000);
 
 async function lavTestbilleder(dir) {
   const sharp = (await import('sharp')).default;
@@ -58,8 +58,30 @@ try {
   const page = await app.firstWindow({ timeout: 60000 });
   await page.waitForLoadState('domcontentloaded');
 
+  // Hovedvinduet oprettes med show: false og vises foerst paa ready-to-show.
+  // Playwright faar fat i vinduet inden da, og et skjult Chromium-vindue
+  // lader vaere med at lave layout: elementerne staar i DOM'en, men uden
+  // stoerrelse. Uden den her ventetid bliver alt nedenfor et lotteri, hvor
+  // testen falder paa "fandt elementet, men det blev aldrig synligt".
+  await page.waitForFunction(
+    () => document.visibilityState === 'visible',
+    null,
+    { timeout: 60000 }
+  );
+
   // Grid med 4 billeder (3 i roden + 1 i undermappe, traeet viser alle).
-  await page.waitForSelector('.tile', { timeout: 30000 });
+  // Der maales paa selve kassen i stedet for Playwrights synlighedstjek,
+  // saa ventetiden slutter praecis naar fliserne er lagt ud.
+  await page.waitForFunction(
+    () => {
+      const foerste = document.querySelector('.tile');
+      if (!foerste) return false;
+      const kasse = foerste.getBoundingClientRect();
+      return kasse.width > 0 && kasse.height > 0;
+    },
+    null,
+    { timeout: 45000 }
+  );
   const tiles = await page.locator('.tile').count();
   if (tiles !== 4) throw new Error(`ventede 4 billeder i grid, fik ${tiles}`);
 
