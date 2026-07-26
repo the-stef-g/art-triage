@@ -99,7 +99,7 @@ describe('koeen rummer kun godkendte', () => {
   });
 
   it('holder en kandidat ude selv efter den er redigeret', () => {
-    catalog.setFlag([versionFor('kandidat.png').version_id], 'edited', 1);
+    catalog.setStage([versionFor('kandidat.png').version_id], 'edited');
     expect(catalog.filesNeedingKeywords().map((f) => f.rel_path)).toEqual(['godkendt.png']);
   });
 

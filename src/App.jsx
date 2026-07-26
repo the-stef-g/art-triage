@@ -219,13 +219,16 @@ export default function App() {
       const ids = selectedRef.current;
       if (ids.length) invoke('img:setRating', { versionIds: ids, rating }).catch(visFejl);
     },
-    toggleFlag: (flag) => {
+    // Arbejdstrin: enten under redigering eller faerdig, aldrig begge.
+    // Saettes trinnet paa noget der allerede staar der, ryddes det, saa
+    // genvejene stadig virker som til og fra.
+    setStage: (stage) => {
       const ids = selectedRef.current;
       if (!ids.length) return;
       const rs = rowsRef.current.filter((r) => ids.includes(r.version_id));
-      const key = flag === 'edited' ? 'edited' : 'finished';
-      const allSet = rs.every((r) => r[key]);
-      invoke('img:setFlag', { versionIds: ids, flag, value: !allSet }).catch(visFejl);
+      const key = stage === 'edited' ? 'edited' : 'finished';
+      const alleHarDet = stage !== null && rs.length > 0 && rs.every((r) => r[key]);
+      invoke('img:setStage', { versionIds: ids, stage: alleHarDet ? null : stage }).catch(visFejl);
     },
     virtualCopy: () => {
       const f = getFocused();
@@ -407,8 +410,8 @@ export default function App() {
         case 'k': act.setRating('kandidat'); break;
         case 'x': act.setRating('kasseret'); break;
         case 'u': act.setRating('ubedomt'); break;
-        case 'f': act.toggleFlag('finished'); break;
-        case 'r': act.toggleFlag('edited'); break;
+        case 'f': act.setStage('finished'); break;
+        case 'r': act.setStage('edited'); break;
         case 'v': act.virtualCopy(); break;
         case ' ': e.preventDefault(); if (idx >= 0) setShowPreview((p) => !p); break;
         case 'escape': setShowPreview(false); setSelected([]); break;

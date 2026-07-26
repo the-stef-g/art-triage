@@ -87,6 +87,16 @@ Ordet står både som feltnavn i kataloget og som synlig tekst, så feltnavn,
 CSS-klasse og visningstekst skal følges ad. Tages sammen med det engelske skifte,
 så teksten kun laves om én gang.
 
+Status: udført, og undervejs kom en fejl frem der lå dybere end teksten. De to
+mærker var uafhængige flag, så det samme billede kunne stå som både being edited
+og finished. Det giver ingen mening: enten ligger billedet ude hos en editor,
+eller også er arbejdet slut. De er nu ét arbejdstrin med tre tilstande, sat med
+knapper under overskriften Workflow stage. Begge kolonner skrives i samme
+sætning, så tilstanden ikke kan opstå, skanningen rydder finished når filen
+ændres på disken igen, fortryd gemmer hele trinnet under ét, og eksisterende
+kataloger ryddes ved åbning, hvor finished vinder. Tre tests falder, hvis
+udelukkelsen fjernes.
+
 ## Pris og betaling
 
 Claude API faktureres via en API-nøgle fra console.anthropic.com, pay-as-you-go,

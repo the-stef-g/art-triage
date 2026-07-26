@@ -63,24 +63,25 @@ export class UndoManager {
     };
   }
 
-  beforeFlags(versionIds, flag) {
-    this._push(this._flagsEntry(versionIds, flag));
+  beforeStage(versionIds) {
+    this._push(this._stageEntry(versionIds));
   }
 
-  _flagsEntry(versionIds, flag) {
-    const key = flag === 'edited' ? 'edited' : 'finished';
+  // Hele trinnet gemmes under ét. Foer blev det ene flag gemt uden det
+  // andet, og en fortrydelse kunne saette begge taendt igen.
+  _stageEntry(versionIds) {
     const saved = versionIds
       .map((id) => {
         const v = this.catalog.getVersion(id);
-        return v ? { id, value: Boolean(v[key]) } : null;
+        return v ? { id, stage: this.catalog.stageOf(v) } : null;
       })
       .filter(Boolean);
     if (!saved.length) return null;
     return {
-      label: flag === 'edited' ? 'redigeret-mærke' : 'færdig-mærke',
+      label: 'arbejdstrin',
       apply: () => {
-        const redo = this._flagsEntry(saved.map((s) => s.id), flag);
-        for (const { id, value } of saved) this.catalog.setFlag([id], flag, value);
+        const redo = this._stageEntry(saved.map((s) => s.id));
+        for (const { id, stage } of saved) this.catalog.setStage([id], stage);
         return redo;
       },
     };

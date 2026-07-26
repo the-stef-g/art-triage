@@ -133,6 +133,26 @@ try {
   // Tilbage til foerste billede, saa resten af flowet staar som foer.
   await page.locator('.tile').first().click();
 
+  // Arbejdstrin er ét ad gangen. R saetter "being edited", F skifter til
+  // "finished", og saa maa den foerste knap ikke stadig staa taendt: det
+  // var praecis fejlen, hvor der stod baade det ene og det andet.
+  await page.keyboard.press('r');
+  await page.waitForSelector('.aktiv-redigeres', { timeout: 10000 });
+  await page.keyboard.press('f');
+  await page.waitForFunction(
+    () => document.querySelectorAll('.aktiv-faerdig').length === 1
+      && document.querySelectorAll('.aktiv-redigeres').length === 0,
+    null,
+    { timeout: 10000 }
+  );
+  // Samme genvej igen rydder trinnet.
+  await page.keyboard.press('f');
+  await page.waitForFunction(
+    () => document.querySelectorAll('.aktiv-faerdig').length === 0,
+    null,
+    { timeout: 10000 }
+  );
+
   // Ny virtuel kopi med V: en ekstra flise dukker op.
   await page.keyboard.press('v');
   await page.waitForFunction(

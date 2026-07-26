@@ -353,10 +353,10 @@ export class AppSession {
       this.undoMgr.beforeRatings(versionIds);
       catalog.setRating(versionIds, rating);
     });
-    handle('img:setFlag', ({ versionIds, flag, value }) => {
+    handle('img:setStage', ({ versionIds, stage }) => {
       const catalog = this.requireCatalog();
-      this.undoMgr.beforeFlags(versionIds, flag);
-      catalog.setFlag(versionIds, flag, value);
+      this.undoMgr.beforeStage(versionIds);
+      catalog.setStage(versionIds, stage ?? null);
     });
     handle('img:virtualCopy', ({ versionId }) => {
       const nyId = this.requireCatalog().createVirtualCopy(versionId);

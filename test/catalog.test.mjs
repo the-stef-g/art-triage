@@ -122,14 +122,56 @@ describe('status og filtre', () => {
     expect(catalog.listVersions({ visKasserede: true, kunKasserede: true })).toHaveLength(1);
   });
 
-  it('filtrerer paa godkendt, redigeret og faerdig', () => {
+  it('filtrerer paa godkendt, redigeres og faerdig', () => {
+    // De to arbejdstrin ligger paa hver sit billede: et billede kan ikke
+    // baade vaere under redigering og faerdigt.
     const rows = catalog.listVersions({});
     catalog.setRating([rows[0].version_id], 'godkendt');
-    catalog.setFlag([rows[1].version_id], 'edited', true);
-    catalog.setFlag([rows[1].version_id], 'finished', true);
+    catalog.setStage([rows[1].version_id], 'edited');
+    catalog.setStage([rows[2].version_id], 'finished');
     expect(catalog.listVersions({ kunGodkendte: true })).toHaveLength(1);
     expect(catalog.listVersions({ kunRedigerede: true })).toHaveLength(1);
     expect(catalog.listVersions({ kunFaerdige: true })).toHaveLength(1);
+  });
+
+  it('lader kun ét arbejdstrin gaelde ad gangen', () => {
+    const [a] = catalog.listVersions({});
+    catalog.setStage([a.version_id], 'edited');
+    expect(catalog.getVersion(a.version_id).edited).toBe(1);
+    catalog.setStage([a.version_id], 'finished');
+    const v = catalog.getVersion(a.version_id);
+    expect(v.finished).toBe(1);
+    expect(v.edited).toBe(0);
+    catalog.setStage([a.version_id], null);
+    expect(catalog.stageOf(catalog.getVersion(a.version_id))).toBe(null);
+  });
+
+  it('rydder faerdig naar filen aendres paa disken igen', () => {
+    // Er der lige gemt en ny udgave, er arbejdet ikke overstaaet.
+    const [a] = catalog.listVersions({});
+    catalog.setStage([a.version_id], 'finished');
+    skriv('a.png', 'helt nyt indhold der giver en anden hash');
+    catalog.sync();
+    const v = catalog.getVersion(a.version_id);
+    expect(v.edited).toBe(1);
+    expect(v.finished).toBe(0);
+  });
+
+  it('afviser et ukendt arbejdstrin', () => {
+    const [a] = catalog.listVersions({});
+    expect(() => catalog.setStage([a.version_id], 'noget-andet')).toThrow(/Unknown workflow stage/);
+  });
+
+  it('rydder op i gamle kataloger hvor begge trin stod taendt', async () => {
+    // Foer var de to uafhaengige flag, saa den tilstand ligger allerede i
+    // Stefs katalog. Faerdig vinder ved aabning.
+    const [a] = catalog.listVersions({});
+    db.run('UPDATE versions SET edited=1, finished=1 WHERE id=?', a.version_id);
+    db.close();
+    await nyCatalog();
+    const v = catalog.getVersion(a.version_id);
+    expect(v.finished).toBe(1);
+    expect(v.edited).toBe(0);
   });
 
   it('filtrerer paa mappe', () => {

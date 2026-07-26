@@ -4,7 +4,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 const CHANNELS = new Set([
   'lib:choose', 'lib:open', 'lib:recent', 'lib:current',
   'lib:rescan', 'lib:driveStatus',
-  'img:list', 'img:imageVersions', 'img:setRating', 'img:setFlag',
+  'img:list', 'img:imageVersions', 'img:setRating', 'img:setStage',
   'img:virtualCopy', 'img:renameVersion', 'img:deleteVersion', 'img:reveal',
   'ser:list', 'ser:create', 'ser:assign', 'ser:rename', 'ser:delete',
   'fold:tree', 'fold:create', 'fold:move', 'fold:cleanup',

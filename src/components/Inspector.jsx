@@ -54,8 +54,8 @@ export default function Inspector({ row, selectedCount, activeKeyword, editors, 
           <li><b>K</b> candidate</li>
           <li><b>X</b> discard</li>
           <li><b>U</b> clear rating</li>
-          <li><b>R</b> being edited on/off</li>
-          <li><b>F</b> finished on/off</li>
+          <li><b>R</b> stage: being edited</li>
+          <li><b>F</b> stage: finished</li>
           <li><b>V</b> new virtual copy</li>
           <li><b>Space</b> large preview</li>
           <li><b>Cmd+Z</b> undo</li>
@@ -82,15 +82,18 @@ export default function Inspector({ row, selectedCount, activeKeyword, editors, 
             </div>
           </>
         )}
+        <h4>Rating</h4>
         <div className="knapraekke">
           <button onClick={() => act.setRating('godkendt')}>Approve</button>
           <button onClick={() => act.setRating('kandidat')}>Candidate</button>
           <button onClick={() => act.setRating('kasseret')}>Discard</button>
           <button onClick={() => act.setRating('ubedomt')}>Clear</button>
         </div>
+        <h4>Workflow stage</h4>
         <div className="knapraekke">
-          <button onClick={() => act.toggleFlag('edited')}>Being edited on/off</button>
-          <button onClick={() => act.toggleFlag('finished')}>Finished on/off</button>
+          <button onClick={() => act.setStage('edited')}>Being edited</button>
+          <button onClick={() => act.setStage('finished')}>Finished</button>
+          <button onClick={() => act.setStage(null)}>Clear</button>
         </div>
         <h4>Series</h4>
         <div className="knapraekke">
@@ -141,7 +144,7 @@ export default function Inspector({ row, selectedCount, activeKeyword, editors, 
           onClick={() => act.setRating('kandidat')}
           title="Good subject, but needs editing before it can be decided"
         >
-          Kandidat
+          Candidate
         </button>
         <button
           className={row.rating === 'kasseret' ? 'aktiv-kasseret' : ''}
@@ -151,15 +154,23 @@ export default function Inspector({ row, selectedCount, activeKeyword, editors, 
         </button>
         <button onClick={() => act.setRating('ubedomt')}>Clear</button>
       </div>
+      <h4>Workflow stage</h4>
       <div className="knapraekke">
-        <label className="tjek">
-          <input type="checkbox" checked={Boolean(row.edited)} onChange={() => act.toggleFlag('edited')} />
+        <button
+          className={row.edited ? 'aktiv-redigeres' : ''}
+          onClick={() => act.setStage('edited')}
+          title="The image is out with an editor right now"
+        >
           Being edited
-        </label>
-        <label className="tjek">
-          <input type="checkbox" checked={Boolean(row.finished)} onChange={() => act.toggleFlag('finished')} />
+        </button>
+        <button
+          className={row.finished ? 'aktiv-faerdig' : ''}
+          onClick={() => act.setStage('finished')}
+          title="The work on this image is over"
+        >
           Finished
-        </label>
+        </button>
+        <button onClick={() => act.setStage(null)}>Clear</button>
       </div>
 
       <h4>Edit in</h4>

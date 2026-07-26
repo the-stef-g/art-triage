@@ -46,14 +46,28 @@ describe('fortryd og gentag', () => {
     expect(catalog.getVersion(a.version_id).rating).toBe('godkendt');
   });
 
-  it('fortryder flag', () => {
+  it('fortryder arbejdstrin', () => {
     const [a] = catalog.listVersions({});
-    undoMgr.beforeFlags([a.version_id], 'finished');
-    catalog.setFlag([a.version_id], 'finished', true);
+    undoMgr.beforeStage([a.version_id]);
+    catalog.setStage([a.version_id], 'finished');
     expect(catalog.getVersion(a.version_id).finished).toBe(1);
 
     undoMgr.undo();
     expect(catalog.getVersion(a.version_id).finished).toBe(0);
+  });
+
+  it('fortryder tilbage til det forrige trin uden at taende begge', () => {
+    // Hele trinnet gemmes under ét. Blev kun det ene flag husket, kunne
+    // en fortrydelse ende med baade redigeres og faerdig taendt.
+    const [a] = catalog.listVersions({});
+    catalog.setStage([a.version_id], 'edited');
+    undoMgr.beforeStage([a.version_id]);
+    catalog.setStage([a.version_id], 'finished');
+
+    undoMgr.undo();
+    const v = catalog.getVersion(a.version_id);
+    expect(v.edited).toBe(1);
+    expect(v.finished).toBe(0);
   });
 
   it('fortryder serie-tildeling', () => {

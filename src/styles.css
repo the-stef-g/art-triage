@@ -308,10 +308,13 @@ input:focus, select:focus { outline: 1px solid var(--accent); }
 .detaljer { color: var(--tekst-svag); font-size: 12px; margin: 4px 0; }
 .knapraekke { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 4px 0; }
 .knapraekke select { flex: 1; min-width: 0; }
-.tjek { display: flex; gap: 6px; align-items: center; cursor: pointer; }
 .aktiv-godkendt { background: var(--godkendt); border-color: var(--godkendt); color: #04260c; font-weight: 700; }
 .aktiv-kandidat { background: var(--kandidat); border-color: var(--kandidat); color: #1a0a33; font-weight: 700; }
 .aktiv-kasseret { background: var(--kasseret); border-color: var(--kasseret); color: #2d0503; font-weight: 700; }
+/* Arbejdstrin. Samme to farver som maerkerne i grid'et, saa knappen og
+   billedet siger det samme. */
+.aktiv-redigeres { background: var(--redigeret); border-color: var(--redigeret); color: #04203f; font-weight: 700; }
+.aktiv-faerdig { background: var(--faerdig); border-color: var(--faerdig); color: #2e1f00; font-weight: 700; }
 .versionsliste { display: flex; flex-direction: column; gap: 2px; }
 .version {
   display: flex;

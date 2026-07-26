@@ -97,6 +97,10 @@ export class Catalog extends EventEmitter {
     if (!kolonner.includes('manual')) {
       this.db.exec('ALTER TABLE keywords ADD COLUMN manual INTEGER NOT NULL DEFAULT 0');
     }
+    // De to trin var foer uafhaengige flag, saa et billede kunne staa som
+    // baade under redigering og faerdigt. Faerdig vinder: det er det trin
+    // man selv har sat sidst, og det er den tilstand der betyder noget.
+    this.db.exec('UPDATE versions SET edited=0 WHERE edited=1 AND finished=1');
   }
 
   abs(rel) {
@@ -226,11 +230,13 @@ export class Catalog extends EventEmitter {
     return { changed: changedFileIds.length, edited: editedFileIds.length, unavailable: false };
   }
 
-  // Saetter redigeret-flag paa alle versioner der bruger denne fil.
+  // Filen er aendret paa disken, saa billedet ligger til redigering igen.
+  // Faerdig-maerket ryddes med: er der lige gemt en ny udgave, er arbejdet
+  // ikke overstaaet, og de to trin kan ikke gaelde samtidig.
   _markEdited(fileId) {
-    this.db.run('UPDATE versions SET edited=1 WHERE file_id=?', fileId);
+    this.db.run('UPDATE versions SET edited=1, finished=0 WHERE file_id=?', fileId);
     this.db.run(
-      `UPDATE versions SET edited=1 WHERE file_id IS NULL AND image_id IN
+      `UPDATE versions SET edited=1, finished=0 WHERE file_id IS NULL AND image_id IN
         (SELECT id FROM images WHERE master_file_id=?)`,
       fileId
     );
@@ -380,14 +386,30 @@ export class Catalog extends EventEmitter {
     this.emit('changed');
   }
 
-  setFlag(versionIds, flag, value) {
-    if (!['edited', 'finished'].includes(flag)) throw new Error(`Ukendt flag: ${flag}`);
+  // Hvor langt et billede er i arbejdet. Det er ét trin ad gangen: enten
+  // ligger billedet til redigering, eller ogsaa er det faerdigt. Foer stod
+  // de to som hver sit flag, der kunne vaere taendt samtidig, og saa stod
+  // der baade "being edited" og "finished" paa det samme billede. Begge
+  // kolonner skrives nu i samme saetning, saa den tilstand ikke findes.
+  setStage(versionIds, stage) {
+    if (![null, 'edited', 'finished'].includes(stage)) {
+      throw new Error(`Unknown workflow stage: ${stage}`);
+    }
+    const edited = stage === 'edited' ? 1 : 0;
+    const finished = stage === 'finished' ? 1 : 0;
     this.db.transaction(() => {
       for (const id of versionIds) {
-        this.db.run(`UPDATE versions SET ${flag}=? WHERE id=?`, value ? 1 : 0, id);
+        this.db.run('UPDATE versions SET edited=?, finished=? WHERE id=?', edited, finished, id);
       }
     });
     this.emit('changed');
+  }
+
+  stageOf(version) {
+    if (!version) return null;
+    if (version.finished) return 'finished';
+    if (version.edited) return 'edited';
+    return null;
   }
 
   // ---------- Virtuelle kopier ----------
