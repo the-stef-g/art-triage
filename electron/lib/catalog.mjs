@@ -8,6 +8,7 @@ import {
 import { join, dirname, basename, extname, posix } from 'node:path';
 import {
   walkImages, walkDirs, quickHash, stemOf, slug, uniquePath, extOf, daCollator,
+  libraryAvailable,
 } from './util.mjs';
 
 const SCHEMA = `
@@ -102,6 +103,13 @@ export class Catalog extends EventEmitter {
   // Koerer en fuld afstemning mellem disk og database. Idempotent, saa
   // watcheren kan kalde den ved enhver aendring.
   sync() {
+    // Er drevet ikke tilsluttet, ligner biblioteket en tom mappe, og en
+    // synkronisering ville markere hver eneste fil som forsvundet. Meld
+    // fra og lad kataloget staa uroert, saa bedoemmelser, serier og
+    // virtuelle kopier overlever at et drev er taget ud.
+    if (!libraryAvailable(this.root)) {
+      return { changed: 0, edited: 0, unavailable: true };
+    }
     const disk = new Map(walkImages(this.root).map((f) => [f.rel, f]));
     const dbFiles = this.db.all('SELECT * FROM files');
     const missing = [];
@@ -206,7 +214,7 @@ export class Catalog extends EventEmitter {
 
     if (changedFileIds.length || missing.length) this.emit('changed');
     if (editedFileIds.length) this.emit('files-edited', editedFileIds);
-    return { changed: changedFileIds.length, edited: editedFileIds.length };
+    return { changed: changedFileIds.length, edited: editedFileIds.length, unavailable: false };
   }
 
   // Saetter redigeret-flag paa alle versioner der bruger denne fil.

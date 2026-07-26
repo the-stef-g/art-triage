@@ -58,8 +58,35 @@ const puls = () => {
   lastActivity = Date.now();
 };
 
-function progressReporter(fase) {
+// Faserne efter selve downloaden melder ingen fremdrift af sig selv:
+// modellen skal pakkes ud i WASM og koere en foerste inferens, og paa en
+// aeldre Intel-iMac tager begge dele lang tid. Uden livstegn saetter
+// statuslinjen sig fast, typisk paa "Henter billedmodel 100%", og ser
+// frossen ud selv om der arbejdes. Pulsen sender fasen igen med forloebet
+// tid, saa der altid er bevaegelse at se paa.
+let pulsTimer = null;
+let faseStart = 0;
+let faseTekst = '';
+
+function saetFase(detail, progress = null) {
+  faseTekst = detail;
+  faseStart = Date.now();
+  stopPuls();
+  send({ type: 'status', state: 'model', progress, detail });
+  pulsTimer = setInterval(() => {
+    const sek = Math.round((Date.now() - faseStart) / 1000);
+    send({ type: 'status', state: 'model', progress, detail: `${faseTekst} (${sek} s)` });
+  }, 2000);
+}
+
+function stopPuls() {
+  if (pulsTimer) clearInterval(pulsTimer);
+  pulsTimer = null;
+}
+
+function progressReporter(hentFase, klargoerFase) {
   const files = new Map();
+  let klargoer = false;
   return (p) => {
     puls();
     if (p.status !== 'progress' || !p.file) return;
@@ -71,7 +98,18 @@ function progressReporter(fase) {
       total += f.total;
     }
     const pct = total ? Math.round((loaded / total) * 100) : 0;
-    send({ type: 'status', state: 'model', progress: pct, detail: fase });
+    if (pct >= 100) {
+      // Filerne er hentet. Herfra og til modellen er klar sker der intet
+      // maalbart, saa der skiftes til puls i stedet for at staa paa 100%.
+      if (!klargoer) {
+        klargoer = true;
+        saetFase(klargoerFase);
+      }
+      return;
+    }
+    klargoer = false;
+    stopPuls();
+    send({ type: 'status', state: 'model', progress: pct, detail: hentFase });
   };
 }
 
@@ -94,15 +132,15 @@ function medStallVagt(promise) {
 // Kun q8: fp32 kan ikke allokeres i 32-bit WASM. Alt tildeles foerst
 // naar hele parret er indlaest, saa en halv fejl ikke efterlader rod.
 async function loadModels(repo) {
-  const pv = progressReporter('Henter billedmodel');
+  const pv = progressReporter('Henter billedmodel', 'Klargør billedmodel');
   puls();
   const proc = await medStallVagt(AutoProcessor.from_pretrained(repo, { progress_callback: pv }));
   puls();
   const vis = await medStallVagt(
     VisionModelClass.from_pretrained(repo, { device: 'wasm', dtype: 'q8', progress_callback: pv })
   );
-  send({ type: 'status', state: 'model', progress: 50, detail: 'Henter sprogmodel' });
-  const pt = progressReporter('Henter sprogmodel');
+  saetFase('Henter sprogmodel', 50);
+  const pt = progressReporter('Henter sprogmodel', 'Klargør sprogmodel');
   puls();
   const tok = await medStallVagt(AutoTokenizer.from_pretrained(repo, { progress_callback: pt }));
   puls();
@@ -139,11 +177,15 @@ async function init() {
   for (let attempt = 0; ; attempt++) {
     let lastErr = null;
     for (const repo of kandidatListe()) {
-      send({ type: 'status', state: 'model', progress: 0, detail: 'Henter billedmodel' });
+      saetFase('Henter billedmodel', 0);
       try {
         await loadModels(repo);
-        send({ type: 'status', state: 'model', progress: 99, detail: 'Starter modellen' });
+        // Foerste inferens varmer WASM op og er den tungeste enkeltdel paa
+        // en aeldre Mac. Pulsen koerer videre her, saa linjen ikke staar
+        // stille netop hvor ventetiden er laengst.
+        saetFase('Starter modellen');
         await medStallVagt(embedText('test'));
+        stopPuls();
         try {
           localStorage.setItem(MODEL_KEY, repo);
         } catch {
@@ -153,6 +195,7 @@ async function init() {
         send({ type: 'ready', device: 'wasm', modelId: modelId(repo) });
         return;
       } catch (err) {
+        stopPuls();
         lastErr = err;
         console.error('Model-kandidat fejlede', repo, err);
       }

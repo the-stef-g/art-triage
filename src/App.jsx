@@ -32,6 +32,8 @@ export default function App() {
   const [modal, setModal] = useState(null);
   const [fejl, setFejl] = useState(null);
   const [appInfo, setAppInfo] = useState(null);
+  const [drev, setDrev] = useState(null); // {missing, root} naar drevet skifter tilstand
+  const [skanner, setSkanner] = useState(false);
 
   const filterRef = useRef(filter);
   filterRef.current = filter;
@@ -142,6 +144,8 @@ export default function App() {
       if (evt.progress?.phase === 'faerdig') refreshMeta();
     } else if (evt.type === 'ai') {
       setAiStatus(evt.status);
+    } else if (evt.type === 'drev') {
+      setDrev({ missing: evt.missing, root: evt.root });
     } else if (evt.type === 'library') {
       setLibrary({ root: evt.root });
     }
@@ -243,6 +247,20 @@ export default function App() {
     },
     moveTo: (fileIds, targetRel) => {
       invoke('fold:move', { fileIds, targetRel }).catch(visFejl);
+    },
+    rescan: async () => {
+      setSkanner(true);
+      try {
+        const res = await invoke('lib:rescan');
+        if (res?.unavailable) {
+          setFejl('Drevet er ikke tilsluttet. Billederne er ikke væk, kataloget står urørt.');
+        } else if (res?.skipped) {
+          setFejl('En skanning er allerede i gang');
+        } else {
+          setFejl(res?.changed ? `Fandt ${res.changed} nye eller ændrede filer` : 'Ingen ændringer fundet');
+        }
+        setTimeout(() => setFejl(null), 5000);
+      } catch (err) { visFejl(err); } finally { setSkanner(false); }
     },
     cleanup: async () => {
       try {
@@ -346,6 +364,8 @@ export default function App() {
         onNewFolder={act.newFolder}
         onCleanup={act.cleanup}
         onChooseLibrary={act.chooseLibrary}
+        onRescan={act.rescan}
+        skanner={skanner}
       />
       <div className="hoved">
         <Sidebar
@@ -383,6 +403,7 @@ export default function App() {
         fejl={fejl}
         library={library}
         version={appInfo?.version}
+        drevMangler={Boolean(drev?.missing)}
       />
       {showPreview && focusedRow && (
         <PreviewOverlay

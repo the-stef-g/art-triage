@@ -29,7 +29,10 @@ export class AiBridge extends EventEmitter {
       return;
     }
     if (msg.type === 'status') {
-      this.setStatus({ state: msg.state, progress: msg.progress ?? 0, detail: msg.detail ?? '' });
+      // progress kan bevidst vaere null: faserne efter download melder
+      // ingen procent, og et paatvunget 0 ville se ud som om alt gik om
+      // forfra. Statuslinjen udelader tallet naar det er null.
+      this.setStatus({ state: msg.state, progress: msg.progress ?? null, detail: msg.detail ?? '' });
       return;
     }
     if (msg.type === 'result' || msg.type === 'error') {

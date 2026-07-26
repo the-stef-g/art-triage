@@ -1,8 +1,14 @@
-export default function StatusBar({ counts, aiStatus, indexProgress, searchInfo, fejl, library, version }) {
+export default function StatusBar({
+  counts, aiStatus, indexProgress, searchInfo, fejl, library, version, drevMangler,
+}) {
   const aiTekst = (() => {
     if (!aiStatus) return '';
     if (aiStatus.state === 'model') {
-      return `${aiStatus.detail || 'Henter AI-model'} ${aiStatus.progress || 0}%`;
+      // Faserne efter download melder ingen procent; saa staar der bare
+      // fasen og hvor laenge den har koert, i stedet for et tal der
+      // haenger fast paa 100.
+      const pct = typeof aiStatus.progress === 'number' ? ` ${aiStatus.progress}%` : '';
+      return `${aiStatus.detail || 'Henter AI-model'}${pct}`;
     }
     if (aiStatus.state === 'klar') return `AI klar (${aiStatus.device === 'webgpu' ? 'GPU' : 'CPU'})`;
     if (aiStatus.state === 'offline') return aiStatus.detail || 'AI offline: modellen kunne ikke hentes';
@@ -33,6 +39,11 @@ export default function StatusBar({ counts, aiStatus, indexProgress, searchInfo,
         <span className="soegeinfo">{searchInfo.matched} resultater</span>
       )}
       <span className="spacer" />
+      {drevMangler && (
+        <span className="drev-mangler" title="Kataloget er urørt. Tilslut drevet og klik Skan igen.">
+          Drevet er ikke tilsluttet
+        </span>
+      )}
       {indexTekst && <span className="index-status">{indexTekst}</span>}
       <span className={`ai-status ${aiStatus?.state || ''}`}>{aiTekst}</span>
       {fejl && <span className="fejl">{fejl}</span>}

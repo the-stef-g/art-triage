@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 
-export default function Toolbar({ filter, setFilter, searchInfo, onNewFolder, onCleanup, onChooseLibrary }) {
+export default function Toolbar({
+  filter, setFilter, searchInfo, onNewFolder, onCleanup, onChooseLibrary, onRescan, skanner,
+}) {
   const [text, setText] = useState(filter.search);
 
   useEffect(() => setText(filter.search), [filter.search]);
@@ -55,6 +57,13 @@ export default function Toolbar({ filter, setFilter, searchInfo, onNewFolder, on
       </div>
       <div className="vaerktoejer">
         <button onClick={onNewFolder}>Ny mappe</button>
+        <button
+          onClick={onRescan}
+          disabled={skanner}
+          title="Gennemgå mappen for nye og ændrede filer med det samme"
+        >
+          {skanner ? 'Skanner …' : 'Skan igen'}
+        </button>
         <button onClick={onCleanup} title="Flyt filer hvor alle versioner er kasseret til mappen _kasseret">Ryd op</button>
         <button onClick={onChooseLibrary} title="Skift til en anden billedmappe">Skift bibliotek</button>
       </div>

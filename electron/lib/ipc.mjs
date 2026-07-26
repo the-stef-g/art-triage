@@ -12,6 +12,16 @@ import { Indexer, MODEL_ID } from './indexer.mjs';
 import { UndoManager } from './undo.mjs';
 import { debounce } from './util.mjs';
 
+// Mappe-overvaageren (chokidar) faar sjaeldent fil-system-haendelser fra
+// eksterne drev paa macOS, og Stefs billeder ligger netop eksternt. Den
+// periodiske genskanning er derfor ikke et sikkerhedsnet men den baerende
+// mekanisme: uden den dukker nye filer foerst op efter en genstart.
+const RESCAN_MIN_MS = 90_000;
+// Et langsomt drev maa ikke ende med at skanne i et vaek. Naeste skanning
+// planlaegges tidligst naar der er gaaet ti gange saa lang tid som den
+// forrige tog, saa skanningen hoejst fylder en tiendedel af tiden.
+const RESCAN_DUTY = 10;
+
 export class AppSession {
   constructor({ settings, ai, rasterizeSvg }) {
     this.settings = settings;
@@ -24,6 +34,10 @@ export class AppSession {
     this.watcher = null;
     this.searchIndex = null;
     this.indexer = null;
+    this.scanTimer = null;
+    this.scanning = false;
+    this.driveMissing = false;
+    this.lastScanMs = 0;
 
     this.ai.on('status', (status) => {
       this.broadcast('ai', { status });
@@ -47,6 +61,56 @@ export class AppSession {
     if (this.win && !this.win.isDestroyed()) {
       this.win.webContents.send('evt', { type, ...payload });
     }
+  }
+
+  // Alle synkroniseringer gaar gennem her, uanset om de kommer fra
+  // watcheren, fra uret eller fra "Skan igen"-knappen. To skanninger maa
+  // aldrig koere oven i hinanden: en fuld gennemgang af et stort
+  // bibliotek paa et eksternt drev tager tid, og to ad gangen ville bare
+  // traekke hinanden ned.
+  runSync(reason = 'auto') {
+    if (!this.catalog) return { skipped: true, reason };
+    if (this.scanning) return { skipped: true, reason };
+    this.scanning = true;
+    const start = Date.now();
+    let res;
+    try {
+      res = this.catalog.sync();
+    } catch {
+      // En enkelt mislykket skanning maa ikke vaelte noget; uret proever igen.
+      res = { changed: 0, edited: 0, unavailable: false };
+    } finally {
+      this.scanning = false;
+    }
+    this.lastScanMs = Date.now() - start;
+    this._reportDrive(Boolean(res.unavailable));
+    return { ...res, skipped: false, reason, varighed: this.lastScanMs };
+  }
+
+  // Melder kun naar tilstanden skifter, saa statuslinjen ikke blinker
+  // ved hver eneste skanning.
+  _reportDrive(missing) {
+    if (missing === this.driveMissing) return;
+    this.driveMissing = missing;
+    this.broadcast('drev', { missing, root: this.catalog?.root ?? null });
+  }
+
+  // Kaeder sig selv frem i stedet for at bruge et fast interval, saa et
+  // langsomt drev automatisk faar laengere mellem skanningerne.
+  _scheduleScan() {
+    clearTimeout(this.scanTimer);
+    const delay = Math.max(RESCAN_MIN_MS, (this.lastScanMs || 0) * RESCAN_DUTY);
+    this.scanTimer = setTimeout(() => {
+      this.runSync('ur');
+      this._scheduleScan();
+    }, delay);
+    // Uret maa hverken holde appen vaagen eller forsinke en afslutning.
+    this.scanTimer.unref?.();
+  }
+
+  _stopScanTimer() {
+    clearTimeout(this.scanTimer);
+    this.scanTimer = null;
   }
 
   async openLibrary(root) {
@@ -88,19 +152,18 @@ export class AppSession {
       }
     }, 400);
 
-    this.catalog.sync();
+    this.driveMissing = false;
+    this.lastScanMs = 0;
+    this.runSync('aabning');
     try {
       this.indexer.recomputeKeywords();
     } catch {
       // noegleord genberegnes ved naeste lejlighed
     }
-    this.watcher = watchLibrary(root, () => {
-      try {
-        this.catalog.sync();
-      } catch {
-        // synkronisering proever igen ved naeste aendring
-      }
-    });
+    // Watcheren beholdes: paa interne diske er den oejeblikkelig. Paa
+    // eksterne drev tier den, og der er det uret nedenfor der leverer.
+    this.watcher = watchLibrary(root, () => this.runSync('watcher'));
+    this._scheduleScan();
     this.settings.rememberLibrary(root);
     this.broadcast('library', { root });
     this.indexer.kick();
@@ -109,6 +172,7 @@ export class AppSession {
 
   // Hurtig, synkron lukning til quit: venter ikke paa watcheren.
   closeQuick() {
+    this._stopScanTimer();
     try { this.indexer?.stop(); } catch { /* ligegyldigt ved quit */ }
     if (this.watcher) {
       this.watcher.close().catch(() => {});
@@ -123,6 +187,7 @@ export class AppSession {
   }
 
   async closeLibrary() {
+    this._stopScanTimer();
     if (this.watcher) {
       await this.watcher.close().catch(() => {});
       this.watcher = null;
@@ -188,6 +253,18 @@ export class AppSession {
     handle('lib:open', async ({ root }) => this.openLibrary(root));
     handle('lib:recent', () => this.settings.data.recentLibraries);
     handle('lib:current', () => (this.catalog ? { root: this.catalog.root } : null));
+    // "Skan igen": naar drevet lige er tilsluttet igen, eller naar der er
+    // lagt filer i mappen og man ikke gider vente paa uret.
+    handle('lib:rescan', () => {
+      this.requireCatalog();
+      const res = this.runSync('manuel');
+      if (!res.skipped) this.indexer?.kick();
+      return res;
+    });
+    handle('lib:driveStatus', () => ({
+      missing: this.driveMissing,
+      root: this.catalog?.root ?? null,
+    }));
 
     handle('img:list', async (filter) => {
       const catalog = this.requireCatalog();

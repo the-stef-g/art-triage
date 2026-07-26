@@ -323,6 +323,7 @@ input:focus, select:focus { outline: 1px solid var(--accent); }
 .ai-status.klar { color: var(--godkendt); }
 .ai-status.offline, .ai-status.fejl { color: var(--kasseret); }
 .statusbar .fejl { color: var(--faerdig); }
+.statusbar .drev-mangler { color: var(--kasseret); font-weight: 600; }
 
 /* ---------- Velkomst ---------- */
 .velkomst {

@@ -37,6 +37,21 @@ export function quickHash(absPath, size) {
 
 export const IGNORED_DIRS = new Set(['.billedflow', 'node_modules']);
 
+// Er biblioteksroden tilgaengelig lige nu?
+//
+// walkImages sluger laesefejl og gaar videre, saa et eksternt drev der
+// ikke er tilsluttet giver praecis samme svar som en tom mappe: nul
+// billeder. Uden det her tjek ville en synkronisering laese det som at
+// hele biblioteket var slettet. Naar billederne ligger paa eksterne
+// diske, er frakoblede drev hverdag og ikke et saertilfaelde.
+export function libraryAvailable(root) {
+  try {
+    return statSync(root).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
 // Gaar hele mappetraeet igennem og returnerer alle understoettede billedfiler.
 export function walkImages(root) {
   const out = [];
