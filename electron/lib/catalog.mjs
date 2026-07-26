@@ -712,6 +712,15 @@ export class Catalog extends EventEmitter {
     return antal;
   }
 
+  // Rydder alt appen selv har gaettet, og lader det Stef har skrevet ind
+  // staa. Bruges naar de automatiske noegleord tages ud af drift, saa
+  // chips og soegning ikke bliver ved med at vise gamle gaet.
+  clearAutoKeywords() {
+    const antal = this.db.run('DELETE FROM keywords WHERE manual=0').changes;
+    if (antal) this.emit('changed');
+    return antal;
+  }
+
   keywordsForFile(fileId) {
     return this.db.all(
       'SELECT word, score, manual FROM keywords WHERE file_id=? ORDER BY manual DESC, score DESC',

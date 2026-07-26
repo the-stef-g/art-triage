@@ -38,9 +38,13 @@ Appen er ikke signeret med et Apple-udviklercertifikat, så første gang siger m
 
 **Serier.** Markér et eller flere billeder og vælg "Ny serie" eller en eksisterende serie i Inspektøren. Klik på en serie i sidepanelet for kun at se dens billeder.
 
-**Søgning.** Skriv fx "gule blomster" i søgefeltet, så finder Billedflow billederne ud fra selve billedindholdet. Det kræver ingen manuelle søgeord: appen analyserer selv alle billeder i baggrunden og tildeler samtidig danske nøgleord, som vises som klikbare chips i sidepanelet. Kun billeder, der tydeligt matcher, vises; en søgning uden reelle match giver ærligt nul resultater. Tallet ved et nøgleord i sidepanelet svarer til det antal billeder, et klik viser.
+**Søgning.** Skriv fx "gule blomster" i søgefeltet, så finder Billedflow billederne ud fra selve billedindholdet. Det kræver ingen søgeord: appen analyserer selv alle billeder i baggrunden. Kun billeder, der tydeligt matcher, vises; en søgning uden reelle match giver ærligt nul resultater. Tallet ved et nøgleord i sidepanelet svarer til det antal billeder, et klik viser.
 
-**Nøgleord der lærer.** Hvert billedes nøgleord kan ses og rettes i Inspektøren. Fjern et forkert ord med krydset, så kommer det aldrig igen på det billede. Er et ord forkert overalt, kan du fjerne det fra alle billeder på én gang med krydset på chippen i sidepanelet, og så holder appen op med at foreslå det. Klikker du et nøgleord i sidepanelet, viser grid'et alle billeder med det ord. Marker de billeder der ikke hører til (klik, cmd-klik eller shift-klik for flere) og fjern dem fra nøgleordet med knappen i Inspektøren. Tilføjer du dine egne ord (fx "Seagully") på et par billeder, lærer appen hvordan de ser ud og foreslår dem på visuelt lignende billeder, som du selv kan beholde eller fjerne. Alt sker lokalt på din Mac, og appen bliver bedre jo mere du retter.
+**Nøgleord.** Appen gætter ikke selv nøgleord. Det gjorde den før, ved at score hvert billede mod en dansk ordliste, men den sammenligning var vendt forkert: ord blev holdt op mod hinanden billede for billede, så en formulering der generelt lå højt vandt på alt. I praksis endte 'kirke' på 1170 ud af 1200 billeder. Den mekanik er taget ud, og de gamle gæt ryddes automatisk væk første gang du åbner biblioteket. Dine egne ord bliver stående.
+
+Du kan selv skrive nøgleord på et billede i Inspektøren, og de vises som klikbare chips i sidepanelet. Klikker du et nøgleord, viser grid'et alle billeder med det ord. Marker dem der ikke hører til (klik, cmd-klik eller shift-klik for flere) og fjern dem fra nøgleordet med knappen i Inspektøren. Krydset på chippen i sidepanelet fjerner ordet fra alle billeder på én gang, også dem du selv har skrevet, og det kan ikke fortrydes.
+
+Automatiske nøgleord kommer tilbage, når de laves af Claude i stedet. Det er punkt 3 i `docs/plan-cloud-noegleord.md`. Indtil da virker den semantiske søgning som før og gratis, for den bygger på billedanalysen og ikke på nøgleord.
 
 ## AI-modellen
 

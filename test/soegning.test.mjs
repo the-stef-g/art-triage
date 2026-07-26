@@ -6,7 +6,6 @@ import { SearchIndex, medianMad, robustZ, normalize } from '../electron/lib/sear
 import { openDatabase } from '../electron/lib/db.mjs';
 import { Catalog } from '../electron/lib/catalog.mjs';
 import { Indexer } from '../electron/lib/indexer.mjs';
-import { vocabHash } from '../electron/lib/vocab.mjs';
 
 // Deterministisk pseudotilfaeldighed, saa testene aldrig flimrer.
 function lcg(seed) {
@@ -113,23 +112,17 @@ describe('noegleord', () => {
     rmSync(root, { recursive: true, force: true });
   });
 
-  it('tildeler kun ord der skiller sig ud', () => {
-    const rand = lcg(3);
+  // Ordliste-scoringen er taget ud af drift: den sammenlignede ord
+  // indbyrdes paa hvert billede, og et ord der generelt laa hoejt vandt
+  // saa paa alt. Indexeren beregner nu kun embeddings til soegningen.
+  // Tildeling og oprydning er daekket i noegleord.test.mjs.
+  it('indekseringen tildeler ikke laengere noegleord', () => {
     const indexer = new Indexer({ catalog, thumbs: null, ai: null, searchIndex: null, model: 'test-model' });
-    const billedVec = tilfaeldigVektor(rand);
-    indexer.vocabVecs = [
-      { word: 'match', vec: taetPaa(rand, billedVec, 0.05) },
-      ...Array.from({ length: 60 }, (_, i) => ({ word: `stoej${i}`, vec: tilfaeldigVektor(rand) })),
-    ];
-    const [a] = catalog.listVersions({});
-    indexer._assignKeywords(a.file_id, billedVec);
-    const ord = catalog.keywordsForFile(a.file_id).map((k) => k.word);
-    expect(ord).toContain('match');
-    expect(ord.length).toBeLessThanOrEqual(6);
-    expect(ord.filter((o) => o.startsWith('stoej')).length).toBeLessThanOrEqual(1);
+    expect(indexer.recomputeKeywords).toBeUndefined();
+    expect(indexer._assignKeywords).toBeUndefined();
   });
 
-  it('manuelle noegleord overlever genberegning og vises foerst', () => {
+  it('et manuelt noegleord staar foran et gemt auto-ord', () => {
     const [a] = catalog.listVersions({});
     catalog.addKeyword(a.file_id, 'seagully');
     catalog.saveKeywords(a.file_id, [{ word: 'strand', score: 3.2 }]);
@@ -149,25 +142,13 @@ describe('noegleord', () => {
     expect(catalog.filesWithKeywordLike('hest')).toEqual([]);
   });
 
-  it('recomputeKeywords genberegner fra gemte embeddings og koerer kun en gang', () => {
+  // En gemt embedding skal stadig kunne bruges af soegningen, selv om
+  // der ikke laengere udledes noegleord af den.
+  it('en gemt embedding giver ingen noegleord af sig selv', () => {
     const rand = lcg(11);
     const model = 'test-model';
-    const indexer = new Indexer({ catalog, thumbs: null, ai: null, searchIndex: null, model });
     const rows = catalog.listVersions({});
-    const billedVec = tilfaeldigVektor(rand);
-    catalog.saveEmbedding(rows[0].file_id, model, billedVec);
-
-    const vocab = [
-      { word: 'match', vec: taetPaa(rand, billedVec, 0.05) },
-      ...Array.from({ length: 60 }, (_, i) => ({ word: `stoej${i}`, vec: tilfaeldigVektor(rand) })),
-    ];
-    catalog.setMeta(`vocab:${model}:${vocabHash()}`, JSON.stringify(vocab.map(({ word, vec }) => ({
-      word,
-      vec: Buffer.from(vec.buffer, vec.byteOffset, vec.byteLength).toString('base64'),
-    }))));
-
-    expect(indexer.recomputeKeywords()).toBe(true);
-    expect(catalog.keywordsForFile(rows[0].file_id).map((k) => k.word)).toContain('match');
-    expect(indexer.recomputeKeywords()).toBe(false);
+    catalog.saveEmbedding(rows[0].file_id, model, tilfaeldigVektor(rand));
+    expect(catalog.keywordsForFile(rows[0].file_id)).toEqual([]);
   });
 });

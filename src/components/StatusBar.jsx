@@ -18,7 +18,6 @@ export default function StatusBar({
 
   const indexTekst = (() => {
     if (!indexProgress) return '';
-    if (indexProgress.phase === 'ordliste') return `Forbereder ordliste ${indexProgress.done}/${indexProgress.total}`;
     if (indexProgress.phase === 'billeder') return `Analyserer billeder ${indexProgress.done}/${indexProgress.total}`;
     return '';
   })();

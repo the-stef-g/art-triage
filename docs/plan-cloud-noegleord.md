@@ -15,6 +15,26 @@ Nøgleord skal fremover komme fra Claude via API, ikke fra den lokale zero-shot
 model. Den lokale SigLIP-model bliver siddende, men kun til den gratis semantiske
 søgning, hvor den er god nok. De dårlige auto-nøgleord fjernes.
 
+Status: den sidste sætning er udført forud for punkt 3, fordi ordene var
+ubrugelige i praksis. Ordliste-scoringen er taget ud af indekseringen, de gamle
+gæt ryddes ved første biblioteksåbning, og electron/lib/vocab.mjs er slettet
+(kan hentes fra git-historikken). Årsagen til de skæve ord er værd at kende,
+så den ikke gentages: scoringen sammenlignede ordene indbyrdes på hvert enkelt
+billede og spurgte, om noget skilte sig ud. Men ordene er ikke indbyrdes
+kalibrerede, så en formulering der generelt ligger tæt på "et fotografi" vinder
+på hvert eneste billede. Kalibreringen skulle have været den anden vej: hvert
+ord målt mod sig selv på tværs af samlingen. Hos Stef landede 'kirke' på 1170
+af 1200 billeder.
+
+Med i samme ombæring røg propageringen af Stefs egne ord til visuelt lignende
+billeder, da den kørte oven på samme tildeling. De ord han selv har skrevet ind
+står urørt; det er kun forslagene til andre billeder der er væk. Skal den
+funktion tilbage, hører den hjemme oven på Claudes nøgleord.
+
+catalog.saveKeywords(fileId, entries) står tilbage ubrugt med vilje. Det er
+sømmen hvor Claudes ord skal skrives ind, med manual=0 så de kan ryddes samlet
+igen uden at røre Stefs egne.
+
 Appen skal være på engelsk. UI-tekster og de AI-genererede nøgleord skifter til
 engelsk. Sitet stefs.company forbliver dansk; det er en anden sammenhæng og røres
 ikke.

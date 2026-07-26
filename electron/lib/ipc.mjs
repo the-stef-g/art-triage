@@ -22,6 +22,12 @@ const RESCAN_MIN_MS = 90_000;
 // forrige tog, saa skanningen hoejst fylder en tiendedel af tiden.
 const RESCAN_DUTY = 10;
 
+// Engangsoprydning pr. bibliotek: de automatiske noegleord var
+// systematisk skaeve og er taget ud af drift, saa de gamle gaet skal ud
+// af databasen. Manuelle ord roeres ikke. Noeglen staar i meta, saa
+// oprydningen kun koerer en gang.
+const AUTOKW_RYDDET = 'autokw_ryddet';
+
 export class AppSession {
   constructor({ settings, ai, rasterizeSvg }) {
     this.settings = settings;
@@ -141,24 +147,20 @@ export class AppSession {
     });
     this.indexer.on('progress', (progress) => this.broadcast('index', { progress }));
 
-    // Genberegner noegleord fra de gemte embeddings naar logik eller
-    // feedback er aendret (ren matematik, ingen AI). Debounced, saa hurtige
-    // rettelser i traek ikke koerer den mange gange.
-    this._recompute = debounce(() => {
-      try {
-        this.indexer?.recomputeKeywords();
-      } catch {
-        // noegleord genberegnes ved naeste lejlighed
-      }
-    }, 400);
-
     this.driveMissing = false;
     this.lastScanMs = 0;
     this.runSync('aabning');
-    try {
-      this.indexer.recomputeKeywords();
-    } catch {
-      // noegleord genberegnes ved naeste lejlighed
+    // Foerste aabning efter at de automatiske noegleord blev taget ud af
+    // drift: fjern de gamle gaet, saa chips og soegning ikke bliver ved
+    // med at vise dem. Stefs egne ord staar uroert.
+    if (this.catalog.getMeta(AUTOKW_RYDDET) !== '1') {
+      try {
+        const antal = this.catalog.clearAutoKeywords();
+        this.catalog.setMeta(AUTOKW_RYDDET, '1');
+        if (antal) this.broadcast('besked', { tekst: `Fjernede ${antal} automatiske nøgleord` });
+      } catch {
+        // proever igen ved naeste aabning; flaget er ikke sat
+      }
     }
     // Watcheren beholdes: paa interne diske er den oejeblikkelig. Paa
     // eksterne drev tier den, og der er det uret nedenfor der leverer.
@@ -368,24 +370,13 @@ export class AppSession {
 
     handle('kw:top', () => this.requireCatalog().topKeywords());
     handle('kw:forFile', ({ fileId }) => this.requireCatalog().keywordsForFile(fileId));
-    handle('kw:add', ({ fileId, word }) => {
-      this.requireCatalog().addKeyword(fileId, word);
-      this._recompute?.();
-    });
-    handle('kw:remove', ({ fileId, word }) => {
-      this.requireCatalog().removeKeyword(fileId, word);
-      this._recompute?.();
-    });
-    handle('kw:removeFromFiles', ({ fileIds, word }) => {
-      const n = this.requireCatalog().removeKeywordFromFiles(fileIds, word);
-      this._recompute?.();
-      return n;
-    });
-    handle('kw:removeAll', ({ word }) => {
-      const n = this.requireCatalog().removeKeywordEverywhere(word);
-      this._recompute?.();
-      return n;
-    });
+    // Ingen genberegning laengere: appen gaetter ikke selv noegleord, saa
+    // det der staar, er det Stef selv har skrevet ind.
+    handle('kw:add', ({ fileId, word }) => this.requireCatalog().addKeyword(fileId, word));
+    handle('kw:remove', ({ fileId, word }) => this.requireCatalog().removeKeyword(fileId, word));
+    handle('kw:removeFromFiles', ({ fileIds, word }) =>
+      this.requireCatalog().removeKeywordFromFiles(fileIds, word));
+    handle('kw:removeAll', ({ word }) => this.requireCatalog().removeKeywordEverywhere(word));
 
     handle('search:status', () => ({
       ai: this.ai.status,

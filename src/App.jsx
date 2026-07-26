@@ -146,6 +146,9 @@ export default function App() {
       setAiStatus(evt.status);
     } else if (evt.type === 'drev') {
       setDrev({ missing: evt.missing, root: evt.root });
+    } else if (evt.type === 'besked') {
+      setFejl(evt.tekst);
+      setTimeout(() => setFejl(null), 6000);
     } else if (evt.type === 'library') {
       setLibrary({ root: evt.root });
     }
