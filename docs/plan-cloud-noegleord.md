@@ -208,6 +208,47 @@ Tabellen keyword_runs er kvitteringen for at en fil har været afsted. Uden den
 kunne en fil der ikke gav nogen ord ikke skelnes fra en der aldrig er sendt, og
 den ville blive betalt for igen ved hver eneste kørsel.
 
+## Hvad første runde på rigtige billeder viste
+
+En hærget murvæg gav weathered wood, peeling paint, blue paint, brown wood,
+decay, distressed surface, rust stains, patina, aged texture, horizontal layers
+og worn finish. Fire af dem forkerte, fem af dem det samme ord sagt på fem
+måder, og hverken wall eller brick var med. To ting fulgte af det.
+
+Instruktionen er skrevet om. Motivet først med det jævneste navn, så materialet
+men kun hvis det er hævet over tvivl, så den dominerende farve. Fem til otte ord.
+Ingen stemning, intet lys, ingen komposition: der er ingen der søger efter
+dramatic light. Og hellere et manglende materiale end et forkert.
+
+Ordene er enkeltord. Ikke blue paint men blue og paint, ikke brick wall men brick
+og wall. Et enkeltord kan genbruges på tusindvis af billeder; en frase kan ikke,
+og et katalog med white paint, black paint og blue paint fyldes med ord der hver
+peger på en håndfuld billeder. Instruktionen beder om det, og svar der alligevel
+kommer som fraser deles op på vej ind, så reglen ikke afhænger af at modellen
+adlyder.
+
+Genbrug håndhæves også aktivt: hver kørsel sender katalogets eksisterende ord med
+og beder Claude bruge et af dem frem for et nyt ord for samme ting. Listen hentes
+én gang pr. kørsel og står fast, fordi et cache-præfiks der skifter undervejs
+ville koste fuld pris på hvert eneste billede.
+
+Om det er nok, afgøres på Stefs egne billeder. Bliver materialerne stadig gættet
+forkert, er det modellen der er for lille, ikke instruktionen: valget står i
+sidepanelet.
+
+## Afvisninger af nøgleord er taget ud
+
+Hver sletning af et nøgleord blev gemt som en varig afvisning i keyword_feedback,
+så ordet aldrig kunne komme igen på det billede. Det gav mening dengang appen
+selv gættede og skulle lære af rettelserne. Nu kommer ordene fra Claude, ingen
+læste afvisningerne længere, og de gjorde kun en oprydning uigenkaldelig uden at
+det stod nogen steder. Tabellen og hele mekanikken er væk.
+
+Krydset på et nøgleord i sidepanelet fjerner nu ordet fra de markerede billeder
+i stedet for fra alle. Arbejdsgangen er: klik ordet, se billederne, marker dem
+det er forkert på (eller Cmd+A for dem alle), fjern. Det var netop den bunkevise
+oprydning der manglede.
+
 ## Hvad der bevidst ikke blev oversat
 
 Databasens værdier for bedømmelse (godkendt, kandidat, kasseret, ubedomt) står

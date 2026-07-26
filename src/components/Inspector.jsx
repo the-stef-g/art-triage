@@ -2,7 +2,12 @@ import { useEffect, useState } from 'react';
 import { invoke, thumbUrl } from '../api';
 import { formatBytes, formatDate, fileName } from '../util';
 
-export default function Inspector({ row, selectedCount, activeKeyword, editors, series, act }) {
+// dataRev taeller op hver gang kataloget melder en aendring. Uden den
+// blev noegleordene kun hentet naar man skiftede billede, saa ord Claude
+// lige havde skrevet foerst dukkede op hvis man gik væk og tilbage igen.
+export default function Inspector({
+  row, selectedCount, activeKeyword, editors, series, act, dataRev,
+}) {
   const [versions, setVersions] = useState([]);
   const [keywords, setKeywords] = useState([]);
   const [editorValg, setEditorValg] = useState('');
@@ -21,7 +26,7 @@ export default function Inspector({ row, selectedCount, activeKeyword, editors, 
     invoke('img:imageVersions', { imageId: row.image_id }).then(setVersions).catch(() => {});
     loadKeywords();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [row?.version_id, row?.file_id, row?.image_id, row?.mtime]);
+  }, [row?.version_id, row?.file_id, row?.image_id, row?.mtime, dataRev]);
 
   const tilfoejOrd = async () => {
     const ord = nytOrd.trim();
@@ -50,11 +55,11 @@ export default function Inspector({ row, selectedCount, activeKeyword, editors, 
       <aside className="inspector">
         <p className="tom">Select an image to see details</p>
         <ul className="genvejsliste">
-          <li><b>G</b> approve</li>
-          <li><b>K</b> candidate</li>
+          <li><b>A</b> approve</li>
+          <li><b>C</b> candidate</li>
           <li><b>X</b> discard</li>
-          <li><b>U</b> clear rating</li>
-          <li><b>R</b> stage: being edited</li>
+          <li><b>U</b> unrated</li>
+          <li><b>E</b> stage: being edited</li>
           <li><b>F</b> stage: finished</li>
           <li><b>V</b> new virtual copy</li>
           <li><b>Space</b> large preview</li>

@@ -119,7 +119,7 @@ function Noegleordskoe({ status, act }) {
 }
 
 export default function Sidebar({
-  tree, series, topKeywords, filter, setFilter, onMoveTo, onRemoveKeywordEverywhere,
+  tree, series, topKeywords, filter, setFilter, onMoveTo, onRemoveFromSelected,
   antalKandidater, onRenameSeries, onDeleteSeries, kwStatus, act,
 }) {
   // Arbejdslisten skal kunne aabnes med et klik. Ud over de andre
@@ -204,8 +204,8 @@ export default function Sidebar({
               </button>
               <button
                 className="chip-fjern"
-                title="Remove the keyword from all images"
-                onClick={() => onRemoveKeywordEverywhere(k.word)}
+                title="Remove the keyword from the selected images. Click the keyword first to see them, then select the ones it is wrong for."
+                onClick={() => onRemoveFromSelected(k.word)}
               >
                 ×
               </button>

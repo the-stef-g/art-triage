@@ -35,6 +35,10 @@ export default function App() {
   const [drev, setDrev] = useState(null); // {missing, root} naar drevet skifter tilstand
   const [skanner, setSkanner] = useState(false);
   const [kwStatus, setKwStatus] = useState(null); // cloud-noegleord: noegle, model, koe
+  // Taeller op ved hver katalog-aendring. Inspektoeren henter noegleord om
+  // paa den, saa ord der bliver skrevet mens man kigger paa billedet, ogsaa
+  // dukker op med det samme.
+  const [dataRev, setDataRev] = useState(0);
 
   const filterRef = useRef(filter);
   filterRef.current = filter;
@@ -120,6 +124,7 @@ export default function App() {
     if (evt.type === 'changed') {
       refresh();
       refreshMeta();
+      setDataRev((n) => n + 1);
     } else if (evt.type === 'genvej') {
       if (evt.cmd === 'hf-token') {
         // Hjaelp-menuen: indtast/ret Hugging Face-token.
@@ -338,25 +343,24 @@ export default function App() {
         },
       });
     },
-    removeKeywordEverywhere: async (word) => {
-      const ok = window.confirm(
-        `Remove the keyword "${word}" from ALL images?\n\n`
-        + `This also removes words you typed yourself, it cannot be undone, `
-        + `and the app will never suggest "${word}" again.`
-      );
-      if (!ok) return;
-      try {
-        await invoke('kw:removeAll', { word });
-        if (filterRef.current.keyword === word) setFilter((f) => ({ ...f, keyword: null }));
-      } catch (err) { visFejl(err); }
-    },
-    // Fjern et nøgleord fra de aktuelt markerede billeder (fx dem der
-    // ikke hører til under det søgeord man kigger på).
-    removeKeywordFromSelected: (word) => {
+    // Fjern et noegleord fra de markerede billeder. Det er vejen til at
+    // rydde et forkert ord op i én omgang: klik ordet i sidepanelet,
+    // marker de billeder det er forkert paa, og fjern det derfra. Ordet
+    // bliver ikke udelukket; det maa gerne komme igen paa andre billeder.
+    removeKeywordFromSelected: async (word) => {
       const fileIds = [...new Set(rowsRef.current
         .filter((r) => selectedRef.current.includes(r.version_id))
         .map((r) => r.file_id))];
-      if (fileIds.length) invoke('kw:removeFromFiles', { fileIds, word }).catch(visFejl);
+      if (!fileIds.length) {
+        setFejl(`Select the images «${word}» is wrong for first. Cmd+A selects them all.`);
+        setTimeout(() => setFejl(null), 6000);
+        return;
+      }
+      try {
+        const antal = await invoke('kw:removeFromFiles', { fileIds, word });
+        setFejl(`Removed «${word}» from ${antal} images`);
+        setTimeout(() => setFejl(null), 4000);
+      } catch (err) { visFejl(err); }
     },
     // ---- Cloud-noegleord ----
     kwRun: async () => {
@@ -395,7 +399,15 @@ export default function App() {
     const onKey = (e) => {
       if (modalOpenRef.current) return;
       const t = e.target;
-      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
+      const iFelt = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable);
+      // Tabulator flytter fokus rundt mellem knapperne, og det staar i
+      // vejen for et arbejde der foregaar med mus og bogstavgenveje.
+      // Felter beholder tabulator, saa man kan gaa fra soegefeltet videre.
+      if (e.key === 'Tab' && !iFelt) {
+        e.preventDefault();
+        return;
+      }
+      if (iFelt) return;
       const rs = rowsRef.current;
       const sel = selectedRef.current;
       const idx = rs.findIndex((r) => r.version_id === sel[sel.length - 1]);
@@ -405,13 +417,24 @@ export default function App() {
         const next = idx < 0 ? 0 : Math.max(0, Math.min(rs.length - 1, idx + delta));
         setSelected([rs[next].version_id]);
       };
+      // Bogstaverne foelger de engelske ord paa knapperne: A approve,
+      // C candidate, X discard, U unrated, E editing, F finished,
+      // V virtual copy. Foer stod de til de danske ord, saa man trykkede
+      // G for Approved og K for Candidate.
       switch (e.key.toLowerCase()) {
-        case 'g': act.setRating('godkendt'); break;
-        case 'k': act.setRating('kandidat'); break;
+        case 'a':
+          if (e.metaKey || e.ctrlKey) {
+            e.preventDefault();
+            setSelected(rs.map((r) => r.version_id));
+          } else {
+            act.setRating('godkendt');
+          }
+          break;
+        case 'c': act.setRating('kandidat'); break;
         case 'x': act.setRating('kasseret'); break;
         case 'u': act.setRating('ubedomt'); break;
+        case 'e': act.setStage('edited'); break;
         case 'f': act.setStage('finished'); break;
-        case 'r': act.setStage('edited'); break;
         case 'v': act.virtualCopy(); break;
         case ' ': e.preventDefault(); if (idx >= 0) setShowPreview((p) => !p); break;
         case 'escape': setShowPreview(false); setSelected([]); break;
@@ -419,12 +442,6 @@ export default function App() {
         case 'arrowright': move(1); break;
         case 'arrowup': move(-columnsRef.current); break;
         case 'arrowdown': move(columnsRef.current); break;
-        case 'a':
-          if (e.metaKey || e.ctrlKey) {
-            e.preventDefault();
-            setSelected(rs.map((r) => r.version_id));
-          }
-          break;
         default: break;
       }
     };
@@ -460,7 +477,7 @@ export default function App() {
           filter={filter}
           setFilter={setFilter}
           onMoveTo={(fileIds, rel) => act.moveTo(fileIds, rel)}
-          onRemoveKeywordEverywhere={act.removeKeywordEverywhere}
+          onRemoveFromSelected={act.removeKeywordFromSelected}
           antalKandidater={counts?.byRating?.kandidat}
           onRenameSeries={act.renameSeries}
           onDeleteSeries={act.deleteSeries}
@@ -483,6 +500,7 @@ export default function App() {
           editors={editors}
           series={series}
           act={act}
+          dataRev={dataRev}
         />
       </div>
       <StatusBar

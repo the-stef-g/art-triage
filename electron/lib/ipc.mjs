@@ -462,7 +462,6 @@ export class AppSession {
     handle('kw:remove', ({ fileId, word }) => this.requireCatalog().removeKeyword(fileId, word));
     handle('kw:removeFromFiles', ({ fileIds, word }) =>
       this.requireCatalog().removeKeywordFromFiles(fileIds, word));
-    handle('kw:removeAll', ({ word }) => this.requireCatalog().removeKeywordEverywhere(word));
 
     handle('search:status', () => ({
       ai: this.ai.status,

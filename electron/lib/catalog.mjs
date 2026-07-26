@@ -56,17 +56,6 @@ CREATE TABLE IF NOT EXISTS keywords(
   manual INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY(file_id, word)
 );
--- Stefs bekraeftelser og afvisninger af noegleord. Varigt laeringssignal:
--- verdict 'confirm' (tilfoejet manuelt) eller 'reject' (slettet). file_id=0
--- er en global afvisning der udelukker ordet fra alle forslag.
-CREATE TABLE IF NOT EXISTS keyword_feedback(
-  file_id INTEGER NOT NULL,
-  word TEXT NOT NULL,
-  verdict TEXT NOT NULL,
-  updated_at INTEGER NOT NULL,
-  PRIMARY KEY(file_id, word)
-);
-CREATE INDEX IF NOT EXISTS idx_kwfb_word ON keyword_feedback(word);
 -- Kvittering for at en fil har vaeret sendt til Claude. Uden den kan en
 -- fil der ikke gav nogen ord ikke skelnes fra en der aldrig er sendt, og
 -- koeren ville sende den igen hver gang og betale for det hver gang.
@@ -683,6 +672,18 @@ export class Catalog extends EventEmitter {
     ).c;
   }
 
+  // Ordforraadet der sendes med til Claude, saa den samme ting faar det
+  // samme ord hver gang i stedet for wall paa ét billede og walls paa det
+  // naeste. Stefs egne ord foerst: de er facit for hvad tingene hedder her.
+  keywordVocabulary(limit = 300) {
+    return this.db.all(
+      `SELECT word, MAX(manual) AS manuel, COUNT(*) AS antal
+       FROM keywords GROUP BY word
+       ORDER BY manuel DESC, antal DESC, word LIMIT ?`,
+      limit
+    ).map((r) => r.word);
+  }
+
   markKeywordRun(fileId, model, words) {
     this.db.run(
       `INSERT INTO keyword_runs(file_id, model, words, run_at) VALUES(?,?,?,?)
@@ -712,81 +713,34 @@ export class Catalog extends EventEmitter {
     });
   }
 
-  // ---------- Noegleords-feedback (laeringssignal) ----------
-
-  _recordFeedback(fileId, word, verdict) {
-    this.db.run(
-      `INSERT INTO keyword_feedback(file_id, word, verdict, updated_at) VALUES(?,?,?,?)
-       ON CONFLICT(file_id, word) DO UPDATE SET verdict=excluded.verdict, updated_at=excluded.updated_at`,
-      fileId, word, verdict, this.now()
-    );
-    this._bumpFeedbackRev();
-  }
-
-  _bumpFeedbackRev() {
-    const n = Number(this.getMeta('kwfeedback_rev') || '0') + 1;
-    this.setMeta('kwfeedback_rev', String(n));
-  }
-
-  feedbackRevision() {
-    return Number(this.getMeta('kwfeedback_rev') || '0');
-  }
-
-  // Ord Stef har afvist for netop denne fil (kommer aldrig igen der).
-  rejectedWordsForFile(fileId) {
-    return new Set(this.db.all(
-      "SELECT word FROM keyword_feedback WHERE file_id=? AND verdict='reject'", fileId
-    ).map((r) => r.word));
-  }
-
-  // Ord der er afvist globalt (udelukkes fra alle forslag).
-  globallyRejectedWords() {
-    return new Set(this.db.all(
-      "SELECT word FROM keyword_feedback WHERE file_id=0 AND verdict='reject'"
-    ).map((r) => r.word));
-  }
-
-  // Bekraeftede eksempler pr. ord: {word -> [file_id, ...]}. Grundlaget for
-  // de laerte prototyper.
-  confirmedExamples() {
-    const map = new Map();
-    for (const r of this.db.all(
-      "SELECT file_id, word FROM keyword_feedback WHERE verdict='confirm' AND file_id>0"
-    )) {
-      if (!map.has(r.word)) map.set(r.word, []);
-      map.get(r.word).push(r.file_id);
-    }
-    return map;
-  }
-
   // ---------- Noegleord ----------
+  //
+  // At fjerne et ord er nu bare at fjerne det. Foer blev hver sletning
+  // ogsaa gemt som en varig afvisning, saa ordet aldrig kunne komme igen
+  // paa det billede. Det gav mening dengang appen selv gaettede og skulle
+  // laere af rettelserne. Nu kommer ordene fra Claude, ingen laeser
+  // afvisningerne, og de gjorde kun en oprydning uigenkaldelig uden at
+  // det stod nogen steder.
 
   addKeyword(fileId, word) {
     const trimmed = String(word || '').trim();
     if (!trimmed) throw new Error('The keyword is empty');
-    this.db.transaction(() => {
-      this.db.run(
-        `INSERT INTO keywords(file_id, word, score, manual) VALUES(?,?,1000,1)
-         ON CONFLICT(file_id, word) DO UPDATE SET manual=1, score=1000`,
-        fileId, trimmed
-      );
-      this._recordFeedback(fileId, trimmed, 'confirm');
-    });
+    this.db.run(
+      `INSERT INTO keywords(file_id, word, score, manual) VALUES(?,?,1000,1)
+       ON CONFLICT(file_id, word) DO UPDATE SET manual=1, score=1000`,
+      fileId, trimmed
+    );
     this.emit('changed');
   }
 
   removeKeyword(fileId, word) {
-    this.db.transaction(() => {
-      this.db.run('DELETE FROM keywords WHERE file_id=? AND word=?', fileId, word);
-      // Varigt: ordet kommer aldrig igen paa dette billede.
-      this._recordFeedback(fileId, word, 'reject');
-    });
+    this.db.run('DELETE FROM keywords WHERE file_id=? AND word=?', fileId, word);
     this.emit('changed');
   }
 
-  // Fjerner et ord fra en bunke valgte billeder (fx dem der ikke hoerer
-  // under et soegeord). Hver fjernelse registreres som reject, saa ordet
-  // ikke kommer igen paa de billeder.
+  // Fjerner et ord fra en bunke valgte billeder. Det er vejen til at rydde
+  // et forkert ord op i én omgang: klik ordet i sidepanelet, marker de
+  // billeder det er forkert paa, og fjern det derfra.
   removeKeywordFromFiles(fileIds, word) {
     const trimmed = String(word || '').trim();
     if (!trimmed || !fileIds || !fileIds.length) return 0;
@@ -794,24 +748,10 @@ export class Catalog extends EventEmitter {
     this.db.transaction(() => {
       for (const id of fileIds) {
         n += this.db.run('DELETE FROM keywords WHERE file_id=? AND word=?', id, trimmed).changes;
-        this._recordFeedback(id, trimmed, 'reject');
       }
     });
     this.emit('changed');
     return n;
-  }
-
-  // Fjerner et ord fra alle billeder og udelukker det fra fremtidige forslag.
-  removeKeywordEverywhere(word) {
-    const trimmed = String(word || '').trim();
-    if (!trimmed) return 0;
-    let antal = 0;
-    this.db.transaction(() => {
-      antal = this.db.run('DELETE FROM keywords WHERE word=?', trimmed).changes;
-      this._recordFeedback(0, trimmed, 'reject');
-    });
-    this.emit('changed');
-    return antal;
   }
 
   // Rydder alt appen selv har gaettet, og lader det Stef har skrevet ind

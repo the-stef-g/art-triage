@@ -9,7 +9,7 @@ const CHANNELS = new Set([
   'ser:list', 'ser:create', 'ser:assign', 'ser:rename', 'ser:delete',
   'fold:tree', 'fold:create', 'fold:move', 'fold:cleanup',
   'ed:list', 'ed:open', 'ed:pick',
-  'kw:top', 'kw:forFile', 'kw:add', 'kw:remove', 'kw:removeAll', 'kw:removeFromFiles',
+  'kw:top', 'kw:forFile', 'kw:add', 'kw:remove', 'kw:removeFromFiles',
   'kw:status', 'kw:run', 'kw:stop', 'kw:setModel', 'kw:reanalyse',
   'search:status', 'app:counts', 'app:undo', 'app:redo',
   'app:info', 'app:setHfToken', 'app:setClaudeKey',

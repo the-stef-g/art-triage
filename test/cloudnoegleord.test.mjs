@@ -12,7 +12,7 @@ import { tmpdir } from 'node:os';
 import { openDatabase } from '../electron/lib/db.mjs';
 import { Catalog } from '../electron/lib/catalog.mjs';
 import {
-  buildRequest, parseKeywords, costOf, mediaTypeFor, KeywordRunner,
+  buildRequest, parseKeywords, costOf, mediaTypeFor, KeywordRunner, vocabularyBlock,
   SYSTEM_PROMPT, KEYWORD_MODELS, DEFAULT_KEYWORD_MODEL, MAX_KEYWORDS,
 } from '../electron/lib/keywords.mjs';
 
@@ -47,10 +47,12 @@ function attrap(opts = {}) {
   return {
     model: opts.model || DEFAULT_KEYWORD_MODEL,
     kald: [],
+    vocabulary: null,
+    setVocabulary(words) { this.vocabulary = words; },
     async analyse(thumbPath) {
       this.kald.push(thumbPath);
       if (opts.kaster) throw opts.kaster;
-      return { entries: parseKeywords(svar(opts.ord || ['yellow flower', 'meadow'])), usage: {}, cost: 0.0001 };
+      return { entries: parseKeywords(svar(opts.ord || ['flower', 'meadow'])), usage: {}, cost: 0.0001 };
     },
   };
 }
@@ -148,6 +150,33 @@ describe('foresporgslen', () => {
     expect(a.system).toEqual(b.system);
   });
 
+  it('sender katalogets egne ord med', () => {
+    const req = buildRequest({
+      model: 'claude-haiku-4-5', base64: 'A', mediaType: 'image/jpeg',
+      vocabulary: ['wall', 'brick', 'blue'],
+    });
+    expect(req.system).toHaveLength(2);
+    expect(req.system[1].text).toContain('wall, brick, blue');
+    // Ordlisten skal ligge inde i cachen, ellers betales den paa hvert
+    // eneste billede i stedet for kun paa det foerste.
+    expect(req.system[1].cache_control).toEqual({ type: 'ephemeral' });
+    expect(req.system[0].cache_control).toBeUndefined();
+  });
+
+  it('er stadig ens fra kald til kald med ordliste', () => {
+    const ordliste = ['wall', 'brick'];
+    const a = buildRequest({ model: 'claude-haiku-4-5', base64: 'A', mediaType: 'image/jpeg', vocabulary: ordliste });
+    const b = buildRequest({ model: 'claude-haiku-4-5', base64: 'B', mediaType: 'image/png', vocabulary: ordliste });
+    expect(a.system).toEqual(b.system);
+  });
+
+  it('springer ordlisten over naar kataloget er tomt', () => {
+    const req = buildRequest({ model: 'claude-haiku-4-5', base64: 'A', mediaType: 'image/jpeg', vocabulary: [] });
+    expect(req.system).toHaveLength(1);
+    expect(req.system[0].cache_control).toEqual({ type: 'ephemeral' });
+    expect(vocabularyBlock([])).toBe(null);
+  });
+
   it('beder om et struktureret svar', () => {
     const req = buildRequest({ model: 'claude-haiku-4-5', base64: 'A', mediaType: 'image/jpeg' });
     expect(req.output_config.format.type).toBe('json_schema');
@@ -161,9 +190,27 @@ describe('foresporgslen', () => {
 
 describe('svaret', () => {
   it('laeser ordene ud i raekkefoelge', () => {
-    const ord = parseKeywords(svar(['harbour', 'blue boat', 'evening light']));
-    expect(ord.map((k) => k.word)).toEqual(['harbour', 'blue boat', 'evening light']);
+    const ord = parseKeywords(svar(['harbour', 'boat', 'blue']));
+    expect(ord.map((k) => k.word)).toEqual(['harbour', 'boat', 'blue']);
     expect(ord[0].score).toBeGreaterThan(ord[1].score);
+  });
+
+  it('deler et flerordssvar op i enkeltord', () => {
+    // Instruktionen beder om enkeltord, men beder er ikke det samme som
+    // faar. Uden opdelingen ender kataloget med blue paint, white paint,
+    // black paint, hvor hvert ord kun peger paa nogle faa billeder.
+    const ord = parseKeywords(svar(['blue paint', 'brick wall']));
+    expect(ord.map((k) => k.word)).toEqual(['blue', 'paint', 'brick', 'wall']);
+  });
+
+  it('smider smaaord vaek naar et svar deles op', () => {
+    const ord = parseKeywords(svar(['wall of brick', 'a door']));
+    expect(ord.map((k) => k.word)).toEqual(['wall', 'brick', 'door']);
+  });
+
+  it('genbruger det samme ord fra to forskellige svar', () => {
+    const ord = parseKeywords(svar(['brick wall', 'brick']));
+    expect(ord.map((k) => k.word)).toEqual(['brick', 'wall']);
   });
 
   it('holder sig under manuelle ords score', () => {
@@ -175,11 +222,16 @@ describe('svaret', () => {
 
   it('normaliserer og fjerner dubletter', () => {
     const ord = parseKeywords(svar(['  Harbour ', 'HARBOUR', 'blue   boat']));
-    expect(ord.map((k) => k.word)).toEqual(['harbour', 'blue boat']);
+    expect(ord.map((k) => k.word)).toEqual(['harbour', 'blue', 'boat']);
   });
 
   it('skaerer ved det aftalte maksimum', () => {
     const mange = Array.from({ length: 40 }, (_, i) => `ord${i}`);
+    expect(parseKeywords(svar(mange))).toHaveLength(MAX_KEYWORDS);
+  });
+
+  it('holder maksimum ogsaa naar svaret bliver delt op', () => {
+    const mange = Array.from({ length: 20 }, (_, i) => `ord${i} andet${i}`);
     expect(parseKeywords(svar(mange))).toHaveLength(MAX_KEYWORDS);
   });
 
@@ -215,14 +267,26 @@ describe('koeren', () => {
     expect(runner.progress.phase).toBe('faerdig');
   });
 
+  it('giver koeren katalogets egne ord med', async () => {
+    // Uden det bliver det wall paa ét billede og walls paa det naeste, og
+    // saa samler et klik paa ordet dem ikke laengere.
+    const fil = versionFor('godkendt.png');
+    catalog.addKeyword(fil.file_id, 'brick');
+    const service = attrap();
+    const runner = new KeywordRunner({ catalog, thumbs, service });
+    runner.start();
+    await new Promise((r) => setTimeout(r, 30));
+    expect(service.vocabulary).toContain('brick');
+  });
+
   it('skriver ordene ind som automatiske', async () => {
-    const service = attrap({ ord: ['yellow flower', 'meadow'] });
+    const service = attrap({ ord: ['flower', 'meadow'] });
     const runner = new KeywordRunner({ catalog, thumbs, service });
     runner.start();
     await new Promise((r) => setTimeout(r, 30));
     const fil = versionFor('godkendt.png');
     const ord = catalog.keywordsForFile(fil.file_id);
-    expect(ord.map((k) => k.word)).toEqual(['yellow flower', 'meadow']);
+    expect(ord.map((k) => k.word)).toEqual(['flower', 'meadow']);
     expect(ord.every((k) => k.manual === 0)).toBe(true);
   });
 

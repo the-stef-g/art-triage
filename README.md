@@ -34,7 +34,11 @@ The app is not signed with an Apple developer certificate, so macOS refuses the 
 
 **Workflow stage.** Separately from the rating, an image sits at one stage: being edited, finished, or neither. It is one at a time, not two switches. An image cannot be out with an editor and finished at the same time, so setting one clears the other. Saving from an editor puts the image back on "being edited", because a new version means the work is not over.
 
-Shortcuts: **G** approve, **K** candidate, **X** discard, **U** clear rating, **R** stage being edited, **F** stage finished, **V** new virtual copy, **space** large preview, **arrow keys** move the selection, **Cmd+Z** undo the last action (rating, stage, series, rename, virtual copy and move), **Shift+Cmd+Z** redo. Pressing **R** or **F** on an image already at that stage clears it.
+Shortcuts follow the English words on the buttons: **A** approve, **C** candidate, **X** discard, **U** unrated, **E** stage being edited, **F** stage finished, **V** new virtual copy, **space** large preview, **arrow keys** move the selection, **Cmd+A** select all, **Cmd+Z** undo the last action (rating, stage, series, rename, virtual copy and move), **Shift+Cmd+Z** redo. Pressing **E** or **F** on an image already at that stage clears it.
+
+Tab does not move focus around the interface. The work is done with the mouse and these letters, and a wandering focus made it unclear what the next key would hit. Tab still works inside text fields.
+
+**The filter chips are views, one at a time.** Approved, Candidates, Being edited and Finished are four ways of looking at the library, and clicking one turns off the others. Clicking the active one goes back to showing everything. "Show discarded" sits apart because it answers something else: whether discarded images come along into the view you are in.
 
 **Candidate.** Use candidate when the subject is good but something technical is in the way: softness, wrong colours and the like. It is not a verdict but a decision on hold until the image has been through the editor. Candidates have their own purple colour in the grid and their own entry in the sidebar, where the list of what is waiting opens with one click. They show up as ordinary images in the grid, unlike discarded ones. Once you have fixed the image you rate it again: approved or discarded. Candidates are never sent for paid analysis, precisely because they are not settled yet.
 
@@ -52,7 +56,9 @@ Shortcuts: **G** approve, **K** candidate, **X** discard, **U** clear rating, **
 
 **Keywords.** Keywords come from Claude. The app used to guess them itself by scoring each image against a Danish word list, but that comparison was the wrong way round: words were held up against each other image by image, so a phrasing that generally scored high won on everything. In practice 'kirke' ended up on 1170 out of 1200 images. That mechanism is gone, and the old guesses are cleared automatically the first time you open the library. Your own words stay.
 
-You can add your own keywords to an image in the Inspector, and they appear as clickable chips in the sidebar. Click a keyword and the grid shows every image with that word. Select the ones that do not belong (click, cmd-click or shift-click for several) and remove them from the keyword with the button in the Inspector. The cross on the chip in the sidebar removes the word from every image at once, including ones you typed yourself, and it cannot be undone.
+You can add your own keywords to an image in the Inspector, and they appear as clickable chips in the sidebar.
+
+**Cleaning up a wrong keyword.** Click the keyword in the sidebar and the grid shows every image carrying it. Select the ones it is wrong for, or press Cmd+A for all of them, then click the cross on the chip. The word is removed from exactly those images and from nowhere else. It is not blacklisted: the same word is free to come back on other images, and on these too if it fits later. Earlier every deletion was also stored as a permanent rejection, which made a tidy-up irreversible without saying so anywhere.
 
 ## Keywords from Claude
 
@@ -66,7 +72,11 @@ You can add your own keywords to an image in the Inspector, and they appear as c
 
 **What is written.** Claude's words go in as automatic keywords (`manual=0`), so they can be cleared as a group without touching anything you typed yourself. Your own words always sort first in the Inspector.
 
-The fixed instruction sent with every image is cached, so it is only paid for in full on the first image of a run. The image itself goes as a 512-pixel thumbnail, the same one the search index already made, not the full RAW.
+**Single words, and few of them.** Keywords are single words: not "blue paint" but "blue" and "paint", not "brick wall" but "brick" and "wall". A single word can be reused across thousands of images; a phrase cannot, and a catalogue of white paint, black paint and blue paint fills up with words that each point at a handful of pictures. Five to eight words per image, in this order: what the thing is, what it is made of, and the dominant colours. No mood, no atmosphere, no light quality — nobody searches for "dramatic light". If Claude answers with a phrase anyway, it is split into its words on the way in.
+
+**Words are reused.** Every run sends the catalogue's existing keywords along and asks Claude to use one of them when it fits, rather than a new word for the same thing. Without that it is "wall" on one image and "walls" on the next, and a click on the word no longer gathers them. Your own words come first in that list: they are the authority on what things are called here.
+
+The fixed instruction and the word list are cached, so they are only paid for in full on the first image of a run. The list is fetched once per run and held constant, because changing it mid-run would break the cache and make every image cost full price. The image itself goes as a 512-pixel thumbnail, the same one the search index already made, not the full RAW.
 
 ## The local AI model
 

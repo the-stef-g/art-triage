@@ -85,15 +85,16 @@ try {
   const tiles = await page.locator('.tile').count();
   if (tiles !== 4) throw new Error(`ventede 4 billeder i grid, fik ${tiles}`);
 
-  // Vaelg foerste billede og godkend med G.
+  // Vaelg foerste billede og godkend med A. Genvejene foelger de engelske
+  // ord paa knapperne: A approve, C candidate, E editing, F finished.
   await page.locator('.tile').first().click();
-  await page.keyboard.press('g');
+  await page.keyboard.press('a');
   await page.waitForSelector('.badge.godkendt', { timeout: 10000 });
 
-  // Kandidat med K paa naeste billede: eget badge, egen markering paa
+  // Kandidat med C paa naeste billede: eget badge, egen markering paa
   // flisen, og arbejdslisten i sidepanelet skal taelle med.
   await page.keyboard.press('ArrowRight');
-  await page.keyboard.press('k');
+  await page.keyboard.press('c');
   await page.waitForSelector('.badge.kandidat', { timeout: 10000 });
   await page.waitForFunction(
     () => document.querySelectorAll('.tile.kandidat').length === 1,
@@ -133,10 +134,24 @@ try {
   // Tilbage til foerste billede, saa resten af flowet staar som foer.
   await page.locator('.tile').first().click();
 
-  // Arbejdstrin er ét ad gangen. R saetter "being edited", F skifter til
+  // Tabulator maa ikke flytte fokus rundt mellem knapperne: arbejdet
+  // foregaar med mus og bogstavgenveje, og et vandrende fokus gjorde det
+  // uklart hvad en tast rammer.
+  // Der sammenlignes paa selve elementet, ikke paa dets klasse: de fleste
+  // knapper i appen har ingen klasse, saa to forskellige knapper ligner
+  // hinanden fuldstaendig paa tekst, og tjekket ville bestaa af sig selv.
+  await page.evaluate(() => { window.__foerFokus = document.activeElement; });
+  await page.keyboard.press('Tab');
+  const flyttet = await page.evaluate(() => {
+    const nu = document.activeElement;
+    return nu === window.__foerFokus ? null : `${nu?.tagName}:${nu?.textContent?.slice(0, 30)}`;
+  });
+  if (flyttet) throw new Error(`Tabulator flyttede fokus til ${flyttet}`);
+
+  // Arbejdstrin er ét ad gangen. E saetter "being edited", F skifter til
   // "finished", og saa maa den foerste knap ikke stadig staa taendt: det
   // var praecis fejlen, hvor der stod baade det ene og det andet.
-  await page.keyboard.press('r');
+  await page.keyboard.press('e');
   await page.waitForSelector('.aktiv-redigeres', { timeout: 10000 });
   await page.keyboard.press('f');
   await page.waitForFunction(
@@ -168,6 +183,23 @@ try {
   await page.waitForFunction(
     () => document.querySelectorAll('.tile').length === 4
       && document.querySelectorAll('.tile.valgt').length === 1,
+    null,
+    { timeout: 10000 }
+  );
+
+  // Filter-chips i vaerktoejslinjen er visninger, ikke afkrydsninger:
+  // der er én aktiv ad gangen. Stod to taendt, skar de hinanden bort, og
+  // grid'et kunne blive tomt uden at det var til at se hvorfor.
+  await page.locator('.chip', { hasText: 'Approved' }).click();
+  await page.locator('.chip', { hasText: 'Finished' }).click();
+  await page.waitForFunction(
+    () => document.querySelectorAll('.filtre .chip.aktiv').length === 1,
+    null,
+    { timeout: 10000 }
+  );
+  await page.locator('.chip', { hasText: 'Finished' }).click();
+  await page.waitForFunction(
+    () => document.querySelectorAll('.filtre .chip.aktiv').length === 0,
     null,
     { timeout: 10000 }
   );

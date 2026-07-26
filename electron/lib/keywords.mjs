@@ -34,21 +34,54 @@ export const THUMB_SIZE = 512;
 // Den faste instruktion caches, saa den kun betales fuldt paa foerste
 // billede. Derfor maa den ikke indeholde noget der skifter fra kald til
 // kald: en dato eller et filnavn her ville aflyse cachen hver gang.
+//
+// Instruktionen er skaerpet efter foerste runde paa Stefs billeder. En
+// haerget murvaeg gav weathered wood, peeling paint, brown wood, rust
+// stains, decay, patina, aged texture, distressed surface, worn finish og
+// horizontal layers: flere af dem forkerte, resten det samme ord sagt paa
+// fem maader, og hverken wall eller brick var med. Derfor: faa ord, kun
+// enkeltord, motivet og materialet foerst, farve altid med, og ingen
+// stemning.
 export const SYSTEM_PROMPT = [
-  'You write keywords for an artist\'s own photographs and artworks so they can be found again later.',
+  'You write search keywords for an artist\'s own photographs so they can be found again later.',
+  'These are working keywords for a catalogue, not a description of the picture.',
   '',
-  'Give 8 to 15 English keywords in lowercase, most important first. Cover, where they apply:',
-  'the main subject, the setting, notable objects, the dominant colours, the light,',
-  'the technique or medium if it is evident, and the mood.',
+  'Give 5 to 8 keywords, in this order of priority:',
+  '1. What the thing IS. The plainest noun for the main subject: wall, door, tree, hand, boat.',
+  '2. What it is MADE OF, if you can see it beyond doubt: brick, concrete, wood, metal, glass, paper.',
+  '3. The DOMINANT COLOURS. Always give at least one, at most two.',
+  '4. The setting or a second clear object, only if it really is there.',
   '',
-  'Rules:',
-  '- Describe only what is actually visible. Never guess at a place, a person or a year.',
-  '- Prefer the concrete over the abstract: "brick wall" beats "architecture".',
-  '- Single words or short noun phrases of at most three words.',
-  '- No punctuation, no camera settings, no file names, no artist names.',
-  '- If the image is blurred, dark or empty, say so with the keywords you do have,',
-  '  rather than inventing a subject.',
+  'Hard rules:',
+  '- Single words only. Never two words. "blue paint" is wrong; give "blue" and "paint".',
+  '  "brick wall" is wrong; give "brick" and "wall". Single words can be reused across',
+  '  thousands of images; phrases cannot, and the catalogue fills up with near-duplicates.',
+  '- Lowercase. Nouns in the singular, except where the plural is the normal word (bricks, leaves).',
+  '- No two words that mean the same thing. Pick one and drop the rest. decay, patina,',
+  '  weathered, aged, distressed and worn are all the same word for this purpose.',
+  '- No mood, no atmosphere, no light quality, no composition, no aesthetics. Leave out',
+  '  dramatic, moody, stormy, serene, textured, minimal, layered, abstract and their kind.',
+  '  Nobody searches for those.',
+  '- Say nothing you are not sure of. A wrong material is worse than a missing one. If you',
+  '  cannot tell wood from stone, leave the material out and keep the subject and colour.',
+  '- Never guess a place, a person, a date or a technique.',
+  '',
+  'Fewer, right words beat more, nearly-right ones. Six good keywords is a good answer.',
 ].join('\n');
+
+// Katalogets egne ord sendes med, saa den samme ting faar det samme ord
+// hver gang. Uden det bliver det wall paa ét billede og walls paa det
+// naeste, og saa samler et klik dem ikke laengere.
+export function vocabularyBlock(words) {
+  if (!words || !words.length) return null;
+  return [
+    'These keywords are already in this catalogue:',
+    words.join(', '),
+    '',
+    'Use one of these whenever it fits the image, exactly as spelled here, instead of a',
+    'new word for the same thing. Only invent a new word when nothing above fits.',
+  ].join('\n');
+}
 
 // Ingen talbegraensninger i skemaet: strukturerede svar understoetter ikke
 // minItems/maxItems, saa antallet staar i instruktionen og skaeres til her.
@@ -79,11 +112,18 @@ export function mediaTypeFor(path) {
 // Selve foresporgslen, holdt adskilt fra netvaerket saa den kan efterses i
 // en test. Billedet ligger efter den faste instruktion, saa cache-praefixet
 // er ens hver gang.
-export function buildRequest({ model, base64, mediaType }) {
+// Ordlisten ligger i sin egen cache-blok efter instruktionen. Den holdes
+// fast gennem en hel koersel, saa praefikset er ens fra billede til
+// billede og cachen holder; foerst naeste koersel henter en frisk liste.
+export function buildRequest({ model, base64, mediaType, vocabulary = null }) {
+  const system = [{ type: 'text', text: SYSTEM_PROMPT }];
+  const ordblok = vocabularyBlock(vocabulary);
+  if (ordblok) system.push({ type: 'text', text: ordblok });
+  system[system.length - 1].cache_control = { type: 'ephemeral' };
   return {
     model,
     max_tokens: 512,
-    system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
+    system,
     output_config: { format: { type: 'json_schema', schema: KEYWORD_SCHEMA } },
     messages: [
       {
@@ -97,7 +137,28 @@ export function buildRequest({ model, base64, mediaType }) {
   };
 }
 
-export const MAX_KEYWORDS = 15;
+export const MAX_KEYWORDS = 8;
+
+// Ord der ikke er vaerd at soege paa, og som kun dukker op fordi et
+// flerordssvar blev delt op.
+const STOPORD = new Set([
+  'a', 'an', 'and', 'of', 'the', 'with', 'in', 'on', 'at', 'to', 'or', 'is',
+  'very', 'some', 'this', 'that', 'it', 'its',
+]);
+
+// Instruktionen beder om enkeltord, men beder er ikke det samme som
+// faar. Kommer der alligevel "blue paint", deles det, saa baade blue og
+// paint kan genbruges paa andre billeder. Uden det her ender kataloget
+// med white paint, black paint, blue paint og saa videre, hvor hvert ord
+// kun peger paa nogle faa billeder.
+function splitOrd(raat) {
+  return String(raat ?? '')
+    .toLowerCase()
+    .replace(/[^a-zæøå0-9\s-]/g, ' ')
+    .split(/[\s-]+/)
+    .map((o) => o.trim())
+    .filter((o) => o.length > 1 && !STOPORD.has(o));
+}
 
 // Ordene kommer i faldende relevans. Scoren foelger raekkefoelgen og
 // holdes under 1000, som er manuelle ords score, saa Stefs egne ord altid
@@ -117,11 +178,12 @@ export function parseKeywords(message, { max = MAX_KEYWORDS } = {}) {
   const set = new Set();
   const ud = [];
   for (const post of raa) {
-    const ord = String(post ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
-    if (!ord || set.has(ord)) continue;
-    set.add(ord);
-    ud.push({ word: ord, score: 900 - ud.length });
-    if (ud.length >= max) break;
+    for (const ord of splitOrd(post)) {
+      if (set.has(ord)) continue;
+      set.add(ord);
+      ud.push({ word: ord, score: 900 - ud.length });
+      if (ud.length >= max) return ud;
+    }
   }
   return ud;
 }
@@ -144,6 +206,13 @@ export class ClaudeKeywords {
     this.apiKey = apiKey;
     this.model = model;
     this.client = client;
+    this.vocabulary = null;
+  }
+
+  // Saettes én gang pr. koersel. Skiftede listen undervejs, ville
+  // cache-praefikset skifte med, og hvert billede ville koste fuld pris.
+  setVocabulary(words) {
+    this.vocabulary = words && words.length ? words : null;
   }
 
   async _ensureClient() {
@@ -158,7 +227,12 @@ export class ClaudeKeywords {
     const client = await this._ensureClient();
     const base64 = readFileSync(thumbPath).toString('base64');
     const svar = await client.messages.create(
-      buildRequest({ model: this.model, base64, mediaType: mediaTypeFor(thumbPath) })
+      buildRequest({
+        model: this.model,
+        base64,
+        mediaType: mediaTypeFor(thumbPath),
+        vocabulary: this.vocabulary,
+      })
     );
     return {
       entries: parseKeywords(svar),
@@ -224,6 +298,9 @@ export class KeywordRunner extends EventEmitter {
       this.setProgress({ phase: 'faerdig', done: 0, total: 0 });
       return;
     }
+    // Katalogets egne ord hentes én gang og staar fast koerslen igennem,
+    // saa den samme ting faar det samme ord og cachen holder.
+    this.service.setVocabulary?.(this.catalog.keywordVocabulary());
     this.setProgress({ total: koe.length });
     for (const file of koe) {
       if (this.stopped) {

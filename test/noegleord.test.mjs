@@ -112,16 +112,26 @@ describe('fjernelse af noegleord', () => {
     expect(ordFor(b)).toContain('strand');
   });
 
-  it('fjern fra alle billeder rammer ogsaa manuelle ord og spaerrer ordet', () => {
+  it('rammer baade manuelle og automatiske ord paa de valgte billeder', () => {
     const a = nytBillede('a.png');
     const b = nytBillede('b.png');
     catalog.addKeyword(a, 'kirke'); // skrevet i haanden
-    catalog.saveKeywords(b, [{ word: 'kirke', score: 3.1 }]); // gaettet
-    expect(catalog.removeKeywordEverywhere('kirke')).toBe(2);
+    catalog.saveKeywords(b, [{ word: 'kirke', score: 3.1 }]); // fra Claude
+    expect(catalog.removeKeywordFromFiles([a, b], 'kirke')).toBe(2);
     expect(ordFor(a)).toEqual([]);
     expect(ordFor(b)).toEqual([]);
-    // Spaerringen gemmes, saa fremtidige ord-kilder kan respektere den.
-    expect(catalog.globallyRejectedWords().has('kirke')).toBe(true);
+  });
+
+  it('spaerrer ikke et ord man har fjernet', () => {
+    // Foer blev hver sletning ogsaa gemt som en varig afvisning, saa
+    // ordet aldrig kunne komme igen paa det billede. En oprydning var
+    // dermed uigenkaldelig uden at det stod nogen steder.
+    const a = nytBillede('a.png');
+    catalog.saveKeywords(a, [{ word: 'wall', score: 899 }]);
+    catalog.removeKeyword(a, 'wall');
+    expect(ordFor(a)).not.toContain('wall');
+    catalog.saveKeywords(a, [{ word: 'wall', score: 899 }]);
+    expect(ordFor(a)).toContain('wall');
   });
 });
 
