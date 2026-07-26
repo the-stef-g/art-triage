@@ -380,7 +380,7 @@ export default function App() {
   }, []);
 
   if (!harBro) {
-    return <div className="velkomst"><h1>art-triage</h1><p>This app must run inside Electron.</p></div>;
+    return <div className="velkomst"><h1>Art Triage</h1><p>This app must run inside Electron.</p></div>;
   }
   if (!library) {
     return <Welcome recent={recent} onChoose={act.chooseLibrary} onOpen={act.openLibrary} />;

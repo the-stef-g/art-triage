@@ -295,12 +295,12 @@ function buildMenu() {
   const template = [
     ...(process.platform === 'darwin'
       ? [{
-          label: 'art-triage',
+          label: 'Art Triage',
           submenu: [
-            { role: 'about', label: 'About art-triage' },
+            { role: 'about', label: 'About Art Triage' },
             { type: 'separator' },
-            { role: 'hide', label: 'Hide art-triage' },
-            { role: 'quit', label: 'Quit art-triage' },
+            { role: 'hide', label: 'Hide Art Triage' },
+            { role: 'quit', label: 'Quit Art Triage' },
           ],
         }]
       : []),
@@ -369,7 +369,7 @@ app.whenReady().then(() => {
   aiLogPath = join(app.getPath('userData'), 'art-triage-ai.log');
   ai = new AiBridge(null);
   ai.on('status', (s) => aiLog(`status: ${s.state} ${s.progress ?? 0}% ${s.detail || ''}`));
-  aiLog(`--- art-triage ${app.getVersion()} startet (${process.platform}, Electron ${process.versions.electron}) ---`);
+  aiLog(`--- Art Triage ${app.getVersion()} startet (${process.platform}, Electron ${process.versions.electron}) ---`);
   session = new AppSession({ settings, ai, rasterizeSvg });
 
   ipcMain.on('ai:msg', (event, msg) => {

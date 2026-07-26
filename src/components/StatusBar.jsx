@@ -24,7 +24,7 @@ export default function StatusBar({
 
   return (
     <footer className="statusbar">
-      {version && <span className="version">art-triage {version}</span>}
+      {version && <span className="version">Art Triage {version}</span>}
       <span className="bibliotek" title={library?.root}>{library?.root?.split('/').pop()}</span>
       {counts && (
         <span>

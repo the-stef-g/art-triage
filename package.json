@@ -1,7 +1,7 @@
 {
   "name": "art-triage",
-  "productName": "art-triage",
-  "version": "0.2.8",
+  "productName": "Art Triage",
+  "version": "0.2.9",
   "description": "Sort and organise image files on macOS",
   "author": "Steffen Graumann",
   "license": "UNLICENSED",
@@ -36,7 +36,7 @@
   },
   "build": {
     "appId": "dk.stefs.art-triage",
-    "productName": "art-triage",
+    "productName": "Art Triage",
     "asar": true,
     "files": [
       "dist/**",

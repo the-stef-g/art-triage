@@ -171,7 +171,7 @@ export default function Inspector({ row, selectedCount, activeKeyword, editors, 
         </select>
         <button
           onClick={() => act.editIn(editorValg || editorList[0]?.appPath || null)}
-          title="Open the file in the chosen app. When you save, art-triage notices and marks the image as being edited."
+          title="Open the file in the chosen app. When you save, Art Triage notices and marks the image as being edited."
         >
           Open
         </button>

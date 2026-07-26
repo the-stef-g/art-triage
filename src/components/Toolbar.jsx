@@ -20,7 +20,7 @@ export default function Toolbar({
 
   return (
     <header className="toolbar">
-      <div className="titel">art-triage</div>
+      <div className="titel">Art Triage</div>
       <div className="soegefelt">
         <input
           type="search"
