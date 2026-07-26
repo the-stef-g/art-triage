@@ -1,0 +1,92 @@
+name: Billedflow
+
+on:
+  push:
+    branches:
+      - main
+      - 'claude/**'
+  workflow_dispatch:
+
+concurrency:
+  group: billedflow-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Tests (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verificér at mindst én AI-modelkandidat findes på Hugging Face
+        run: |
+          kandidater="onnx-community/siglip2-base-patch16-224-ONNX"
+          ok=0
+          for repo in $kandidater; do
+            mangler=0; ukendt=0
+            for f in config.json tokenizer.json preprocessor_config.json onnx/text_model_quantized.onnx onnx/vision_model_quantized.onnx; do
+              url="https://huggingface.co/$repo/resolve/main/$f"
+              code=$(curl -s -o /dev/null -w "%{http_code}" -L -r 0-0 "$url")
+              echo "$code  $url"
+              case "$code" in
+                200|206) ;;
+                401|403|429) ukendt=1 ;;
+                *) mangler=1 ;;
+              esac
+            done
+            if [ "$mangler" = "0" ] && [ "$ukendt" = "0" ]; then
+              echo "OK: $repo er komplet"
+              ok=1
+            elif [ "$mangler" = "0" ]; then
+              echo "UKENDT (kvote/auth): $repo kan ikke verificeres herfra"
+              ok=1
+            else
+              echo "MANGLER: $repo er ikke komplet"
+            fi
+          done
+          if [ "$ok" = "0" ]; then
+            echo "FEJL: ingen af modelkandidaterne findes komplet" >&2
+            exit 1
+          fi
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - name: Tjek at alle ORT-wasm-filer er bundtet
+        run: node scripts/check-ort-assets.mjs
+      - name: Smoke test (Electron under Xvfb)
+        run: xvfb-run --auto-servernum npm run smoke
+        timeout-minutes: 8
+        env:
+          ELECTRON_DISABLE_SANDBOX: '1'
+      - name: Upload smoke-skaermbillede
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-skaermbilleder
+          path: smoke-*.png
+          if-no-files-found: ignore
+
+  build-mac:
+    name: Byg macOS-app (Intel x64)
+    runs-on: macos-latest
+    timeout-minutes: 25
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm ci
+      - run: npm run dist:mac
+      - name: Upload app-artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Billedflow-mac-x64
+          path: release/Billedflow-mac-x64.zip
