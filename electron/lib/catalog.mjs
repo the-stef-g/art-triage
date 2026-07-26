@@ -288,6 +288,7 @@ export class Catalog extends EventEmitter {
       where.push("v.rating = 'kasseret'");
     }
     if (filter.kunGodkendte) where.push("v.rating = 'godkendt'");
+    if (filter.kunKandidater) where.push("v.rating = 'kandidat'");
     if (filter.kunRedigerede) where.push('v.edited = 1');
     if (filter.kunFaerdige) where.push('v.finished = 1');
     if (filter.serieId) {
@@ -354,8 +355,12 @@ export class Catalog extends EventEmitter {
 
   // ---------- Status ----------
 
+  // kandidat: motivet er godt, men der er noget teknisk galt (uskarphed,
+  // farver), saa billedet skal en tur i editoren foer det kan afgoeres.
+  // Det er en ventende beslutning, ikke en dom, og derfor sendes
+  // kandidater aldrig til betalt analyse.
   setRating(versionIds, rating) {
-    if (!['ubedomt', 'godkendt', 'kasseret'].includes(rating)) {
+    if (!['ubedomt', 'godkendt', 'kandidat', 'kasseret'].includes(rating)) {
       throw new Error(`Ukendt bedømmelse: ${rating}`);
     }
     this.db.transaction(() => {

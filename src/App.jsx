@@ -10,7 +10,7 @@ import { PreviewOverlay, NameModal } from './components/Overlay';
 
 const defaultFilter = {
   folder: null, search: '', visKasserede: false, kunKasserede: false,
-  kunGodkendte: false, kunRedigerede: false, kunFaerdige: false,
+  kunGodkendte: false, kunKandidater: false, kunRedigerede: false, kunFaerdige: false,
   serieId: null, keyword: null, sort: 'navn',
 };
 
@@ -326,6 +326,7 @@ export default function App() {
       };
       switch (e.key.toLowerCase()) {
         case 'g': act.setRating('godkendt'); break;
+        case 'k': act.setRating('kandidat'); break;
         case 'x': act.setRating('kasseret'); break;
         case 'u': act.setRating('ubedomt'); break;
         case 'f': act.toggleFlag('finished'); break;
@@ -379,6 +380,7 @@ export default function App() {
           setFilter={setFilter}
           onMoveTo={(fileIds, rel) => act.moveTo(fileIds, rel)}
           onRemoveKeywordEverywhere={act.removeKeywordEverywhere}
+          antalKandidater={counts?.byRating?.kandidat}
         />
         <Grid
           rows={rows}

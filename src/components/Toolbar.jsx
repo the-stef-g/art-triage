@@ -43,6 +43,7 @@ export default function Toolbar({
       {searchInfo?.error && <span className="soegebesked">{searchInfo.error}</span>}
       <div className="filtre">
         <button className={filter.kunGodkendte ? 'chip aktiv' : 'chip'} onClick={() => toggle('kunGodkendte')} title="Vis kun godkendte">Godkendte</button>
+        <button className={filter.kunKandidater ? 'chip aktiv' : 'chip'} onClick={() => toggle('kunKandidater')} title="Vis kun kandidater, altså dem der venter på en tur i editoren">Kandidater</button>
         <button className={filter.kunRedigerede ? 'chip aktiv' : 'chip'} onClick={() => toggle('kunRedigerede')} title="Vis kun redigerede">Redigerede</button>
         <button className={filter.kunFaerdige ? 'chip aktiv' : 'chip'} onClick={() => toggle('kunFaerdige')} title="Vis kun færdige">Færdige</button>
         <button className={filter.visKasserede ? 'chip aktiv' : 'chip'} onClick={() => toggle('visKasserede')} title="Vis også kasserede billeder">Vis kasserede</button>

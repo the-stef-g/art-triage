@@ -30,6 +30,7 @@ export default function StatusBar({
         <span>
           {counts.total} billeder
           {counts.byRating?.godkendt ? ` · ${counts.byRating.godkendt} godkendt` : ''}
+          {counts.byRating?.kandidat ? ` · ${counts.byRating.kandidat} kandidat` : ''}
           {counts.byRating?.kasseret ? ` · ${counts.byRating.kasseret} kasseret` : ''}
           {` · ${counts.indexed} analyseret`}
         </span>

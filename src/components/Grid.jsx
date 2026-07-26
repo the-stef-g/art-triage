@@ -11,6 +11,9 @@ function Badges({ row }) {
   return (
     <div className="badges">
       {row.rating === 'godkendt' && <span className="badge godkendt" title="Godkendt">✓</span>}
+      {row.rating === 'kandidat' && (
+        <span className="badge kandidat" title="Kandidat: god på motivet, skal redigeres før den kan afgøres">K</span>
+      )}
       {row.rating === 'kasseret' && <span className="badge kasseret" title="Kasseret">✕</span>}
       {Boolean(row.edited) && <span className="badge redigeret" title="Redigeret">R</span>}
       {Boolean(row.finished) && <span className="badge faerdig" title="Færdig">F</span>}
@@ -26,7 +29,7 @@ function Badges({ row }) {
 function Tile({ row, isSelected, onClick, onDoubleClick, onDragStart }) {
   return (
     <div
-      className={`tile ${isSelected ? 'valgt' : ''} ${row.rating === 'kasseret' ? 'nedtonet' : ''}`}
+      className={`tile ${isSelected ? 'valgt' : ''} ${row.rating === 'kasseret' ? 'nedtonet' : ''} ${row.rating === 'kandidat' ? 'kandidat' : ''}`}
       onClick={onClick}
       onDoubleClick={onDoubleClick}
       draggable

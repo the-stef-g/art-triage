@@ -9,6 +9,8 @@
   --tekst-svag: #9a9aa2;
   --accent: #4f8cff;
   --godkendt: #3fb950;
+  /* Kandidat: en ventende beslutning, saa hverken groen eller roed. */
+  --kandidat: #a371f7;
   --kasseret: #f85149;
   --redigeret: #58a6ff;
   --faerdig: #d29922;
@@ -135,6 +137,16 @@ input:focus, select:focus { outline: 1px solid var(--accent); }
 }
 .serie:hover { background: var(--bg-hover); }
 .serie.aktiv { background: var(--bg-aktiv); }
+.kandidatliste {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  border-left: 3px solid var(--kandidat);
+}
+.kandidatliste:hover { background: var(--bg-hover); }
+.kandidatliste.aktiv { background: var(--bg-aktiv); }
 .chips { display: flex; flex-wrap: wrap; gap: 5px; padding: 0 8px; }
 .chip.manuel { border-color: var(--accent); color: var(--accent); }
 .fjern-fra-noegleord { flex: 1; border-color: var(--kasseret); color: var(--kasseret); }
@@ -180,6 +192,9 @@ input:focus, select:focus { outline: 1px solid var(--accent); }
 .tile:hover { background: var(--bg-hover); }
 .tile.valgt { border-color: var(--accent); }
 .tile.nedtonet { opacity: 0.45; }
+/* Indvendig kant, saa kandidater kan ses paa afstand uden at laese
+   badges, og uden at spaende ben for den blaa markeringskant. */
+.tile.kandidat { box-shadow: inset 0 0 0 2px var(--kandidat); }
 .tile-billede {
   height: 172px;
   display: flex;
@@ -229,6 +244,7 @@ input:focus, select:focus { outline: 1px solid var(--accent); }
   white-space: nowrap;
 }
 .badge.godkendt { background: var(--godkendt); color: #04260c; }
+.badge.kandidat { background: var(--kandidat); color: #1a0a33; }
 .badge.kasseret { background: var(--kasseret); color: #2d0503; }
 .badge.redigeret { background: var(--redigeret); color: #05233f; }
 .badge.faerdig { background: var(--faerdig); color: #2b1f00; }
@@ -280,6 +296,7 @@ input:focus, select:focus { outline: 1px solid var(--accent); }
 .knapraekke select { flex: 1; min-width: 0; }
 .tjek { display: flex; gap: 6px; align-items: center; cursor: pointer; }
 .aktiv-godkendt { background: var(--godkendt); border-color: var(--godkendt); color: #04260c; font-weight: 700; }
+.aktiv-kandidat { background: var(--kandidat); border-color: var(--kandidat); color: #1a0a33; font-weight: 700; }
 .aktiv-kasseret { background: var(--kasseret); border-color: var(--kasseret); color: #2d0503; font-weight: 700; }
 .versionsliste { display: flex; flex-direction: column; gap: 2px; }
 .version {

@@ -90,6 +90,24 @@ try {
   await page.keyboard.press('g');
   await page.waitForSelector('.badge.godkendt', { timeout: 10000 });
 
+  // Kandidat med K paa naeste billede: eget badge, egen markering paa
+  // flisen, og arbejdslisten i sidepanelet skal taelle med.
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('k');
+  await page.waitForSelector('.badge.kandidat', { timeout: 10000 });
+  await page.waitForFunction(
+    () => document.querySelectorAll('.tile.kandidat').length === 1,
+    null,
+    { timeout: 10000 }
+  );
+  await page.waitForFunction(
+    () => document.querySelector('.kandidatliste .antal')?.textContent.trim() === '1',
+    null,
+    { timeout: 10000 }
+  );
+  // Tilbage til foerste billede, saa resten af flowet staar som foer.
+  await page.keyboard.press('ArrowLeft');
+
   // Ny virtuel kopi med V: en ekstra flise dukker op.
   await page.keyboard.press('v');
   await page.waitForFunction(
@@ -118,7 +136,7 @@ try {
   );
 
   await page.screenshot({ path: join(projectRoot, 'smoke-grid.png') });
-  console.log('SMOKE OK: grid, godkend, virtuel kopi, kassér og mappefilter virker');
+  console.log('SMOKE OK: grid, godkend, kandidat, virtuel kopi, kassér og mappefilter virker');
   succes = true;
 } catch (err) {
   console.error(`SMOKE FEJL: ${err?.message || err}`);

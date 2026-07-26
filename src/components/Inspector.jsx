@@ -83,6 +83,7 @@ export default function Inspector({ row, selectedCount, activeKeyword, editors, 
         )}
         <div className="knapraekke">
           <button onClick={() => act.setRating('godkendt')}>Godkend</button>
+          <button onClick={() => act.setRating('kandidat')}>Kandidat</button>
           <button onClick={() => act.setRating('kasseret')}>Kassér</button>
           <button onClick={() => act.setRating('ubedomt')}>Nulstil</button>
         </div>
@@ -135,6 +136,13 @@ export default function Inspector({ row, selectedCount, activeKeyword, editors, 
           Godkendt
         </button>
         <button
+          className={row.rating === 'kandidat' ? 'aktiv-kandidat' : ''}
+          onClick={() => act.setRating('kandidat')}
+          title="God på motivet, men skal redigeres før den kan afgøres"
+        >
+          Kandidat
+        </button>
+        <button
           className={row.rating === 'kasseret' ? 'aktiv-kasseret' : ''}
           onClick={() => act.setRating('kasseret')}
         >
@@ -178,7 +186,7 @@ export default function Inspector({ row, selectedCount, activeKeyword, editors, 
           <div key={v.id} className={`version ${v.id === row.version_id ? 'aktiv' : ''}`}>
             <span className="versionsnavn">{v.is_master ? 'Original' : v.name}</span>
             <span className="versionsinfo">
-              {v.rating === 'godkendt' ? '✓' : v.rating === 'kasseret' ? '✕' : ''}
+              {v.rating === 'godkendt' ? '✓' : v.rating === 'kandidat' ? 'K' : v.rating === 'kasseret' ? '✕' : ''}
               {v.edited ? ' R' : ''}
               {v.finished ? ' F' : ''}
             </span>

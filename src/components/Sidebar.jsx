@@ -51,7 +51,22 @@ function FolderNode({ node, depth, filter, setFilter, onMoveTo }) {
   );
 }
 
-export default function Sidebar({ tree, series, topKeywords, filter, setFilter, onMoveTo, onRemoveKeywordEverywhere }) {
+export default function Sidebar({
+  tree, series, topKeywords, filter, setFilter, onMoveTo, onRemoveKeywordEverywhere, antalKandidater,
+}) {
+  // Arbejdslisten skal kunne aabnes med et klik, uden at man foerst
+  // skal stille paa filtre. Derfor ryddes de filtre der ellers ville
+  // skaere kandidater fra, i stedet for bare at slaa et flag til.
+  const visKandidater = () => setFilter((f) => ({
+    ...f,
+    kunKandidater: !f.kunKandidater,
+    kunGodkendte: false,
+    kunFaerdige: false,
+    visKasserede: false,
+    keyword: null,
+    serieId: null,
+  }));
+
   return (
     <aside className="sidebar">
       <section>
@@ -59,6 +74,17 @@ export default function Sidebar({ tree, series, topKeywords, filter, setFilter, 
         {tree && (
           <FolderNode node={tree} depth={0} filter={filter} setFilter={setFilter} onMoveTo={onMoveTo} />
         )}
+      </section>
+      <section>
+        <h3>Kandidater</h3>
+        <div
+          className={`kandidatliste ${filter.kunKandidater ? 'aktiv' : ''}`}
+          onClick={visKandidater}
+          title="Billeder der venter på en tur i editoren, før de kan afgøres"
+        >
+          <span>Venter på redigering</span>
+          <span className="antal">{antalKandidater || 0}</span>
+        </div>
       </section>
       <section>
         <h3>Serier</h3>
