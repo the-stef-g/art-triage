@@ -528,16 +528,42 @@ export class Catalog extends EventEmitter {
 
   folderTree() {
     const dirs = walkDirs(this.root);
-    const counts = new Map();
-    for (const f of this.db.all('SELECT rel_path FROM files WHERE present=1')) {
-      const dir = posix.dirname(f.rel_path);
-      const key = dir === '.' ? '' : dir;
-      counts.set(key, (counts.get(key) || 0) + 1);
+    // Tallene ved hver mappe skal vise det samme som et klik paa mappen.
+    // Derfor taelles versioner og ikke filer, og undermapper regnes med,
+    // praecis som filteret goer. Foer blev der taldt filer i mappen selv,
+    // saa tallet og det man saa efter klikket kunne vaere to forskellige.
+    const raekker = this.db.all(
+      `SELECT f.rel_path AS rel_path, v.rating AS rating, COUNT(*) AS antal
+       FROM versions v
+       JOIN images i ON i.id = v.image_id
+       JOIN files f ON f.id = COALESCE(v.file_id, i.master_file_id)
+       WHERE f.present = 1
+       GROUP BY f.rel_path, v.rating`
+    );
+    const tomTaelling = () => ({ godkendt: 0, kandidat: 0, kasseret: 0, ubedomt: 0 });
+    const perMappe = new Map();
+    for (const r of raekker) {
+      let dir = posix.dirname(r.rel_path);
+      if (dir === '.') dir = '';
+      // Tal med i mappen selv og i alle mapper over den.
+      for (;;) {
+        if (!perMappe.has(dir)) perMappe.set(dir, tomTaelling());
+        const t = perMappe.get(dir);
+        if (t[r.rating] !== undefined) t[r.rating] += r.antal;
+        if (dir === '') break;
+        const op = posix.dirname(dir);
+        dir = op === '.' ? '' : op;
+      }
     }
-    const rootNode = { name: basename(this.root), rel: '', children: [], count: counts.get('') || 0 };
+    const nyNode = (name, rel) => {
+      const counts = perMappe.get(rel) || tomTaelling();
+      const count = counts.godkendt + counts.kandidat + counts.kasseret + counts.ubedomt;
+      return { name, rel, children: [], counts, count };
+    };
+    const rootNode = nyNode(basename(this.root), '');
     const byRel = new Map([['', rootNode]]);
     for (const rel of dirs) {
-      const node = { name: posix.basename(rel), rel, children: [], count: counts.get(rel) || 0 };
+      const node = nyNode(posix.basename(rel), rel);
       byRel.set(rel, node);
       const parentRel = posix.dirname(rel);
       const parent = byRel.get(parentRel === '.' ? '' : parentRel) || rootNode;

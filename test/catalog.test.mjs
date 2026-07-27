@@ -338,16 +338,47 @@ describe('mapper og flytning', () => {
     expect(existsSync(join(root, 'blandet.png'))).toBe(true);
   });
 
-  it('mappetraeet taeller filer pr. mappe', () => {
+  it('mappetraeet taeller undermapper med', () => {
+    // Tallet skal vise det samme som et klik paa mappen, og et klik
+    // filtrerer paa "mappe/%", altsaa inklusive undermapper. Foer blev
+    // der taldt filer i mappen selv, saa tal og visning kunne afvige.
     skriv('a.png', 'a');
     skriv('m1/b.png', 'b');
     skriv('m1/m2/c.png', 'c');
     catalog.sync();
     const tree = catalog.folderTree();
-    expect(tree.count).toBe(1);
+    expect(tree.count).toBe(3);
     const m1 = tree.children.find((c) => c.name === 'm1');
-    expect(m1.count).toBe(1);
+    expect(m1.count).toBe(2);
     expect(m1.children[0].count).toBe(1);
+    expect(catalog.listVersions({ folder: 'm1', visKasserede: true })).toHaveLength(2);
+  });
+
+  it('mappetraeet taeller pr. bedoemmelse', () => {
+    skriv('m1/a.png', 'a');
+    skriv('m1/b.png', 'b');
+    skriv('m1/c.png', 'c');
+    catalog.sync();
+    const ver = (rel) => catalog.listVersions({ visKasserede: true })
+      .find((r) => r.rel_path === rel).version_id;
+    catalog.setRating([ver('m1/a.png')], 'godkendt');
+    catalog.setRating([ver('m1/b.png')], 'kandidat');
+    catalog.setRating([ver('m1/c.png')], 'kasseret');
+    const m1 = catalog.folderTree().children.find((c) => c.name === 'm1');
+    expect(m1.counts).toEqual({ godkendt: 1, kandidat: 1, kasseret: 1, ubedomt: 0 });
+  });
+
+  it('taeller virtuelle kopier med, ligesom grid\'et', () => {
+    // Der taelles versioner og ikke filer: en virtuel kopi er sin egen
+    // flise i grid'et og skal derfor ogsaa taelle med i mappen.
+    skriv('m1/a.png', 'a');
+    catalog.sync();
+    const foer = catalog.folderTree().children.find((c) => c.name === 'm1');
+    expect(foer.count).toBe(1);
+    const ver = catalog.listVersions({}).find((r) => r.rel_path === 'm1/a.png');
+    catalog.createVirtualCopy(ver.version_id);
+    const efter = catalog.folderTree().children.find((c) => c.name === 'm1');
+    expect(efter.count).toBe(2);
   });
 });
 

@@ -30,7 +30,7 @@ The app is not signed with an Apple developer certificate, so macOS refuses the 
 
 **New files and external drives.** If your library sits on an external drive, macOS rarely tells the app that new files have arrived. That is why art-triage goes through the folder itself at regular intervals, and you can always click "Scan again" in the toolbar to do it right now. If you unplug the drive while the app is running, the status bar says the drive is not connected and the catalogue is left untouched: ratings, series and virtual copies wait for you until the drive is back.
 
-**Rating.** Every image is approved, a candidate, discarded or unrated. Discarded images are hidden by default; the Discarded chip in the toolbar shows them.
+**Rating.** Every image is approved, a candidate, discarded or unrated. The three decided states are a traffic light: green ✓ approved, yellow ? candidate, red ✕ discarded. The badge in the corner of the image is the whole marking; there is no coloured frame around the picture, because a badge is enough to catch the eye and a frame under every image was noise. Discarded images are hidden by default; the Discarded chip in the toolbar shows them.
 
 **Workflow stage.** Separately from the rating, an image sits at one stage: being edited, finished, or neither. It is one at a time, not two switches. An image cannot be out with an editor and finished at the same time, so setting one clears the other. Saving from an editor puts the image back on "being edited", because a new version means the work is not over.
 
@@ -50,7 +50,7 @@ Tab does not move focus around the interface. The work is done with the mouse an
 
 **The large preview stays inside the middle column.** Space fills the grid area, not the window, so the sidebar and the Inspector stay where they are and you can see series, keywords and rating while looking at the picture full size. Space again or Escape closes it.
 
-**Candidate.** Use candidate when the subject is good but something technical is in the way: softness, wrong colours and the like. It is not a verdict but a decision on hold until the image has been through the editor. Candidates have their own purple colour in the grid and their own entry in the sidebar, where the list of what is waiting opens with one click. They show up as ordinary images in the grid, unlike discarded ones. Once you have fixed the image you rate it again: approved or discarded. Candidates are never sent for paid analysis, precisely because they are not settled yet.
+**Candidate.** Use candidate when the subject is good but something technical is in the way: softness, wrong colours and the like. It is not a verdict but a decision on hold until the image has been through the editor. Candidate is the yellow light in the middle: a question mark, not a verdict. Candidates have their own entry in the sidebar, where the list of what is waiting opens with one click. They show up as ordinary images in the grid, unlike discarded ones. Once you have fixed the image you rate it again: approved or discarded. Candidates are never sent for paid analysis, precisely because they are not settled yet.
 
 **Virtual copies.** "New virtual copy" creates an extra version of the same subject, for instance for a different crop. The copy takes up no space on disk until you send it off for editing. At that moment art-triage makes a physical copy next to the original and opens it in your editor.
 
@@ -61,6 +61,8 @@ Tab does not move focus around the interface. The work is done with the mouse an
 **Series.** Select one or more images and pick "New series" or an existing series in the Inspector. Click a series in the sidebar to see only its images. Hover a series in the sidebar and two buttons appear: the pencil renames it, the bin deletes it. Deleting a series does not touch the images, they only lose their link to it.
 
 **The sidebar is navigation.** Folders, the candidate list, series and keywords are four views, and there is one at a time. Click somewhere new and you go straight there, without having to click your way out of the previous one first.
+
+**Every folder shows how far it has come**, in the same traffic-light colours: green approved | yellow candidates | red discarded | grey unrated. Zeroes are left out so the row does not fill with numbers that say nothing. The counts include subfolders and count versions rather than files, so a number matches exactly what you see when you click the folder.
 
 **Search.** Type for example "yellow flowers" in the search field and art-triage finds the images from the picture content itself. It needs no keywords: the app analyses every image in the background. Only images that clearly match are shown; a search with no real matches honestly returns nothing. The number next to a keyword in the sidebar matches how many images a click will show.
 

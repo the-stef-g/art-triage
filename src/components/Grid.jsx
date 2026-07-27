@@ -12,7 +12,7 @@ function Badges({ row }) {
     <div className="badges">
       {row.rating === 'godkendt' && <span className="badge godkendt" title="Approved">✓</span>}
       {row.rating === 'kandidat' && (
-        <span className="badge kandidat" title="Candidate: good subject, needs editing before it can be decided">K</span>
+        <span className="badge kandidat" title="Candidate: good subject, needs editing before it can be decided">?</span>
       )}
       {row.rating === 'kasseret' && <span className="badge kasseret" title="Discarded">✕</span>}
       {Boolean(row.edited) && <span className="badge redigeret" title="Being edited">R</span>}

@@ -96,6 +96,12 @@ try {
   await page.keyboard.press('ArrowRight');
   await page.keyboard.press('c');
   await page.waitForSelector('.badge.kandidat', { timeout: 10000 });
+  // Bedoemmelserne er et trafiklys, saa kandidat er et spoergsmaalstegn
+  // og ikke et K fra det danske "kandidat".
+  const kandidatTegn = await page.locator('.badge.kandidat').first().innerText();
+  if (kandidatTegn.trim() !== '?') {
+    throw new Error(`Kandidat-badgen viser "${kandidatTegn}" og ikke "?"`);
+  }
   await page.waitForFunction(
     () => document.querySelectorAll('.tile.kandidat').length === 1,
     null,
@@ -106,6 +112,26 @@ try {
     null,
     { timeout: 10000 }
   );
+  // Mappetallene staar i trafiklysets farver. Paa dette tidspunkt er ét
+  // billede godkendt og ét kandidat, saa begge tal skal staa der, og
+  // resten skal vaere ubedoemt.
+  const mappetal = await page.evaluate(() => {
+    const rod = document.querySelector('.mappe');
+    const tag = (k) => rod.querySelector(k)?.textContent?.trim() ?? null;
+    return {
+      godkendt: tag('.tal-godkendt'),
+      kandidat: tag('.tal-kandidat'),
+      ubedomt: tag('.tal-ubedomt'),
+      kasseret: tag('.tal-kasseret'),
+    };
+  });
+  if (mappetal.godkendt !== '1' || mappetal.kandidat !== '1' || mappetal.ubedomt !== '2') {
+    throw new Error(`Mappetallene passer ikke: ${JSON.stringify(mappetal)}`);
+  }
+  if (mappetal.kasseret !== null) {
+    throw new Error('Et nul blev vist i mappetallene i stedet for at blive udeladt');
+  }
+
   // Sidepanelet er navigation: et klik et nyt sted skal foere derhen, uden
   // at man foerst skal klikke sig ud af den forrige visning.
   await page.locator('.kandidatliste').click();

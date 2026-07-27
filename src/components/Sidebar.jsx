@@ -11,6 +11,33 @@ const KUN_EN_VISNING = {
   kunKandidater: false,
 };
 
+// Tallene ved en mappe, i trafiklysets farver: grøn godkendt, gul
+// kandidat, rød kasseret, graa ubedømt. Nuller udelades, saa raekken ikke
+// fyldes med tal der ikke siger noget. Undermapper er talt med, saa
+// tallene svarer til det man faar at se, naar man klikker paa mappen.
+const TAL = [
+  ['godkendt', 'tal-godkendt', 'approved'],
+  ['kandidat', 'tal-kandidat', 'candidates'],
+  ['kasseret', 'tal-kasseret', 'discarded'],
+  ['ubedomt', 'tal-ubedomt', 'unrated'],
+];
+
+function Mappetal({ counts }) {
+  if (!counts) return null;
+  const viste = TAL.filter(([key]) => counts[key] > 0);
+  if (!viste.length) return null;
+  return (
+    <span className="mappetal">
+      {viste.map(([key, klasse, navn], i) => (
+        <span key={key}>
+          {i > 0 && <span className="skiller">|</span>}
+          <span className={klasse} title={`${counts[key]} ${navn}`}>{counts[key]}</span>
+        </span>
+      ))}
+    </span>
+  );
+}
+
 function FolderNode({ node, depth, filter, setFilter, onMoveTo }) {
   const [open, setOpen] = useState(depth < 1);
   const [dragOver, setDragOver] = useState(false);
@@ -46,7 +73,7 @@ function FolderNode({ node, depth, filter, setFilter, onMoveTo }) {
           </button>
         )}
         <span className="mappenavn">{depth === 0 ? 'All images' : node.name}</span>
-        {node.count > 0 && <span className="antal">{node.count}</span>}
+        <Mappetal counts={node.counts} />
       </div>
       {open && node.children.map((child) => (
         <FolderNode
