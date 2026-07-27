@@ -107,11 +107,6 @@ try {
     null,
     { timeout: 10000 }
   );
-  await page.waitForFunction(
-    () => document.querySelector('.kandidatliste .antal')?.textContent.trim() === '1',
-    null,
-    { timeout: 10000 }
-  );
   // Mappetallene staar i trafiklysets farver. Paa dette tidspunkt er ét
   // billede godkendt og ét kandidat, saa begge tal skal staa der, og
   // resten skal vaere ubedoemt.
@@ -132,14 +127,19 @@ try {
     throw new Error('Et nul blev vist i mappetallene i stedet for at blive udeladt');
   }
 
-  // Sidepanelet er navigation: et klik et nyt sted skal foere derhen, uden
-  // at man foerst skal klikke sig ud af den forrige visning.
-  await page.locator('.kandidatliste').click();
+  // Kandidatlisten er Candidates-chippen i vaerktoejslinjen. Den stod
+  // ogsaa som sin egen sektion i sidepanelet, men to veje til den samme
+  // visning er én for meget.
+  await page.locator('.chip', { hasText: 'Candidates' }).click();
   await page.waitForFunction(
     () => document.querySelectorAll('.tile').length === 1,
     null,
     { timeout: 10000 }
   );
+  await page.locator('.chip', { hasText: 'Candidates' }).click();
+
+  // Sidepanelet er navigation: et klik et nyt sted skal foere derhen, uden
+  // at man foerst skal klikke sig ud af den forrige visning.
   await page.locator('.mappe', { hasText: 'All images' }).click();
   await page.waitForFunction(
     () => document.querySelectorAll('.tile').length === 4,
@@ -208,6 +208,36 @@ try {
   if (daekker) throw new Error('Forstoerrelsen daekker sidepanelet eller inspektoeren');
   await page.keyboard.press(' ');
   await page.waitForSelector('.forstoerret', { state: 'detached', timeout: 10000 });
+
+  // Skyderen i bundlinjen styrer hvor mange billeder der staar i bredden,
+  // og fliserne skal fylde hele midterfeltet. Foer var flisebredden fast,
+  // saa de kolonner der ikke gik op blev til en stribe bar baggrund langs
+  // hoejre kant.
+  for (const antal of [3, 7]) {
+    await page.locator('.kolonnevalg input').fill(String(antal));
+    await page.waitForFunction(
+      (n) => document.querySelector('.kolonnevalg .antal')?.textContent.trim() === String(n),
+      antal,
+      { timeout: 10000 }
+    );
+    const maal = await page.evaluate(() => {
+      const omraade = document.querySelector('.grid-omraade').getBoundingClientRect();
+      const celler = [...document.querySelectorAll('.celle')].map((c) => c.getBoundingClientRect());
+      const foerste = celler[0];
+      const iFoersteRaekke = celler.filter((c) => Math.abs(c.top - foerste.top) < 2);
+      const hoejst = Math.max(...iFoersteRaekke.map((c) => c.right));
+      return { rest: omraade.right - hoejst, iRaekken: iFoersteRaekke.length };
+    });
+    // Der er fire billeder, saa ved syv kolonner fyldes raekken ikke, og
+    // der maales kun paa bredden ved tre.
+    if (antal === 3 && maal.iRaekken !== 3) {
+      throw new Error(`Skyderen gav ${maal.iRaekken} billeder i bredden og ikke ${antal}`);
+    }
+    if (antal === 3 && maal.rest > 20) {
+      throw new Error(`Der stod ${Math.round(maal.rest)} px bar baggrund til hoejre for fliserne`);
+    }
+  }
+  await page.locator('.kolonnevalg input').fill('4');
 
   // Piletast-navigation gaar i ring. Der er fire billeder, saa fire tryk
   // paa hoejre pil fra det foerste skal lande paa det foerste igen.

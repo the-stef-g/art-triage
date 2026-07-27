@@ -4,8 +4,18 @@ import { useSize } from '../hooks';
 import { thumbUrl } from '../api';
 import { fileName } from '../util';
 
-const CELL_W = 236;
-const CELL_H = 264;
+// Fliserne fylder hele bredden af midterfeltet, delt paa det antal
+// kolonner brugeren har valgt. Foer var bredden fast, og de kolonner der
+// ikke gik op, blev til en stribe bar baggrund langs hoejre kant.
+//
+// Billedfeltet foelger flisens bredde, men navn og badges under det er
+// tekst i fast stoerrelse og maa ikke skaleres med. Derfor et fast
+// tillaeg oven i den skalerede billedhoejde.
+const BILLED_FORHOLD = 0.78;
+const TEKST_HOEJDE = 92;
+// Plads til den lodrette rullebjaelke, saa den sidste kolonne ikke bliver
+// klemt eller skubbet ud, naar der er flere raekker end der er plads til.
+const RULLEBREDDE = 14;
 
 function Badges({ row }) {
   return (
@@ -63,13 +73,20 @@ function Tile({ row, isSelected, isActive, onClick, onDoubleClick, onDragStart }
 // omraade-markeringen fra det samme udgangspunkt.
 export default function Grid({
   rows, selected, active, setSelected, setActive, focusIndex, harSoegning,
-  onOpenPreview, onColumns, ankerRef,
+  onOpenPreview, onColumns, ankerRef, columns,
 }) {
   const [ref, size] = useSize();
   const gridRef = useRef(null);
 
-  const columns = Math.max(1, Math.floor((size.width - 12) / CELL_W));
   useEffect(() => onColumns(columns), [columns, onColumns]);
+
+  const rowCount = Math.ceil(rows.length / columns);
+  // Rullebjaelken tages fra bredden foerst, saa fliserne passer uanset om
+  // der er én raekke eller tusind.
+  const brugbar = Math.max(columns * 40, size.width - (rowCount > 1 ? RULLEBREDDE : 0));
+  const cellW = Math.floor(brugbar / columns);
+  const billedHoejde = Math.round((cellW - 16) * BILLED_FORHOLD);
+  const cellH = billedHoejde + TEKST_HOEJDE;
 
   // Det markerede billede skal altid blive i synsfeltet, ogsaa ved
   // piletast-navigation.
@@ -115,7 +132,6 @@ export default function Grid({
     e.dataTransfer.effectAllowed = 'move';
   }, [rows, selected, selectedSet]);
 
-  const rowCount = Math.ceil(rows.length / columns);
 
   const Cell = useCallback(({ columnIndex, rowIndex, style }) => {
     const index = rowIndex * columns + columnIndex;
@@ -140,7 +156,9 @@ export default function Grid({
   }, [rows, columns, selectedSet, active, handleClick, handleDragStart, setSelected, setActive, onOpenPreview]);
 
   return (
-    <section className="grid-omraade" ref={ref}>
+    // Billedhoejden gives videre som CSS-variabel: den skal skalere med
+    // flisens bredde, og det er kun her tallet er kendt.
+    <section className="grid-omraade" ref={ref} style={{ '--billedhoejde': `${billedHoejde}px` }}>
       {rows.length === 0 ? (
         <div className="tom-tilstand">
           {harSoegning ? (
@@ -160,8 +178,8 @@ export default function Grid({
           ref={gridRef}
           columnCount={columns}
           rowCount={rowCount}
-          columnWidth={CELL_W}
-          rowHeight={CELL_H}
+          columnWidth={cellW}
+          rowHeight={cellH}
           width={size.width}
           height={size.height}
         >

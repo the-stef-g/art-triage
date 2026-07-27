@@ -5,7 +5,7 @@ import Toolbar from './components/Toolbar';
 import Sidebar from './components/Sidebar';
 import Grid from './components/Grid';
 import Inspector from './components/Inspector';
-import StatusBar from './components/StatusBar';
+import StatusBar, { MIN_KOLONNER, MAX_KOLONNER } from './components/StatusBar';
 import { PreviewOverlay, NameModal } from './components/Overlay';
 
 const defaultFilter = {
@@ -44,6 +44,12 @@ export default function App() {
   // paa den, saa ord der bliver skrevet mens man kigger paa billedet, ogsaa
   // dukker op med det samme.
   const [dataRev, setDataRev] = useState(0);
+  // Antal billeder i bredden. Gemmes lokalt, saa den staar hvor man
+  // efterlod den naeste gang appen aabnes.
+  const [kolonner, setKolonner] = useState(() => {
+    const gemt = Number(localStorage.getItem('kolonner'));
+    return gemt >= MIN_KOLONNER && gemt <= MAX_KOLONNER ? gemt : 5;
+  });
 
   const filterRef = useRef(filter);
   filterRef.current = filter;
@@ -561,7 +567,6 @@ export default function App() {
           setFilter={setFilter}
           onMoveTo={(fileIds, rel) => act.moveTo(fileIds, rel)}
           onRemoveFromSelected={act.removeKeywordFromSelected}
-          antalKandidater={counts?.byRating?.kandidat}
           onRenameSeries={act.renameSeries}
           onDeleteSeries={act.deleteSeries}
           kwStatus={kwStatus}
@@ -581,6 +586,7 @@ export default function App() {
             onOpenPreview={() => setShowPreview(true)}
             onColumns={(c) => { columnsRef.current = c; }}
             ankerRef={ankerRef}
+            columns={kolonner}
           />
           {showPreview && focusedRow && (
             <PreviewOverlay
@@ -609,6 +615,11 @@ export default function App() {
         version={appInfo?.version}
         drevMangler={Boolean(drev?.missing)}
         kwStatus={kwStatus}
+        kolonner={kolonner}
+        setKolonner={(n) => {
+          setKolonner(n);
+          localStorage.setItem('kolonner', String(n));
+        }}
       />
       {modal && (
         <NameModal

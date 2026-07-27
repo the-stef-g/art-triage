@@ -1,5 +1,9 @@
+export const MIN_KOLONNER = 3;
+export const MAX_KOLONNER = 10;
+
 export default function StatusBar({
   counts, aiStatus, indexProgress, searchInfo, fejl, library, version, drevMangler, kwStatus,
+  kolonner, setKolonner,
 }) {
   const aiTekst = (() => {
     if (!aiStatus) return '';
@@ -47,6 +51,16 @@ export default function StatusBar({
         <span className="soegeinfo">{searchInfo.matched} results</span>
       )}
       <span className="spacer" />
+      <label className="kolonnevalg" title="How many images across the grid">
+        <input
+          type="range"
+          min={MIN_KOLONNER}
+          max={MAX_KOLONNER}
+          value={kolonner}
+          onChange={(e) => setKolonner(Number(e.target.value))}
+        />
+        <span className="antal">{kolonner}</span>
+      </label>
       {drevMangler && (
         <span className="drev-mangler" title="The catalogue is untouched. Connect the drive and click Scan again.">
           Drive not connected

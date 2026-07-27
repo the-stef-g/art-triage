@@ -50,7 +50,7 @@ Tab does not move focus around the interface. The work is done with the mouse an
 
 **The large preview stays inside the middle column.** Space fills the grid area, not the window, so the sidebar and the Inspector stay where they are and you can see series, keywords and rating while looking at the picture full size. Space again or Escape closes it.
 
-**Candidate.** Use candidate when the subject is good but something technical is in the way: softness, wrong colours and the like. It is not a verdict but a decision on hold until the image has been through the editor. Candidate is the yellow light in the middle: a question mark, not a verdict. Candidates have their own entry in the sidebar, where the list of what is waiting opens with one click. They show up as ordinary images in the grid, unlike discarded ones. Once you have fixed the image you rate it again: approved or discarded. Candidates are never sent for paid analysis, precisely because they are not settled yet.
+**Candidate.** Use candidate when the subject is good but something technical is in the way: softness, wrong colours and the like. It is not a verdict but a decision on hold until the image has been through the editor. Candidate is the yellow light in the middle: a question mark, not a verdict. The Candidates chip in the toolbar is the work list of what is waiting for a round in the editor. They show up as ordinary images in the grid, unlike discarded ones. Once you have fixed the image you rate it again: approved or discarded. Candidates are never sent for paid analysis, precisely because they are not settled yet.
 
 **Virtual copies.** "New virtual copy" creates an extra version of the same subject, for instance for a different crop. The copy takes up no space on disk until you send it off for editing. At that moment art-triage makes a physical copy next to the original and opens it in your editor.
 
@@ -60,9 +60,11 @@ Tab does not move focus around the interface. The work is done with the mouse an
 
 **Series.** Select one or more images and pick "New series" or an existing series in the Inspector. Click a series in the sidebar to see only its images. Hover a series in the sidebar and two buttons appear: the pencil renames it, the bin deletes it. Deleting a series does not touch the images, they only lose their link to it.
 
-**The sidebar is navigation.** Folders, the candidate list, series and keywords are four views, and there is one at a time. Click somewhere new and you go straight there, without having to click your way out of the previous one first.
+**The sidebar is navigation.** Folders, series and keywords are three views, and there is one at a time. Click somewhere new and you go straight there, without having to click your way out of the previous one first.
 
-**Every folder shows how far it has come**, in the same traffic-light colours: green approved | yellow candidates | red discarded | grey unrated. Zeroes are left out so the row does not fill with numbers that say nothing. The counts include subfolders and count versions rather than files, so a number matches exactly what you see when you click the folder.
+**Every folder shows how far it has come**, in the same traffic-light colours: green approved, yellow candidates, red discarded, grey unrated. The colours keep the numbers apart, so they are simply spaced rather than divided by rules. Zeroes are left out so the row does not fill with numbers that say nothing. The counts include subfolders and count versions rather than files, so a number matches exactly what you see when you click the folder.
+
+**The slider in the status bar sets how many images stand across the grid**, from 3 to 10. The tiles fill the whole width between the two columns, and the image area grows with them, so there is never a strip of bare background along the right edge. The setting is remembered between sessions.
 
 **Search.** Type for example "yellow flowers" in the search field and art-triage finds the images from the picture content itself. It needs no keywords: the app analyses every image in the background. Only images that clearly match are shown; a search with no real matches honestly returns nothing. The number next to a keyword in the sidebar matches how many images a click will show.
 

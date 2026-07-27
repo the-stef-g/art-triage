@@ -26,13 +26,12 @@ function Mappetal({ counts }) {
   if (!counts) return null;
   const viste = TAL.filter(([key]) => counts[key] > 0);
   if (!viste.length) return null;
+  // Farverne holder tallene fra hinanden, saa et mellemrum er nok. En
+  // lodret streg imellem fyldte mere end den forklarede.
   return (
     <span className="mappetal">
-      {viste.map(([key, klasse, navn], i) => (
-        <span key={key}>
-          {i > 0 && <span className="skiller">|</span>}
-          <span className={klasse} title={`${counts[key]} ${navn}`}>{counts[key]}</span>
-        </span>
+      {viste.map(([key, klasse, navn]) => (
+        <span key={key} className={klasse} title={`${counts[key]} ${navn}`}>{counts[key]}</span>
       ))}
     </span>
   );
@@ -147,20 +146,8 @@ function Noegleordskoe({ status, act }) {
 
 export default function Sidebar({
   tree, series, topKeywords, filter, setFilter, onMoveTo, onRemoveFromSelected,
-  antalKandidater, onRenameSeries, onDeleteSeries, kwStatus, act,
+  onRenameSeries, onDeleteSeries, kwStatus, act,
 }) {
-  // Arbejdslisten skal kunne aabnes med et klik. Ud over de andre
-  // visninger ryddes ogsaa de filtre i vaerktoejslinjen der ellers ville
-  // skaere kandidater fra, saa listen viser det den lover.
-  const visKandidater = () => setFilter((f) => ({
-    ...f,
-    ...KUN_EN_VISNING,
-    kunKandidater: true,
-    kunGodkendte: false,
-    kunFaerdige: false,
-    visKasserede: false,
-  }));
-
   const visSerie = (id) => setFilter((f) => ({ ...f, ...KUN_EN_VISNING, serieId: id }));
   const visNoegleord = (word) => setFilter((f) => ({ ...f, ...KUN_EN_VISNING, keyword: word }));
 
@@ -172,17 +159,9 @@ export default function Sidebar({
           <FolderNode node={tree} depth={0} filter={filter} setFilter={setFilter} onMoveTo={onMoveTo} />
         )}
       </section>
-      <section>
-        <h3>Candidates</h3>
-        <div
-          className={`kandidatliste ${filter.kunKandidater ? 'aktiv' : ''}`}
-          onClick={visKandidater}
-          title="Images waiting for a round in the editor before they can be decided"
-        >
-          <span>Waiting for editing</span>
-          <span className="antal">{antalKandidater || 0}</span>
-        </div>
-      </section>
+      {/* Kandidatlisten stod her som sin egen sektion. Den er taget ud
+          igen: Candidates-chippen i vaerktoejslinjen goer det samme, og
+          to veje til den samme visning er én for meget. */}
       <section>
         <h3>Series</h3>
         {series.length === 0 && <p className="tom">No series yet</p>}
