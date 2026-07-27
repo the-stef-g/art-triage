@@ -239,6 +239,12 @@ export default function App() {
       const f = getFocused();
       if (f) invoke('img:virtualCopy', { versionId: f.version_id }).catch(visFejl);
     },
+    // Knapperne i vaerktoejslinjen skal kunne det samme som tasterne, saa
+    // de to sidste faar ogsaa en indgang her.
+    togglePreview: () => {
+      if (getFocused()) setShowPreview((p) => !p);
+    },
+    undo: () => invoke('app:undo').catch(() => {}),
     editIn: async (appPath, versionId = getFocused()?.version_id) => {
       if (!versionId) return;
       try {
@@ -468,6 +474,8 @@ export default function App() {
         onChooseLibrary={act.chooseLibrary}
         onRescan={act.rescan}
         skanner={skanner}
+        act={act}
+        harValg={selected.length > 0}
       />
       <div className="hoved">
         <Sidebar
@@ -484,15 +492,25 @@ export default function App() {
           kwStatus={kwStatus}
           act={act}
         />
-        <Grid
-          rows={rows}
-          selected={selected}
-          setSelected={setSelected}
-          focusIndex={rows.findIndex((r) => r.version_id === selected[selected.length - 1])}
-          harSoegning={Boolean((filter.search && filter.search.trim()) || filter.keyword)}
-          onOpenPreview={() => setShowPreview(true)}
-          onColumns={(c) => { columnsRef.current = c; }}
-        />
+        {/* Midterfeltet baerer baade grid'et og forstoerrelsen, saa den
+            store visning holder sig inden for de to kolonner. */}
+        <div className="midte">
+          <Grid
+            rows={rows}
+            selected={selected}
+            setSelected={setSelected}
+            focusIndex={rows.findIndex((r) => r.version_id === selected[selected.length - 1])}
+            harSoegning={Boolean((filter.search && filter.search.trim()) || filter.keyword)}
+            onOpenPreview={() => setShowPreview(true)}
+            onColumns={(c) => { columnsRef.current = c; }}
+          />
+          {showPreview && focusedRow && (
+            <PreviewOverlay
+              row={focusedRow}
+              onClose={() => setShowPreview(false)}
+            />
+          )}
+        </div>
         <Inspector
           row={focusedRow}
           selectedCount={selected.length}
@@ -514,12 +532,6 @@ export default function App() {
         drevMangler={Boolean(drev?.missing)}
         kwStatus={kwStatus}
       />
-      {showPreview && focusedRow && (
-        <PreviewOverlay
-          row={focusedRow}
-          onClose={() => setShowPreview(false)}
-        />
-      )}
       {modal && (
         <NameModal
           title={modal.title}

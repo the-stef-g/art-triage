@@ -30,15 +30,17 @@ The app is not signed with an Apple developer certificate, so macOS refuses the 
 
 **New files and external drives.** If your library sits on an external drive, macOS rarely tells the app that new files have arrived. That is why art-triage goes through the folder itself at regular intervals, and you can always click "Scan again" in the toolbar to do it right now. If you unplug the drive while the app is running, the status bar says the drive is not connected and the catalogue is left untouched: ratings, series and virtual copies wait for you until the drive is back.
 
-**Rating.** Every image is approved, a candidate, discarded or unrated. Discarded images are hidden by default and can be shown again with "Show discarded".
+**Rating.** Every image is approved, a candidate, discarded or unrated. Discarded images are hidden by default; the Discarded chip in the toolbar shows them.
 
 **Workflow stage.** Separately from the rating, an image sits at one stage: being edited, finished, or neither. It is one at a time, not two switches. An image cannot be out with an editor and finished at the same time, so setting one clears the other. Saving from an editor puts the image back on "being edited", because a new version means the work is not over.
 
-Shortcuts follow the English words on the buttons: **A** approve, **C** candidate, **X** discard, **U** unrated, **E** stage being edited, **F** stage finished, **V** new virtual copy, **space** large preview, **arrow keys** move the selection, **Cmd+A** select all, **Cmd+Z** undo the last action (rating, stage, series, rename, virtual copy and move), **Shift+Cmd+Z** redo. Pressing **E** or **F** on an image already at that stage clears it.
+**The action buttons are in the toolbar**, between the sort order and New folder, each with its key on it: **A** approve, **C** candidate, **X** discard, **U** unrated, **E** being edited, **F** finished, **V** virtual copy, **Space** large preview, **Cmd+Z** undo. Click them or press the key, it is the same thing. They used to be a list in the Inspector, which showed only when nothing was selected, so they were out of sight exactly when there was something to use them on. Also: **arrow keys** move the selection, **Cmd+A** selects all, **Shift+Cmd+Z** redoes. Pressing **E** or **F** on an image already at that stage clears it.
 
 Tab does not move focus around the interface. The work is done with the mouse and these letters, and a wandering focus made it unclear what the next key would hit. Tab still works inside text fields.
 
-**The filter chips are views, one at a time.** Approved, Candidates, Being edited and Finished are four ways of looking at the library, and clicking one turns off the others. Clicking the active one goes back to showing everything. "Show discarded" sits apart because it answers something else: whether discarded images come along into the view you are in.
+**The filter chips are views, one at a time.** Approved, Candidates, Being edited, Finished and Discarded are five ways of looking at the library, and clicking one turns off the others. Clicking the active one goes back to showing everything.
+
+**The large preview stays inside the middle column.** Space fills the grid area, not the window, so the sidebar and the Inspector stay where they are and you can see series, keywords and rating while looking at the picture full size. Space again or Escape closes it.
 
 **Candidate.** Use candidate when the subject is good but something technical is in the way: softness, wrong colours and the like. It is not a verdict but a decision on hold until the image has been through the editor. Candidates have their own purple colour in the grid and their own entry in the sidebar, where the list of what is waiting opens with one click. They show up as ordinary images in the grid, unlike discarded ones. Once you have fixed the image you rate it again: approved or discarded. Candidates are never sent for paid analysis, precisely because they are not settled yet.
 

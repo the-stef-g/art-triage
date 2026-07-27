@@ -168,6 +168,35 @@ try {
     { timeout: 10000 }
   );
 
+  // Forstoerrelsen skal blive inden for midterfeltet, saa sidepanel og
+  // inspektoer bliver staaende. Var den bundet til vinduet igen, ville
+  // den daekke begge kolonner.
+  await page.keyboard.press(' ');
+  await page.waitForSelector('.forstoerret', { timeout: 10000 });
+  const daekker = await page.evaluate(() => {
+    const stor = document.querySelector('.forstoerret').getBoundingClientRect();
+    const side = document.querySelector('.sidebar').getBoundingClientRect();
+    const insp = document.querySelector('.inspector').getBoundingClientRect();
+    return stor.left < side.right - 1 || stor.right > insp.left + 1;
+  });
+  if (daekker) throw new Error('Forstoerrelsen daekker sidepanelet eller inspektoeren');
+  await page.keyboard.press(' ');
+  await page.waitForSelector('.forstoerret', { state: 'detached', timeout: 10000 });
+
+  // Handlingsknapperne i vaerktoejslinjen goer det samme som tasterne.
+  await page.locator('.handling', { hasText: 'candidate' }).click();
+  await page.waitForFunction(
+    () => document.querySelectorAll('.tile.kandidat').length === 2,
+    null,
+    { timeout: 10000 }
+  );
+  await page.locator('.handling', { hasText: 'unrated' }).click();
+  await page.waitForFunction(
+    () => document.querySelectorAll('.tile.kandidat').length === 1,
+    null,
+    { timeout: 10000 }
+  );
+
   // Ny virtuel kopi med V: en ekstra flise dukker op.
   await page.keyboard.press('v');
   await page.waitForFunction(
@@ -189,15 +218,23 @@ try {
 
   // Filter-chips i vaerktoejslinjen er visninger, ikke afkrydsninger:
   // der er én aktiv ad gangen. Stod to taendt, skar de hinanden bort, og
-  // grid'et kunne blive tomt uden at det var til at se hvorfor.
+  // grid'et kunne blive tomt uden at det var til at se hvorfor. Discarded
+  // er med i raekken paa lige fod med de andre.
   await page.locator('.chip', { hasText: 'Approved' }).click();
-  await page.locator('.chip', { hasText: 'Finished' }).click();
+  await page.locator('.chip', { hasText: 'Discarded' }).click();
   await page.waitForFunction(
     () => document.querySelectorAll('.filtre .chip.aktiv').length === 1,
     null,
     { timeout: 10000 }
   );
-  await page.locator('.chip', { hasText: 'Finished' }).click();
+  // Discarded skal vise de kasserede, ikke ingenting: visningen slaar
+  // ogsaa synligheden til, som ellers er slukket som standard.
+  await page.waitForFunction(
+    () => document.querySelectorAll('.tile').length === 1,
+    null,
+    { timeout: 10000 }
+  );
+  await page.locator('.chip', { hasText: 'Discarded' }).click();
   await page.waitForFunction(
     () => document.querySelectorAll('.filtre .chip.aktiv').length === 0,
     null,

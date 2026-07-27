@@ -72,6 +72,29 @@ input:focus, select:focus { outline: 1px solid var(--accent); }
 .filtre { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .vaerktoejer { display: flex; gap: 6px; margin-left: auto; }
 
+/* Handlinger paa det markerede. Tasten staar paa knappen, saa genvejene
+   laeres af sig selv i stedet for at skulle slaas op. */
+.handlinger { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+.handling {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px 3px 4px;
+  font-size: 12px;
+}
+.handling .tast {
+  min-width: 22px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--bg-hover);
+  color: var(--tekst);
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+}
+.handling:disabled { opacity: 0.4; }
+.handling:disabled .tast { background: var(--bg); }
+
 .chip {
   border-radius: 999px;
   padding: 3px 11px;
@@ -191,6 +214,10 @@ input:focus, select:focus { outline: 1px solid var(--accent); }
 .tom { color: var(--tekst-svag); font-size: 12px; padding: 0 8px; }
 
 /* ---------- Grid ---------- */
+/* Midterfeltet mellem de to kolonner. Forstoerrelsen laegger sig oven i
+   det her, ikke oven i hele vinduet, saa serier, noegleord og bedoemmelse
+   stadig er synlige mens man kigger stort paa billedet. */
+.midte { flex: 1; min-width: 0; position: relative; display: flex; }
 .grid-omraade { flex: 1; min-width: 0; position: relative; }
 .celle { padding: 8px; }
 .tile {
@@ -327,19 +354,6 @@ input:focus, select:focus { outline: 1px solid var(--accent); }
 .versionsnavn { flex: 1; overflow: hidden; text-overflow: ellipsis; }
 .versionsinfo { color: var(--tekst-svag); font-size: 11px; }
 .versionsknapper { display: flex; gap: 2px; }
-.genvejsliste { list-style: none; padding: 0; color: var(--tekst-svag); }
-.genvejsliste li { padding: 3px 0; }
-.genvejsliste b {
-  display: inline-block;
-  min-width: 84px;
-  color: var(--tekst);
-  background: var(--bg-hover);
-  border-radius: 4px;
-  padding: 1px 6px;
-  margin-right: 8px;
-  text-align: center;
-  font-size: 11px;
-}
 
 /* ---------- Statusbar ---------- */
 .statusbar {
@@ -399,6 +413,22 @@ button.stor {
 }
 .overlay img { max-width: 94vw; max-height: 88vh; object-fit: contain; }
 .overlay-info { color: var(--tekst-svag); }
+/* Forstoerrelsen: samme udseende som overlayet, men bundet til
+   midterfeltet i stedet for til vinduet. Derfor absolute og procenter i
+   stedet for fixed og vh, som ville maale paa hele skaermen igen. */
+.forstoerret {
+  position: absolute;
+  inset: 0;
+  background: rgba(8, 8, 10, 0.94);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  z-index: 40;
+}
+.forstoerret img { max-width: 100%; max-height: calc(100% - 28px); object-fit: contain; }
 .modal {
   background: var(--bg-panel);
   border: 1px solid var(--kant);

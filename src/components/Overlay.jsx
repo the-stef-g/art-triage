@@ -11,8 +11,11 @@ export function PreviewOverlay({ row, onClose }) {
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
+  // Forstoerrelsen daekker kun midterfeltet, ikke hele vinduet. Sidepanel
+  // og inspektoer bliver staaende, saa man kan se serier, noegleord og
+  // bedoemmelse mens man kigger stort paa billedet.
   return (
-    <div className="overlay" onClick={onClose}>
+    <div className="forstoerret" onClick={onClose}>
       <img src={thumbUrl(row.file_id, row.mtime, 2048)} alt={fileName(row.rel_path)} />
       <div className="overlay-info">
         {fileName(row.rel_path)}

@@ -54,17 +54,9 @@ export default function Inspector({
     return (
       <aside className="inspector">
         <p className="tom">Select an image to see details</p>
-        <ul className="genvejsliste">
-          <li><b>A</b> approve</li>
-          <li><b>C</b> candidate</li>
-          <li><b>X</b> discard</li>
-          <li><b>U</b> unrated</li>
-          <li><b>E</b> stage: being edited</li>
-          <li><b>F</b> stage: finished</li>
-          <li><b>V</b> new virtual copy</li>
-          <li><b>Space</b> large preview</li>
-          <li><b>Cmd+Z</b> undo</li>
-        </ul>
+        {/* Genvejene stod her, altsaa netop naar der ikke var noget at
+            bruge dem paa. De er flyttet op i vaerktoejslinjen, hvor de
+            baade er fremme hele tiden og kan klikkes. */}
       </aside>
     );
   }
