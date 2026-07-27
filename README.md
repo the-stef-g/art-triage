@@ -34,7 +34,11 @@ The app is not signed with an Apple developer certificate, so macOS refuses the 
 
 **Workflow stage.** Separately from the rating, an image sits at one stage: being edited, finished, or neither. It is one at a time, not two switches. An image cannot be out with an editor and finished at the same time, so setting one clears the other. Saving from an editor puts the image back on "being edited", because a new version means the work is not over.
 
-**The action buttons are in the toolbar**, between the sort order and New folder, each with its key on it: **A** approve, **C** candidate, **X** discard, **U** unrated, **E** being edited, **F** finished, **V** virtual copy, **Space** large preview, **Cmd+Z** undo. Click them or press the key, it is the same thing. They used to be a list in the Inspector, which showed only when nothing was selected, so they were out of sight exactly when there was something to use them on. Also: **arrow keys** move the selection, **Cmd+A** selects all, **Shift+Cmd+Z** redoes. Pressing **E** or **F** on an image already at that stage clears it.
+**The action buttons are in the toolbar**, between the sort order and New folder, each with its key on it: **A** approve, **C** candidate, **X** discard, **U** unrated, **E** being edited, **F** finished, **V** virtual copy. Click them or press the key, it is the same thing. They used to be a list in the Inspector, which showed only when nothing was selected, so they were out of sight exactly when there was something to use them on. **Space** (large preview) and **Cmd+Z** (undo) have no button; they sit in the fingers already. Also: **Cmd+A** selects all, **Shift+Cmd+Z** redoes. Pressing **E** or **F** on an image already at that stage clears it.
+
+**Selecting several.** Shift-click picks a range, cmd-click adds or removes one, and **Shift+arrow** extends the selection from the keyboard. Every action works on the whole selection. **Escape** leaves multi-select and keeps the image you were standing on, so the arrows carry on from there; a second Escape clears the selection. While the large preview is open, Escape closes that instead and leaves the selection alone.
+
+**The arrows wrap around.** Right arrow on the last image lands on the first. Up and down move a row at a time and wrap the same way. Shift+arrow stops at the ends rather than wrapping, since wrapping there would suddenly select the whole library.
 
 Tab does not move focus around the interface. The work is done with the mouse and these letters, and a wandering focus made it unclear what the next key would hit. Tab still works inside text fields.
 
@@ -58,7 +62,7 @@ Tab does not move focus around the interface. The work is done with the mouse an
 
 **Keywords.** Keywords come from Claude. The app used to guess them itself by scoring each image against a Danish word list, but that comparison was the wrong way round: words were held up against each other image by image, so a phrasing that generally scored high won on everything. In practice 'kirke' ended up on 1170 out of 1200 images. That mechanism is gone, and the old guesses are cleared automatically the first time you open the library. Your own words stay.
 
-You can add your own keywords to an image in the Inspector, and they appear as clickable chips in the sidebar.
+You can add your own keywords to an image in the Inspector, and they appear as clickable chips in the sidebar. The chips are listed alphabetically so a word is easy to find. If the list ever has to be cut, it drops the rarest words rather than the end of the alphabet, which would make everything from S onwards vanish without warning.
 
 **Cleaning up a wrong keyword.** Click the keyword in the sidebar and the grid shows every image carrying it. Select the ones it is wrong for, or press Cmd+A for all of them, then click the cross on the chip. The word is removed from exactly those images and from nowhere else. It is not blacklisted: the same word is free to come back on other images, and on these too if it fits later. Earlier every deletion was also stored as a permanent rejection, which made a tidy-up irreversible without saying so anywhere.
 

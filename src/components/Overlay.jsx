@@ -2,15 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { thumbUrl } from '../api';
 import { fileName } from '../util';
 
+// Escape haandteres i App sammen med de andre genveje. Laa der ogsaa en
+// lytter her, ville to steder svare paa den samme tast, og det ene
+// skulle saa gaette hvad det andet havde gjort.
 export function PreviewOverlay({ row, onClose }) {
-  useEffect(() => {
-    const onKey = (e) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
-
   // Forstoerrelsen daekker kun midterfeltet, ikke hele vinduet. Sidepanel
   // og inspektoer bliver staaende, saa man kan se serier, noegleord og
   // bedoemmelse mens man kigger stort paa billedet.

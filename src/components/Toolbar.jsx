@@ -12,9 +12,9 @@ const HANDLINGER = [
   { tast: 'E', navn: 'being edited', kraeverValg: true },
   { tast: 'F', navn: 'finished', kraeverValg: true },
   { tast: 'V', navn: 'virtual copy', kraeverValg: true },
-  { tast: 'Space', navn: 'large preview', kraeverValg: true },
-  { tast: 'Cmd+Z', navn: 'undo', kraeverValg: false },
 ];
+// Space og Cmd+Z er ikke med. De sidder i fingrene i forvejen, og en
+// knap til dem ville bare fylde i raekken.
 
 export default function Toolbar({
   filter, setFilter, searchInfo, onNewFolder, onCleanup, onChooseLibrary, onRescan, skanner,
@@ -66,8 +66,6 @@ export default function Toolbar({
       case 'E': act.setStage('edited'); break;
       case 'F': act.setStage('finished'); break;
       case 'V': act.virtualCopy(); break;
-      case 'Space': act.togglePreview(); break;
-      case 'Cmd+Z': act.undo(); break;
       default: break;
     }
   };

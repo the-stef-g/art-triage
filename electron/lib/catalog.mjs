@@ -785,18 +785,25 @@ export class Catalog extends EventEmitter {
 
   // Tallet skal matche hvad et klik viser: kun filer der er den effektive
   // fil for mindst én ikke-kasseret version taelles med.
-  topKeywords(limit = 40) {
+  //
+  // Listen vises alfabetisk, saa et ord er til at finde. Udvalget sker
+  // stadig paa antal: skulle der skaeres, er det de sjaeldneste ord der
+  // ryger, ikke dem sidst i alfabetet. En alfabetisk graense ville lade
+  // hele enden af alfabetet forsvinde uden varsel.
+  topKeywords(limit = 500) {
     return this.db.all(
-      `SELECT k.word, COUNT(DISTINCT k.file_id) AS antal
-       FROM keywords k
-       JOIN files f ON f.id = k.file_id
-       WHERE f.present=1
-         AND EXISTS (
-           SELECT 1 FROM versions v JOIN images i ON i.id = v.image_id
-           WHERE COALESCE(v.file_id, i.master_file_id) = k.file_id
-             AND v.rating != 'kasseret'
-         )
-       GROUP BY k.word ORDER BY antal DESC, k.word LIMIT ?`,
+      `SELECT word, antal FROM (
+         SELECT k.word AS word, COUNT(DISTINCT k.file_id) AS antal
+         FROM keywords k
+         JOIN files f ON f.id = k.file_id
+         WHERE f.present=1
+           AND EXISTS (
+             SELECT 1 FROM versions v JOIN images i ON i.id = v.image_id
+             WHERE COALESCE(v.file_id, i.master_file_id) = k.file_id
+               AND v.rating != 'kasseret'
+           )
+         GROUP BY k.word ORDER BY antal DESC, k.word LIMIT ?
+       ) ORDER BY lower(word)`,
       limit
     );
   }

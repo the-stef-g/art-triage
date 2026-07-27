@@ -56,9 +56,12 @@ function Tile({ row, isSelected, onClick, onDoubleClick, onDragStart }) {
   );
 }
 
-export default function Grid({ rows, selected, setSelected, focusIndex, harSoegning, onOpenPreview, onColumns }) {
+// ankerRef ejes af App, saa Skift+klik og Skift+piletast regner
+// omraade-markeringen fra det samme udgangspunkt.
+export default function Grid({
+  rows, selected, setSelected, focusIndex, harSoegning, onOpenPreview, onColumns, ankerRef,
+}) {
   const [ref, size] = useSize();
-  const anchorRef = useRef(0);
   const gridRef = useRef(null);
 
   const columns = Math.max(1, Math.floor((size.width - 12) / CELL_W));
@@ -80,19 +83,22 @@ export default function Grid({ rows, selected, setSelected, focusIndex, harSoegn
 
   const handleClick = useCallback((row, index, e) => {
     if (e.shiftKey) {
-      const from = Math.min(anchorRef.current, index);
-      const to = Math.max(anchorRef.current, index);
-      setSelected(rows.slice(from, to + 1).map((r) => r.version_id));
+      const anker = Math.max(0, Math.min(rows.length - 1, ankerRef.current));
+      const ids = rows.slice(Math.min(anker, index), Math.max(anker, index) + 1)
+        .map((r) => r.version_id);
+      // Det sidste id er det fokuserede, saa Skift+piletast bagefter
+      // fortsaetter fra den ende man lige klikkede paa.
+      setSelected(index < anker ? ids.reverse() : ids);
     } else if (e.metaKey || e.ctrlKey) {
-      anchorRef.current = index;
+      ankerRef.current = index;
       setSelected((sel) => (sel.includes(row.version_id)
         ? sel.filter((id) => id !== row.version_id)
         : [...sel, row.version_id]));
     } else {
-      anchorRef.current = index;
+      ankerRef.current = index;
       setSelected([row.version_id]);
     }
-  }, [rows, setSelected]);
+  }, [rows, setSelected, ankerRef]);
 
   const handleDragStart = useCallback((row, e) => {
     const ids = selectedSet.has(row.version_id) ? selected : [row.version_id];

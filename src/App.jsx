@@ -49,6 +49,11 @@ export default function App() {
   const columnsRef = useRef(4);
   const modalOpenRef = useRef(false);
   modalOpenRef.current = Boolean(modal);
+  const showPreviewRef = useRef(false);
+  showPreviewRef.current = showPreview;
+  // Udgangspunktet for en omraade-markering. Den ligger her og ikke i
+  // grid'et, saa Skift+klik og Skift+piletast regner fra det samme sted.
+  const ankerRef = useRef(0);
 
   const visFejl = useCallback((err) => {
     setFejl(String(err?.message || err));
@@ -239,12 +244,6 @@ export default function App() {
       const f = getFocused();
       if (f) invoke('img:virtualCopy', { versionId: f.version_id }).catch(visFejl);
     },
-    // Knapperne i vaerktoejslinjen skal kunne det samme som tasterne, saa
-    // de to sidste faar ogsaa en indgang her.
-    togglePreview: () => {
-      if (getFocused()) setShowPreview((p) => !p);
-    },
-    undo: () => invoke('app:undo').catch(() => {}),
     editIn: async (appPath, versionId = getFocused()?.version_id) => {
       if (!versionId) return;
       try {
@@ -413,15 +412,40 @@ export default function App() {
         e.preventDefault();
         return;
       }
+      // Escape lukker forstoerrelsen naar den er aaben, og roerer ikke
+      // markeringen. Er den lukket, er Escape vejen ud af multi-select.
+      // Rammer den begge dele paa én gang, mister man markeringen hver
+      // gang man lukker et stort billede.
+      if (e.key === 'Escape' && showPreviewRef.current) {
+        setShowPreview(false);
+        return;
+      }
       if (iFelt) return;
       const rs = rowsRef.current;
       const sel = selectedRef.current;
       const idx = rs.findIndex((r) => r.version_id === sel[sel.length - 1]);
-      const move = (delta) => {
+      // Navigation gaar i ring: hoejre pil paa det sidste billede lander
+      // paa det foerste. Med Skift udvides markeringen i stedet, og der
+      // stopper den ved enderne: et ombrud dér ville pludselig markere
+      // hele biblioteket.
+      const move = (delta, udvid = false) => {
         e.preventDefault();
         if (!rs.length) return;
-        const next = idx < 0 ? 0 : Math.max(0, Math.min(rs.length - 1, idx + delta));
-        setSelected([rs[next].version_id]);
+        const fra = idx < 0 ? 0 : idx;
+        if (!udvid) {
+          const next = (((fra + delta) % rs.length) + rs.length) % rs.length;
+          ankerRef.current = next;
+          setSelected([rs[next].version_id]);
+          return;
+        }
+        const next = Math.max(0, Math.min(rs.length - 1, fra + delta));
+        const anker = Math.max(0, Math.min(rs.length - 1, ankerRef.current));
+        const ids = rs.slice(Math.min(anker, next), Math.max(anker, next) + 1)
+          .map((r) => r.version_id);
+        // Det sidste id er det fokuserede. Gaar udvidelsen bagud, skal
+        // listen vendes, ellers hopper fokus til den anden ende og naeste
+        // tryk gaar den forkerte vej.
+        setSelected(next < anker ? ids.reverse() : ids);
       };
       // Bogstaverne foelger de engelske ord paa knapperne: A approve,
       // C candidate, X discard, U unrated, E editing, F finished,
@@ -443,11 +467,15 @@ export default function App() {
         case 'f': act.setStage('finished'); break;
         case 'v': act.virtualCopy(); break;
         case ' ': e.preventDefault(); if (idx >= 0) setShowPreview((p) => !p); break;
-        case 'escape': setShowPreview(false); setSelected([]); break;
-        case 'arrowleft': move(-1); break;
-        case 'arrowright': move(1); break;
-        case 'arrowup': move(-columnsRef.current); break;
-        case 'arrowdown': move(columnsRef.current); break;
+        // Foerste Escape forlader multi-select og beholder det billede man
+        // stod paa, saa pilene fortsaetter derfra. Anden Escape rydder.
+        case 'escape':
+          setSelected((s) => (s.length > 1 ? s.slice(-1) : []));
+          break;
+        case 'arrowleft': move(-1, e.shiftKey); break;
+        case 'arrowright': move(1, e.shiftKey); break;
+        case 'arrowup': move(-columnsRef.current, e.shiftKey); break;
+        case 'arrowdown': move(columnsRef.current, e.shiftKey); break;
         default: break;
       }
     };
@@ -503,6 +531,7 @@ export default function App() {
             harSoegning={Boolean((filter.search && filter.search.trim()) || filter.keyword)}
             onOpenPreview={() => setShowPreview(true)}
             onColumns={(c) => { columnsRef.current = c; }}
+            ankerRef={ankerRef}
           />
           {showPreview && focusedRow && (
             <PreviewOverlay

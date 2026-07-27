@@ -158,3 +158,35 @@ describe('noegleordstal matcher synlige billeder', () => {
     expect(catalog.topKeywords().map((k) => k.word)).not.toContain('kunkasseret');
   });
 });
+
+describe('noegleordslisten er alfabetisk', () => {
+  it('viser ordene i alfabetisk raekkefoelge uanset hvor tit de bruges', () => {
+    const a = nytBillede('a.png');
+    const b = nytBillede('b.png');
+    const c = nytBillede('c.png');
+    // wall er det hyppigste og ville staa foerst i en taelling.
+    for (const id of [a, b, c]) catalog.addKeyword(id, 'wall');
+    catalog.addKeyword(a, 'brick');
+    catalog.addKeyword(b, 'blue');
+    expect(catalog.topKeywords().map((k) => k.word)).toEqual(['blue', 'brick', 'wall']);
+  });
+
+  it('sorterer uden at skele til store bogstaver', () => {
+    // Stefs egne ord beholder hans skrivemaade, Claudes er smaa.
+    const a = nytBillede('a.png');
+    catalog.addKeyword(a, 'Zink');
+    catalog.saveKeywords(a, [{ word: 'brick', score: 899 }, { word: 'wall', score: 898 }]);
+    expect(catalog.topKeywords().map((k) => k.word)).toEqual(['brick', 'wall', 'Zink']);
+  });
+
+  it('skaerer de sjaeldneste ord fra, ikke enden af alfabetet', () => {
+    // En graense sat alfabetisk ville lade alt fra fx s og frem
+    // forsvinde uden varsel. Udvalget sker paa antal, visningen paa navn.
+    const a = nytBillede('a.png');
+    const b = nytBillede('b.png');
+    catalog.addKeyword(a, 'zebra');
+    catalog.addKeyword(b, 'zebra');
+    catalog.addKeyword(a, 'anemone');
+    expect(catalog.topKeywords(1).map((k) => k.word)).toEqual(['zebra']);
+  });
+});

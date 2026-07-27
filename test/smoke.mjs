@@ -183,6 +183,41 @@ try {
   await page.keyboard.press(' ');
   await page.waitForSelector('.forstoerret', { state: 'detached', timeout: 10000 });
 
+  // Piletast-navigation gaar i ring. Der er fire billeder, saa fire tryk
+  // paa hoejre pil fra det foerste skal lande paa det foerste igen.
+  await page.locator('.tile').first().click();
+  for (let i = 0; i < 4; i += 1) await page.keyboard.press('ArrowRight');
+  const iRing = await page.evaluate(() => {
+    const fliser = [...document.querySelectorAll('.tile')];
+    return fliser.findIndex((t) => t.classList.contains('valgt')) === 0;
+  });
+  if (!iRing) throw new Error('Piletasterne gik ikke i ring til det foerste billede');
+
+  // Skift+pil udvider markeringen til naboerne, og Escape forlader
+  // multi-select uden at miste det billede man staar paa.
+  await page.keyboard.press('Shift+ArrowRight');
+  await page.keyboard.press('Shift+ArrowRight');
+  await page.waitForFunction(
+    () => document.querySelectorAll('.tile.valgt').length === 3,
+    null,
+    { timeout: 10000 }
+  );
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(
+    () => document.querySelectorAll('.tile.valgt').length === 1,
+    null,
+    { timeout: 10000 }
+  );
+
+  // Escape maa ikke rydde markeringen mens forstoerrelsen er aaben: saa
+  // ville man miste den hver gang man lukkede et stort billede.
+  await page.keyboard.press(' ');
+  await page.waitForSelector('.forstoerret', { timeout: 10000 });
+  await page.keyboard.press('Escape');
+  await page.waitForSelector('.forstoerret', { state: 'detached', timeout: 10000 });
+  const beholdt = await page.locator('.tile.valgt').count();
+  if (beholdt !== 1) throw new Error(`Escape ryddede markeringen sammen med forstoerrelsen (${beholdt})`);
+
   // Handlingsknapperne i vaerktoejslinjen goer det samme som tasterne.
   await page.locator('.handling', { hasText: 'candidate' }).click();
   await page.waitForFunction(
