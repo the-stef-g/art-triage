@@ -61,64 +61,53 @@ export default function Inspector({
     );
   }
 
-  if (selectedCount > 1) {
-    return (
-      <aside className="inspector">
-        <h3>{selectedCount} selected</h3>
-        {activeKeyword && (
-          <>
-            <h4>Keywords</h4>
-            <div className="knapraekke">
-              <button
-                className="fjern-fra-noegleord"
-                onClick={() => act.removeKeywordFromSelected(activeKeyword)}
-                title={`Remove the keyword "${activeKeyword}" from the selected images`}
-              >
-                Remove «{activeKeyword}» from the {selectedCount} selected
-              </button>
-            </div>
-          </>
-        )}
-        <h4>Rating</h4>
-        <div className="knapraekke">
-          <button onClick={() => act.setRating('godkendt')}>Approve</button>
-          <button onClick={() => act.setRating('kandidat')}>Candidate</button>
-          <button onClick={() => act.setRating('kasseret')}>Discard</button>
-          <button onClick={() => act.setRating('ubedomt')}>Clear</button>
-        </div>
-        <h4>Workflow stage</h4>
-        <div className="knapraekke">
-          <button onClick={() => act.setStage('edited')}>Being edited</button>
-          <button onClick={() => act.setStage('finished')}>Finished</button>
-          <button onClick={() => act.setStage(null)}>Clear</button>
-        </div>
-        <h4>Series</h4>
-        <div className="knapraekke">
-          <select
-            value=""
-            onChange={(e) => {
-              const v = e.target.value;
-              if (v === 'ny') act.newSeries();
-              else if (v === 'fjern') act.assignSeries(null);
-              else if (v) act.assignSeries(Number(v));
-            }}
-          >
-            <option value="">Set series …</option>
-            {series.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-            <option value="ny">New series …</option>
-            <option value="fjern">Remove from series</option>
-          </select>
-        </div>
-      </aside>
-    );
-  }
-
   const editorList = editors.length
     ? editors
     : [{ appPath: '', label: 'Default app' }];
 
   return (
     <aside className="inspector">
+      {/* Inspektoeren viser altid det aktive billede, ogsaa naar der er
+          flere markeret. Foer blev hele panelet skiftet ud med en
+          "N selected"-visning, saa man mistede billedet af syne netop
+          naar man skulle bruge det til at vaelge det rigtige. Det der
+          gaelder hele bunken, staar for sig herover. */}
+      {selectedCount > 1 && (
+        <div className="bunke">
+          <h4>{selectedCount} selected</h4>
+          <p className="tom">
+            Rating and workflow stage below apply to the active image only.
+          </p>
+          {activeKeyword && (
+            <div className="knapraekke">
+              <button
+                className="fjern-fra-noegleord"
+                onClick={() => act.removeKeywordFromSelected(activeKeyword)}
+                title={`Remove the keyword "${activeKeyword}" from the selected images`}
+              >
+                Remove «{activeKeyword}» from all {selectedCount}
+              </button>
+            </div>
+          )}
+          <div className="knapraekke">
+            <select
+              value=""
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v === 'ny') act.newSeries();
+                else if (v === 'fjern') act.assignSeries(null);
+                else if (v) act.assignSeries(Number(v));
+              }}
+              title="Applies to all the selected images"
+            >
+              <option value="">Set series for all {selectedCount} …</option>
+              {series.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+              <option value="ny">New series …</option>
+              <option value="fjern">Remove from series</option>
+            </select>
+          </div>
+        </div>
+      )}
       <div className="stor-preview">
         <img src={thumbUrl(row.file_id, row.mtime, 2048)} alt={fileName(row.rel_path)} />
       </div>

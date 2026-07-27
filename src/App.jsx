@@ -233,20 +233,27 @@ export default function App() {
         setSelected([]);
       } catch (err) { visFejl(err); }
     },
+    // Bedoemmelse og arbejdstrin gaelder kun det aktive billede, ogsaa
+    // naar der er flere markeret. De to er en vurdering af ét billede,
+    // truffet mens man kigger paa det. Ramte de hele markeringen, kunne
+    // man ikke gaa en markering igennem og bedoemme billederne hver for
+    // sig, og et enkelt tastetryk kunne aendre tyve billeder man ikke
+    // havde set paa. Serie, mappeflytning og noegleordsoprydning gaelder
+    // stadig hele markeringen: de er netop bunkearbejde.
     setRating: (rating) => {
-      const ids = selectedRef.current;
-      if (ids.length) invoke('img:setRating', { versionIds: ids, rating }).catch(visFejl);
+      const f = getFocused();
+      if (f) invoke('img:setRating', { versionIds: [f.version_id], rating }).catch(visFejl);
     },
     // Arbejdstrin: enten under redigering eller faerdig, aldrig begge.
     // Saettes trinnet paa noget der allerede staar der, ryddes det, saa
     // genvejene stadig virker som til og fra.
     setStage: (stage) => {
-      const ids = selectedRef.current;
-      if (!ids.length) return;
-      const rs = rowsRef.current.filter((r) => ids.includes(r.version_id));
+      const f = getFocused();
+      if (!f) return;
       const key = stage === 'edited' ? 'edited' : 'finished';
-      const alleHarDet = stage !== null && rs.length > 0 && rs.every((r) => r[key]);
-      invoke('img:setStage', { versionIds: ids, stage: alleHarDet ? null : stage }).catch(visFejl);
+      const harDet = stage !== null && Boolean(f[key]);
+      invoke('img:setStage', { versionIds: [f.version_id], stage: harDet ? null : stage })
+        .catch(visFejl);
     },
     virtualCopy: () => {
       const f = getFocused();

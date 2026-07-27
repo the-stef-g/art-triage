@@ -212,6 +212,17 @@ input:focus, select:focus { outline: 1px solid var(--accent); }
 }
 .chip-fjern:hover { color: var(--kasseret); background: none; }
 .tom { color: var(--tekst-svag); font-size: 12px; padding: 0 8px; }
+/* Det der gaelder hele markeringen, holdt for sig oeverst i inspektoeren,
+   saa det ikke forveksles med det der gaelder det aktive billede. */
+.bunke {
+  background: var(--bg-hover);
+  border: 1px solid var(--kant);
+  border-radius: var(--radius);
+  padding: 8px;
+  margin-bottom: 10px;
+}
+.bunke h4 { margin-top: 0; }
+.bunke .tom { padding: 0; margin: 0 0 6px; }
 
 /* ---------- Grid ---------- */
 /* Midterfeltet mellem de to kolonner. Forstoerrelsen laegger sig oven i

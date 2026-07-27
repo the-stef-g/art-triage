@@ -115,7 +115,7 @@ export default function Toolbar({
             className="handling"
             disabled={h.kraeverValg && !harValg}
             onClick={() => koerHandling(h.tast)}
-            title={h.kraeverValg ? `${h.navn} — works on the selected images` : h.navn}
+            title={h.kraeverValg ? `${h.navn} — applies to the active image` : h.navn}
           >
             <span className="tast">{h.tast}</span>
             <span className="handlingsnavn">{h.navn}</span>

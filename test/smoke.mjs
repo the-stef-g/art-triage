@@ -228,6 +228,28 @@ try {
     throw new Error(`Det aktive billede gik ikke i ring inde i markeringen (stod paa ${efterPil.aktiv})`);
   }
 
+  // Bedoemmelse rammer kun det aktive billede, ikke hele markeringen.
+  // Ellers kunne et enkelt tastetryk aendre tyve billeder man ikke havde
+  // set paa, og en markering kunne ikke gennemgaas billede for billede.
+  const kandidaterFoer = await page.locator('.tile.kandidat').count();
+  await page.keyboard.press('c');
+  await page.waitForFunction(
+    (foer) => document.querySelectorAll('.tile.kandidat').length === foer + 1,
+    kandidaterFoer,
+    { timeout: 10000 }
+  );
+  const stadigValgt = await page.locator('.tile.valgt').count();
+  if (stadigValgt !== 3) {
+    throw new Error(`Bedoemmelsen aendrede markeringen (${stadigValgt} tilbage)`);
+  }
+  // Ryd igen, saa resten af flowet staar som foer.
+  await page.keyboard.press('u');
+  await page.waitForFunction(
+    (foer) => document.querySelectorAll('.tile.kandidat').length === foer,
+    kandidaterFoer,
+    { timeout: 10000 }
+  );
+
   // Escape forlader multi-select og beholder det aktive billede.
   await page.keyboard.press('Escape');
   await page.waitForFunction(
