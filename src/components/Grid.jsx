@@ -26,10 +26,13 @@ function Badges({ row }) {
   );
 }
 
-function Tile({ row, isSelected, onClick, onDoubleClick, onDragStart }) {
+// isActive er billedet man staar paa inde i markeringen. Det er det
+// inspektoeren viser, og det pilene flytter, saa det skal kunne skelnes
+// fra resten af de markerede.
+function Tile({ row, isSelected, isActive, onClick, onDoubleClick, onDragStart }) {
   return (
     <div
-      className={`tile ${isSelected ? 'valgt' : ''} ${row.rating === 'kasseret' ? 'nedtonet' : ''} ${row.rating === 'kandidat' ? 'kandidat' : ''}`}
+      className={`tile ${isSelected ? 'valgt' : ''} ${isActive ? 'aktiv' : ''} ${row.rating === 'kasseret' ? 'nedtonet' : ''} ${row.rating === 'kandidat' ? 'kandidat' : ''}`}
       onClick={onClick}
       onDoubleClick={onDoubleClick}
       draggable
@@ -59,7 +62,8 @@ function Tile({ row, isSelected, onClick, onDoubleClick, onDragStart }) {
 // ankerRef ejes af App, saa Skift+klik og Skift+piletast regner
 // omraade-markeringen fra det samme udgangspunkt.
 export default function Grid({
-  rows, selected, setSelected, focusIndex, harSoegning, onOpenPreview, onColumns, ankerRef,
+  rows, selected, active, setSelected, setActive, focusIndex, harSoegning,
+  onOpenPreview, onColumns, ankerRef,
 }) {
   const [ref, size] = useSize();
   const gridRef = useRef(null);
@@ -81,24 +85,26 @@ export default function Grid({
 
   const selectedSet = useMemo(() => new Set(selected), [selected]);
 
+  // Et klik saetter altid det aktive billede til det man klikkede paa,
+  // ogsaa naar markeringen er en hel raekke: det er dér man staar.
   const handleClick = useCallback((row, index, e) => {
     if (e.shiftKey) {
       const anker = Math.max(0, Math.min(rows.length - 1, ankerRef.current));
-      const ids = rows.slice(Math.min(anker, index), Math.max(anker, index) + 1)
-        .map((r) => r.version_id);
-      // Det sidste id er det fokuserede, saa Skift+piletast bagefter
-      // fortsaetter fra den ende man lige klikkede paa.
-      setSelected(index < anker ? ids.reverse() : ids);
+      setSelected(rows.slice(Math.min(anker, index), Math.max(anker, index) + 1)
+        .map((r) => r.version_id));
+      setActive(row.version_id);
     } else if (e.metaKey || e.ctrlKey) {
       ankerRef.current = index;
       setSelected((sel) => (sel.includes(row.version_id)
         ? sel.filter((id) => id !== row.version_id)
         : [...sel, row.version_id]));
+      setActive(row.version_id);
     } else {
       ankerRef.current = index;
       setSelected([row.version_id]);
+      setActive(row.version_id);
     }
-  }, [rows, setSelected, ankerRef]);
+  }, [rows, setSelected, setActive, ankerRef]);
 
   const handleDragStart = useCallback((row, e) => {
     const ids = selectedSet.has(row.version_id) ? selected : [row.version_id];
@@ -120,13 +126,18 @@ export default function Grid({
         <Tile
           row={row}
           isSelected={selectedSet.has(row.version_id)}
+          isActive={row.version_id === active}
           onClick={(e) => handleClick(row, index, e)}
-          onDoubleClick={() => { setSelected([row.version_id]); onOpenPreview(); }}
+          onDoubleClick={() => {
+            setSelected([row.version_id]);
+            setActive(row.version_id);
+            onOpenPreview();
+          }}
           onDragStart={(e) => handleDragStart(row, e)}
         />
       </div>
     );
-  }, [rows, columns, selectedSet, handleClick, handleDragStart, setSelected, onOpenPreview]);
+  }, [rows, columns, selectedSet, active, handleClick, handleDragStart, setSelected, setActive, onOpenPreview]);
 
   return (
     <section className="grid-omraade" ref={ref}>

@@ -193,21 +193,55 @@ try {
   });
   if (!iRing) throw new Error('Piletasterne gik ikke i ring til det foerste billede');
 
-  // Skift+pil udvider markeringen til naboerne, og Escape forlader
-  // multi-select uden at miste det billede man staar paa.
+  // Skift+pil udvider markeringen, og det aktive billede foelger med ud
+  // til den ende man udvider mod.
   await page.keyboard.press('Shift+ArrowRight');
   await page.keyboard.press('Shift+ArrowRight');
   await page.waitForFunction(
-    () => document.querySelectorAll('.tile.valgt').length === 3,
+    () => document.querySelectorAll('.tile.valgt').length === 3
+      && document.querySelectorAll('.tile.aktiv').length === 1,
     null,
     { timeout: 10000 }
   );
+  const aktivEfterUdvidelse = await page.evaluate(() => {
+    const fliser = [...document.querySelectorAll('.tile')];
+    return fliser.findIndex((t) => t.classList.contains('aktiv'));
+  });
+  if (aktivEfterUdvidelse !== 2) {
+    throw new Error(`Det aktive billede fulgte ikke med udvidelsen (stod paa ${aktivEfterUdvidelse})`);
+  }
+
+  // Pil uden Skift maa ikke forlade multi-select. Den flytter det aktive
+  // billede rundt inde i markeringen og gaar i ring dér.
+  await page.keyboard.press('ArrowRight');
+  const efterPil = await page.evaluate(() => {
+    const fliser = [...document.querySelectorAll('.tile')];
+    return {
+      valgte: fliser.filter((t) => t.classList.contains('valgt')).length,
+      aktiv: fliser.findIndex((t) => t.classList.contains('aktiv')),
+    };
+  });
+  if (efterPil.valgte !== 3) {
+    throw new Error(`Hoejre pil forlod multi-select (${efterPil.valgte} markerede tilbage)`);
+  }
+  if (efterPil.aktiv !== 0) {
+    throw new Error(`Det aktive billede gik ikke i ring inde i markeringen (stod paa ${efterPil.aktiv})`);
+  }
+
+  // Escape forlader multi-select og beholder det aktive billede.
   await page.keyboard.press('Escape');
   await page.waitForFunction(
     () => document.querySelectorAll('.tile.valgt').length === 1,
     null,
     { timeout: 10000 }
   );
+  const beholdtAktiv = await page.evaluate(() => {
+    const fliser = [...document.querySelectorAll('.tile')];
+    return fliser.findIndex((t) => t.classList.contains('aktiv'));
+  });
+  if (beholdtAktiv !== 0) {
+    throw new Error(`Escape beholdt ikke det aktive billede (stod paa ${beholdtAktiv})`);
+  }
 
   // Escape maa ikke rydde markeringen mens forstoerrelsen er aaben: saa
   // ville man miste den hver gang man lukkede et stort billede.

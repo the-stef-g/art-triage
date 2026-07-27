@@ -27,7 +27,12 @@ export default function App() {
   const [topKeywords, setTopKeywords] = useState([]);
   const [aiStatus, setAiStatus] = useState(null);
   const [indexProgress, setIndexProgress] = useState(null);
-  const [selected, setSelected] = useState([]); // version_id'er i klik-raekkefoelge
+  const [selected, setSelected] = useState([]); // version_id'er der er markeret
+  // Det aktive billede inde i markeringen: det man staar paa, og det
+  // inspektoeren viser. Foer var det bare sidste element i selected, og
+  // saa skulle listen vendes for at flytte fokus, hvilket ikke kunne
+  // baere at pilene skal kunne gaa rundt inde i en markering.
+  const [active, setActive] = useState(null);
   const [showPreview, setShowPreview] = useState(false);
   const [modal, setModal] = useState(null);
   const [fejl, setFejl] = useState(null);
@@ -46,6 +51,8 @@ export default function App() {
   rowsRef.current = rows;
   const selectedRef = useRef(selected);
   selectedRef.current = selected;
+  const activeRef = useRef(active);
+  activeRef.current = active;
   const columnsRef = useRef(4);
   const modalOpenRef = useRef(false);
   modalOpenRef.current = Boolean(modal);
@@ -67,20 +74,24 @@ export default function App() {
       // markeringen (fx efter kassering), markeres billedet paa samme
       // plads i den nye liste, altsaa det naeste foto.
       const gamleRows = rowsRef.current;
-      const gammelSel = selectedRef.current;
-      const gammeltIdx = gamleRows.findIndex(
-        (r) => r.version_id === gammelSel[gammelSel.length - 1]
-      );
+      const gammeltIdx = gamleRows.findIndex((r) => r.version_id === activeRef.current);
       setRows(res.rows);
       setCounts(res.counts);
       setSearchInfo(res.searchInfo);
-      setSelected((sel) => {
-        const valid = new Set(res.rows.map((r) => r.version_id));
-        const beholdt = sel.filter((id) => valid.has(id));
-        if (beholdt.length || gammeltIdx < 0 || !res.rows.length) return beholdt;
+      const valid = new Set(res.rows.map((r) => r.version_id));
+      const beholdt = selectedRef.current.filter((id) => valid.has(id));
+      let nyValg = beholdt;
+      let nyAktiv = valid.has(activeRef.current) ? activeRef.current : null;
+      if (!beholdt.length && gammeltIdx >= 0 && res.rows.length) {
         const idx = Math.min(gammeltIdx, res.rows.length - 1);
-        return [res.rows[idx].version_id];
-      });
+        nyValg = [res.rows[idx].version_id];
+        nyAktiv = nyValg[0];
+      } else if (!nyAktiv && beholdt.length) {
+        // Det aktive billede forsvandt, men resten af markeringen staar.
+        nyAktiv = beholdt[0];
+      }
+      setSelected(nyValg);
+      setActive(nyAktiv);
     } catch (err) {
       visFejl(err);
     }
@@ -196,14 +207,11 @@ export default function App() {
     }).catch(() => {});
   }, [library, filter, refresh, refreshMeta]);
 
-  const focusedRow = rows.find((r) => r.version_id === selected[selected.length - 1]) || null;
+  const focusedRow = rows.find((r) => r.version_id === active) || null;
 
-  // Slaar det fokuserede billede op via refs, saa tastaturgenvejene
-  // (registreret en gang) altid ser den aktuelle markering.
-  const getFocused = () => {
-    const sel = selectedRef.current;
-    return rowsRef.current.find((r) => r.version_id === sel[sel.length - 1]) || null;
-  };
+  // Slaar det aktive billede op via refs, saa tastaturgenvejene
+  // (registreret en gang) altid ser den aktuelle tilstand.
+  const getFocused = () => rowsRef.current.find((r) => r.version_id === activeRef.current) || null;
 
   // ---------- Handlinger ----------
 
@@ -423,29 +431,49 @@ export default function App() {
       if (iFelt) return;
       const rs = rowsRef.current;
       const sel = selectedRef.current;
-      const idx = rs.findIndex((r) => r.version_id === sel[sel.length - 1]);
-      // Navigation gaar i ring: hoejre pil paa det sidste billede lander
-      // paa det foerste. Med Skift udvides markeringen i stedet, og der
-      // stopper den ved enderne: et ombrud dér ville pludselig markere
-      // hele biblioteket.
+      const idx = rs.findIndex((r) => r.version_id === activeRef.current);
+      // Markering og aktivt billede er to ting, som i Lightroom. Pilene
+      // flytter det aktive billede; de laver ikke om paa markeringen.
+      //
+      // Staar der flere markerede, gaar pilene rundt inde i markeringen.
+      // Foer sprang de ud af den og efterlod ét billede markeret, saa en
+      // markering ikke kunne gennemgaas billede for billede uden at gaa
+      // i stykker. Er der kun ét eller ingen, gaar pilene gennem hele
+      // grid'et og tager markeringen med.
+      //
+      // Med Skift udvides markeringen fra ankeret. Der stopper den ved
+      // enderne: et ombrud dér ville pludselig markere hele biblioteket.
       const move = (delta, udvid = false) => {
         e.preventDefault();
         if (!rs.length) return;
         const fra = idx < 0 ? 0 : idx;
-        if (!udvid) {
-          const next = (((fra + delta) % rs.length) + rs.length) % rs.length;
-          ankerRef.current = next;
-          setSelected([rs[next].version_id]);
+
+        if (udvid) {
+          const next = Math.max(0, Math.min(rs.length - 1, fra + delta));
+          const anker = Math.max(0, Math.min(rs.length - 1, ankerRef.current));
+          setSelected(rs.slice(Math.min(anker, next), Math.max(anker, next) + 1)
+            .map((r) => r.version_id));
+          setActive(rs[next].version_id);
           return;
         }
-        const next = Math.max(0, Math.min(rs.length - 1, fra + delta));
-        const anker = Math.max(0, Math.min(rs.length - 1, ankerRef.current));
-        const ids = rs.slice(Math.min(anker, next), Math.max(anker, next) + 1)
-          .map((r) => r.version_id);
-        // Det sidste id er det fokuserede. Gaar udvidelsen bagud, skal
-        // listen vendes, ellers hopper fokus til den anden ende og naeste
-        // tryk gaar den forkerte vej.
-        setSelected(next < anker ? ids.reverse() : ids);
+
+        if (sel.length > 1) {
+          // Inden for markeringen, i grid'ets raekkefoelge. Op og ned kan
+          // ikke ramme en raekke praecist her, saa de flytter ét skridt i
+          // den retning; alt andet ville springe uforudsigeligt rundt.
+          const iValg = rs.filter((r) => sel.includes(r.version_id));
+          const nuIdx = iValg.findIndex((r) => r.version_id === activeRef.current);
+          const skridt = delta > 0 ? 1 : -1;
+          const naeste = (((nuIdx < 0 ? 0 : nuIdx) + skridt) % iValg.length + iValg.length)
+            % iValg.length;
+          setActive(iValg[naeste].version_id);
+          return;
+        }
+
+        const next = (((fra + delta) % rs.length) + rs.length) % rs.length;
+        ankerRef.current = next;
+        setSelected([rs[next].version_id]);
+        setActive(rs[next].version_id);
       };
       // Bogstaverne foelger de engelske ord paa knapperne: A approve,
       // C candidate, X discard, U unrated, E editing, F finished,
@@ -456,6 +484,12 @@ export default function App() {
           if (e.metaKey || e.ctrlKey) {
             e.preventDefault();
             setSelected(rs.map((r) => r.version_id));
+            // Det aktive billede beholdes, saa man bliver staaende hvor
+            // man var, nu bare med alt markeret omkring sig.
+            if (idx < 0 && rs.length) {
+              ankerRef.current = 0;
+              setActive(rs[0].version_id);
+            }
           } else {
             act.setRating('godkendt');
           }
@@ -467,10 +501,16 @@ export default function App() {
         case 'f': act.setStage('finished'); break;
         case 'v': act.virtualCopy(); break;
         case ' ': e.preventDefault(); if (idx >= 0) setShowPreview((p) => !p); break;
-        // Foerste Escape forlader multi-select og beholder det billede man
-        // stod paa, saa pilene fortsaetter derfra. Anden Escape rydder.
+        // Foerste Escape forlader multi-select og beholder det aktive
+        // billede, saa pilene fortsaetter derfra. Anden Escape rydder.
         case 'escape':
-          setSelected((s) => (s.length > 1 ? s.slice(-1) : []));
+          if (sel.length > 1 && activeRef.current) {
+            setSelected([activeRef.current]);
+            ankerRef.current = idx < 0 ? 0 : idx;
+          } else {
+            setSelected([]);
+            setActive(null);
+          }
           break;
         case 'arrowleft': move(-1, e.shiftKey); break;
         case 'arrowright': move(1, e.shiftKey); break;
@@ -526,8 +566,10 @@ export default function App() {
           <Grid
             rows={rows}
             selected={selected}
+            active={active}
             setSelected={setSelected}
-            focusIndex={rows.findIndex((r) => r.version_id === selected[selected.length - 1])}
+            setActive={setActive}
+            focusIndex={rows.findIndex((r) => r.version_id === active)}
             harSoegning={Boolean((filter.search && filter.search.trim()) || filter.keyword)}
             onOpenPreview={() => setShowPreview(true)}
             onColumns={(c) => { columnsRef.current = c; }}

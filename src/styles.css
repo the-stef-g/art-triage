@@ -231,7 +231,12 @@ input:focus, select:focus { outline: 1px solid var(--accent); }
   cursor: pointer;
 }
 .tile:hover { background: var(--bg-hover); }
-.tile.valgt { border-color: var(--accent); }
+/* Markerede billeder faar en daempet kant. Det aktive, altsaa det man
+   staar paa og det inspektoeren viser, faar fuld farve og lysere baggrund.
+   Uden den forskel kan man ikke se hvor i en markering man er. */
+.tile.valgt { border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+.tile.aktiv { border-color: var(--accent); background: var(--bg-aktiv); }
+.tile.aktiv .tile-navn { color: var(--tekst); font-weight: 600; }
 .tile.nedtonet { opacity: 0.45; }
 /* Indvendig kant, saa kandidater kan ses paa afstand uden at laese
    badges, og uden at spaende ben for den blaa markeringskant. */
