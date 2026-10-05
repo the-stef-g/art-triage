@@ -3,7 +3,7 @@
 // tabsfrit "raa-billede" (SOF3) og den rigtige forhaandsvisning, i den
 // raekkefoelge kameraer lægger dem.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, writeFileSync, rmSync, existsSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { indbyggetJpeg, jpegHoved } from '../electron/lib/rawpreview.mjs';
@@ -165,6 +165,31 @@ describe('forhaandsvisning af en RAW-fil', () => {
     const sti = await t.ensure(2, 5, fil, 2048);
     const m = await sharp(sti).metadata();
     expect([m.width, m.height]).toEqual([1000, 1600]); // staaende, ikke liggende
+  });
+
+  it('retter en staaende RAW-fil, selv om JPEG\'en selv siger retning 1', async () => {
+    const pix = Buffer.alloc(1600 * 1000 * 3, 90);
+    const jpegMed1 = await sharp(pix, { raw: { width: 1600, height: 1000, channels: 3 } })
+      .jpeg().withMetadata({ orientation: 1 }).toBuffer();
+    const fil = join(dir, 'staaende1.cr2');
+    writeFileSync(fil, Buffer.concat([tiffMedRetning(6), jpegMed1]));
+    const { t } = lav(ingenProgrammer);
+    // Samme retning ved alle stoerrelser, ogsaa griddets og inspektoerens.
+    for (const [id, str] of [[6, 512], [7, 2048]]) {
+      const m = await sharp(await t.ensure(id, 5, fil, str)).metadata();
+      expect(m.height).toBeGreaterThan(m.width);
+    }
+  });
+
+  it('toemmer en cache fra en aeldre version, og lader en ny staa', async () => {
+    const cache = join(dir, 'cache');
+    mkdirSync(cache, { recursive: true });
+    writeFileSync(join(cache, '1-5-512.jpg'), 'gammel');
+    lav(ingenProgrammer);
+    expect(existsSync(join(cache, '1-5-512.jpg'))).toBe(false);
+    writeFileSync(join(cache, '1-5-512.jpg'), 'ny');
+    lav(ingenProgrammer);
+    expect(existsSync(join(cache, '1-5-512.jpg'))).toBe(true);
   });
 
   it('rammer ikke sips og qlmanage naar RAW-filen har en indbygget JPEG, ogsaa uden sharp-krav', async () => {

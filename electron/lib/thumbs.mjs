@@ -5,7 +5,7 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import {
-  existsSync, mkdirSync, renameSync, mkdtempSync, rmSync, readdirSync, writeFileSync,
+  existsSync, mkdirSync, renameSync, mkdtempSync, rmSync, readdirSync, writeFileSync, readFileSync,
 } from 'node:fs';
 import { join, basename } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -32,6 +32,8 @@ const MAX_PROCESSER = 3;
 // Der skal findes mindst saa stor en indbygget JPEG, foer den bruges i stedet
 // for at lade sips fremkalde RAW-filen.
 const MIN_INDBYGGET = 400;
+// Haeves naar forhaandsvisningernes retning eller udseende aendres.
+const CACHE_VERSION = '2';
 
 // Retningen (EXIF 1 til 8) lagt paa et sharp-billede. En RAW-fils JPEG har
 // sjaeldent selv en retning, saa den kommer fra RAW-filen.
@@ -68,6 +70,23 @@ export class Thumbnailer {
     this._aktive = 0;
     this._koe = [];
     mkdirSync(cacheDir, { recursive: true });
+    this._rydGammelCache();
+  }
+
+  // Forhaandsvisninger lavet af en aeldre udgave kan have en forkert retning,
+  // og griddets 512 px ligger saa i cachen med en anden retning end 2048 px
+  // fra den nye. Cachen er kun genskabelige filer, saa en ny version tømmer den.
+  _rydGammelCache() {
+    const mark = join(this.cacheDir, '.version');
+    try {
+      if (existsSync(mark) && readFileSync(mark, 'utf8').trim() === CACHE_VERSION) return;
+      for (const navn of readdirSync(this.cacheDir)) {
+        if (/\.(jpg|png)$/.test(navn) || /\.tmp-/.test(navn)) rmSync(join(this.cacheDir, navn), { force: true });
+      }
+      writeFileSync(mark, CACHE_VERSION);
+    } catch {
+      // en cache der ikke kan ryddes er kun en pyntefejl
+    }
   }
 
   // Koerer et eksternt program, hoejst MAX_PROCESSER ad gangen, og prover
@@ -214,8 +233,14 @@ export class Thumbnailer {
       if (sharp) {
         const meta = await sharp(emb.buffer, { failOn: 'none' }).metadata();
         let img = sharp(emb.buffer, { failOn: 'none' });
-        // En JPEG med egen retning rettes af sharp; ellers bruges RAW-filens.
-        img = meta.orientation ? img.rotate() : medRetning(img, exifOrientation(absPath));
+        // RAW-filens egen retning gaar foer: kameraer skriver ofte en
+        // retning 1 ind i den indbyggede JPEG, selv om billedet er taget
+        // staaende, og sharp ville saa lade den ligge. Staar der ingen
+        // retning paa RAW-filen, bruges JPEG'ens egen.
+        const filRetning = exifOrientation(absPath);
+        img = filRetning && filRetning > 1
+          ? medRetning(img, filRetning)
+          : (meta.orientation ? img.rotate() : img);
         await img
           .resize(size, size, { fit: 'inside', withoutEnlargement: true })
           .jpeg({ quality: 85 })
