@@ -353,9 +353,14 @@ export default function App() {
         .catch(visFejl);
     },
     // Drej det aktive billede manuelt, naar automatikken tager fejl.
+    // Gælder alle markerede billeder, ellers det aktive.
     rotate: (delta) => {
       const f = getFocused();
-      if (f) invoke('img:rotate', { fileId: f.file_id, delta }).catch(visFejl);
+      const valgte = new Set(selectedRef.current);
+      const fileIds = valgte.size > 1
+        ? [...new Set(rowsRef.current.filter((r) => valgte.has(r.version_id)).map((r) => r.file_id))]
+        : (f ? [f.file_id] : []);
+      if (fileIds.length) invoke('img:rotate', { fileIds, delta }).catch(visFejl);
     },
     virtualCopy: () => {
       const f = getFocused();

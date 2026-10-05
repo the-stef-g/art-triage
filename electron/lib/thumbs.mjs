@@ -55,11 +55,13 @@ export class Thumbnailer {
   // trin svigter, ogsaa naar et senere trin redder billedet. Uden det
   // var en mislykket forhaandsvisning bare null, og aarsagen var vaek.
   constructor({
-    cacheDir, rasterizeSvg = null, platform = process.platform, runner = run, onError = null,
+    cacheDir, rasterizeSvg = null, platform = process.platform, runner = run, onError = null, onInfo = null,
     rotationFor = () => 0,
   }) {
     // Drejningen man selv har lagt paa en fil (0/90/180/270 med uret).
     this.rotationFor = rotationFor;
+    this.onInfo = onInfo;
+    this._retningslog = 0;
     this.cacheDir = cacheDir;
     this.rasterizeSvg = rasterizeSvg;
     this.platform = platform;
@@ -282,8 +284,19 @@ export class Thumbnailer {
         // retning 1 ind i den indbyggede JPEG, selv om billedet er taget
         // staaende, og sharp ville saa lade den ligge. Staar der ingen
         // retning paa RAW-filen, bruges JPEG'ens egen.
-        let filRetning = exifOrientation(absPath);
-        if (!filRetning || filRetning === 1) filRetning = await this._sipsRetning(absPath);
+        const fraFil = exifOrientation(absPath);
+        let filRetning = fraFil;
+        let fraSips = null;
+        if (!filRetning || filRetning === 1) {
+          fraSips = await this._sipsRetning(absPath);
+          filRetning = fraSips;
+        }
+        // De foerste par stykker i loggen, saa det kan ses hvor retningen
+        // staar, hvis automatikken tager fejl.
+        if (this._retningslog < 25) {
+          this._retningslog += 1;
+          this.onInfo?.(`orientation (${basename(absPath)}): file=${fraFil} sips=${fraSips} jpeg=${meta.orientation ?? null} embedded=${emb.width}x${emb.height} used=${filRetning ?? meta.orientation ?? 1}`);
+        }
         img = filRetning && filRetning > 1
           ? medRetning(img, filRetning)
           : (meta.orientation ? img.rotate() : img);
