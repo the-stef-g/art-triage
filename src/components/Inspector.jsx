@@ -116,7 +116,7 @@ export default function Inspector({
         <button className="lille" onClick={() => act.rotate(-90)} title="Rotate left (shortcut L)">⟲ Left</button>
         <button className="lille" onClick={() => act.rotate(90)} title="Rotate right (shortcut R)">⟳ Right</button>
         {row.rotation ? (
-          <button className="lille" onClick={() => invoke('img:rotate', { fileIds: [row.file_id], delta: 0 }).catch(onError)} title="Back to the automatic rotation">Reset</button>
+          <button className="lille" onClick={() => act.rotate(0)} title="Back to the automatic rotation">Reset</button>
         ) : null}
       </div>
       <h3 title={row.rel_path}>{fileName(row.rel_path)}</h3>

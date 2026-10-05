@@ -33,7 +33,7 @@ const MAX_PROCESSER = 3;
 // for at lade sips fremkalde RAW-filen.
 const MIN_INDBYGGET = 400;
 // Haeves naar forhaandsvisningernes retning eller udseende aendres.
-const CACHE_VERSION = '2';
+const CACHE_VERSION = '3';
 
 // Retningen (EXIF 1 til 8) lagt paa et sharp-billede. En RAW-fils JPEG har
 // sjaeldent selv en retning, saa den kommer fra RAW-filen.
