@@ -152,7 +152,8 @@ describe('forhaandsvisning af en RAW-fil', () => {
     const { t, fejl } = lav(async (...a) => { kald.push(a); });
     const sti = await t.ensure(1, 5, fil, 1024);
     expect(sti).toMatch(/1-5-1024\.jpg$/);
-    expect(kald).toEqual([]);
+    // Kun et spoergsmaal om retningen, ingen forhaandsvisning laves af sips.
+    expect(kald.filter((k) => !k[1].includes('-g'))).toEqual([]);
     expect(fejl).toEqual([]);
     const m = await sharp(sti).metadata();
     expect([m.width, m.height]).toEqual([1024, 640]);
@@ -179,6 +180,28 @@ describe('forhaandsvisning af en RAW-fil', () => {
       const m = await sharp(await t.ensure(id, 5, fil, str)).metadata();
       expect(m.height).toBeGreaterThan(m.width);
     }
+  });
+
+  it('spoerger sips om retningen, naar RAW-filen og JPEG\'en ingen har', async () => {
+    const fil = join(dir, 'ukendt.cr2');
+    writeFileSync(fil, Buffer.concat([tiffMedRetning(1), await medHjoerne(1600, 1000)]));
+    const { t } = lav(async (cmd, args) => ({ stdout: `${args[2]}\n  orientation: 6\n` }));
+    const m = await sharp(await t.ensure(8, 5, fil, 2048)).metadata();
+    expect([m.width, m.height]).toEqual([1000, 1600]);
+  });
+
+  it('lægger brugerens egen drejning oven paa, og glemmer cachen ved ny drejning', async () => {
+    const fil = join(dir, 'drej.cr2');
+    writeFileSync(fil, Buffer.concat([tiffMedRetning(1), await medHjoerne(1600, 1000)]));
+    let grader = 0;
+    const { t } = lav(ingenProgrammer, { rotationFor: () => grader });
+    let m = await sharp(await t.ensure(9, 5, fil, 512)).metadata();
+    expect([m.width, m.height]).toEqual([512, 320]);
+    grader = 90;
+    t.forgetFile(9);
+    expect(t.findExisting(9, 5, 512)).toBeNull();
+    m = await sharp(await t.ensure(9, 5, fil, 512)).metadata();
+    expect([m.width, m.height]).toEqual([320, 512]);
   });
 
   it('toemmer en cache fra en aeldre version, og lader en ny staa', async () => {

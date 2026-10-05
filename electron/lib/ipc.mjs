@@ -141,6 +141,7 @@ export class AppSession {
     this.thumbs = new Thumbnailer({
       cacheDir: join(dataDir, 'cache'),
       rasterizeSvg: this.rasterizeSvg,
+      rotationFor: (id) => this.catalog?.getFile(id)?.rotation || 0,
       // Hvert trin der svigter staar i loggen, ogsaa naar et senere trin
       // redder forhaandsvisningen.
       onError: ({ stage, file, message }) => this.log(`preview ${stage} (${file}): ${message}`),
@@ -486,6 +487,15 @@ export class AppSession {
     handle('img:deleteVersion', async ({ versionId }) => {
       const fileAbs = this.requireCatalog().deleteVersion(versionId);
       if (fileAbs) await shell.trashItem(fileAbs).catch(() => {});
+    });
+    // Manuel drejning naar automatikken tager fejl. delta er 90, -90 eller 0.
+    handle('img:rotate', ({ fileId, delta }) => {
+      const catalog = this.requireCatalog();
+      if (![90, -90, 180, 0].includes(delta)) throw new Error('Unknown rotation');
+      const rotation = catalog.rotateFile(fileId, delta);
+      this.thumbs?.forgetFile(fileId);
+      this.log(`rotate: file ${fileId} now ${rotation} degrees`);
+      return { rotation };
     });
     handle('img:reveal', ({ versionId }) => {
       const p = this.requireCatalog().filePathForVersion(versionId);

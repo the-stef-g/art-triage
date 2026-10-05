@@ -148,7 +148,7 @@ export async function exportJpeg(
   absPath,
   size = SHOP_IMAGE_SIZE,
   quality = SHOP_JPEG_QUALITY,
-  { platform = process.platform, runner = run } = {}
+  { platform = process.platform, runner = run, rotation = 0 } = {}
 ) {
   const dir = mkdtempSync(join(tmpdir(), 'at-shop-'));
   const out = join(dir, 'export.jpg');
@@ -160,6 +160,11 @@ export async function exportJpeg(
     for (const [navn, fn] of veje) {
       try {
         await fn(absPath, size, quality, out, runner);
+        if (rotation) {
+          // Brugerens egen drejning, lagt oven paa den automatiske.
+          const sharp = (await import('sharp')).default;
+          return await sharp(out).rotate(rotation).jpeg({ quality }).toBuffer();
+        }
         return readFileSync(out);
       } catch (err) {
         aarsager.push(`${navn}: ${kortAarsag(err)}`);
@@ -177,7 +182,7 @@ const VIDEO_TYPES = { mp4: 'video/mp4', m4v: 'video/x-m4v', mov: 'video/quicktim
 // Hvilken udgave af en fil der er uploadet. Aendres noget af det, er det en
 // ny fil.
 function sourceKey(file) {
-  return `${file.id}:${file.size}:${file.mtime}:${file.hash ?? ''}`;
+  return `${file.id}:${file.size}:${file.mtime}:${file.hash ?? ''}${file.rotation ? `:r${file.rotation}` : ''}`;
 }
 
 export class MediaSync {
@@ -206,7 +211,7 @@ export class MediaSync {
       }
     }
     const abs = this.catalog.abs(file.rel_path);
-    const buffer = await this.exporter(abs);
+    const buffer = await this.exporter(abs, undefined, undefined, { rotation: file.rotation || 0 });
     const stem = basename(file.rel_path).replace(/\.[^.]+$/, '');
     const media = await this.client.uploadMedia(buffer, `${stem}-${role.replace(':', 'x')}.jpg`, 'image/jpeg');
     await this.client.wpApi('POST', `/media/${media.id}`, { alt_text: alt || '', title: stem });

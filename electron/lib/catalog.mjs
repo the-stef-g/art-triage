@@ -151,6 +151,12 @@ export class Catalog extends EventEmitter {
     for (const kol of ['intro', 'template', 'colour']) {
       if (!serieKolonner.includes(kol)) this.db.exec(`ALTER TABLE series ADD COLUMN ${kol} TEXT`);
     }
+    // En drejning man selv har lagt paa et billede, naar automatikken
+    // tager fejl: 0, 90, 180 eller 270 grader med uret.
+    const filKolonner = this.db.all('PRAGMA table_info(files)').map((k) => k.name);
+    if (!filKolonner.includes('rotation')) {
+      this.db.exec('ALTER TABLE files ADD COLUMN rotation INTEGER NOT NULL DEFAULT 0');
+    }
     // De to trin var foer uafhaengige flag, saa et billede kunne staa som
     // baade under redigering og faerdigt. Faerdig vinder: det er det trin
     // man selv har sat sidst, og det er den tilstand der betyder noget.
@@ -439,7 +445,7 @@ export class Catalog extends EventEmitter {
     const rows = this.db.all(
       `SELECT v.id AS version_id, v.image_id, v.name AS version_name, v.is_master,
               v.rating, v.edited, v.finished,
-              f.id AS file_id, f.rel_path, f.mtime, f.size,
+              f.id AS file_id, f.rel_path, f.mtime, f.size, f.rotation,
               i.series_id, s.name AS series_name,
               (SELECT COUNT(*) FROM versions v2 WHERE v2.image_id = v.image_id) AS version_count
        FROM versions v
@@ -519,6 +525,18 @@ export class Catalog extends EventEmitter {
       }
     });
     this.emit('changed');
+  }
+
+  // Dreje et billede et kvarter ad gangen. delta er 90 (med uret) eller -90;
+  // 0 nulstiller. Returnerer den nye drejning.
+  rotateFile(fileId, delta) {
+    const f = this.getFile(fileId);
+    if (!f) throw new Error('The file is not in the library');
+    const ny = delta === 0 ? 0 : (((f.rotation || 0) + delta) % 360 + 360) % 360;
+    if (ny % 90 !== 0) throw new Error('The rotation must be a multiple of 90 degrees');
+    this.db.run('UPDATE files SET rotation=? WHERE id=?', ny, fileId);
+    this.emit('changed');
+    return ny;
   }
 
   stageOf(version) {

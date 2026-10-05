@@ -50,7 +50,7 @@ function Tile({ row, isSelected, isActive, onClick, onDoubleClick, onDragStart, 
     >
       <div className="tile-billede" key={thumbRev}>
         <img
-          src={thumbUrl(row.file_id, row.mtime, 512)}
+          src={thumbUrl(row.file_id, row.mtime, 512, row.rotation)}
           alt={fileName(row.rel_path)}
           loading="lazy"
           draggable={false}

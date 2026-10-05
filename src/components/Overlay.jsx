@@ -11,7 +11,7 @@ export function PreviewOverlay({ row, onClose }) {
   // bedoemmelse mens man kigger stort paa billedet.
   return (
     <div className="forstoerret" onClick={onClose}>
-      <img src={thumbUrl(row.file_id, row.mtime, 2048)} alt={fileName(row.rel_path)} />
+      <img src={thumbUrl(row.file_id, row.mtime, 2048, row.rotation)} alt={fileName(row.rel_path)} />
       <div className="overlay-info">
         {fileName(row.rel_path)}
         {!row.is_master ? ` · ${row.version_name}` : ''}

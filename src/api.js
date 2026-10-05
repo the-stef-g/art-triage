@@ -21,6 +21,8 @@ export function setThumbRetry(n) {
   thumbRetry = n;
 }
 
-export function thumbUrl(fileId, mtime, size = 512) {
-  return `thumb://img/${fileId}?s=${size}&v=${mtime}${thumbRetry ? `&r=${thumbRetry}` : ''}`;
+// rotation er brugerens egen drejning. Den staar i adressen, saa browseren
+// henter forhaandsvisningen igen naar den aendres.
+export function thumbUrl(fileId, mtime, size = 512, rotation = 0) {
+  return `thumb://img/${fileId}?s=${size}&v=${mtime}${rotation ? `&o=${rotation}` : ''}${thumbRetry ? `&r=${thumbRetry}` : ''}`;
 }

@@ -352,6 +352,11 @@ export default function App() {
       invoke('img:setStage', { versionIds: [f.version_id], stage: harDet ? null : stage })
         .catch(visFejl);
     },
+    // Drej det aktive billede manuelt, naar automatikken tager fejl.
+    rotate: (delta) => {
+      const f = getFocused();
+      if (f) invoke('img:rotate', { fileId: f.file_id, delta }).catch(visFejl);
+    },
     virtualCopy: () => {
       const f = getFocused();
       if (f) invoke('img:virtualCopy', { versionId: f.version_id }).catch(visFejl);
@@ -604,6 +609,9 @@ export default function App() {
         case 'e': act.setStage('edited'); break;
         case 'f': act.setStage('finished'); break;
         case 'v': act.virtualCopy(); break;
+        // [ og ] er svaere at ramme paa et dansk tastatur, saa L og R gør det samme.
+        case '[': case 'l': if (!e.metaKey && !e.ctrlKey) act.rotate(-90); break;
+        case ']': case 'r': if (!e.metaKey && !e.ctrlKey) act.rotate(90); break;
         case ' ': e.preventDefault(); if (idx >= 0) setShowPreview((p) => !p); break;
         // Foerste Escape forlader multi-select og beholder det aktive
         // billede, saa pilene fortsaetter derfra. Anden Escape rydder.

@@ -110,7 +110,14 @@ export default function Inspector({
         </div>
       )}
       <div className="stor-preview">
-        <img src={thumbUrl(row.file_id, row.mtime, 2048)} alt={fileName(row.rel_path)} />
+        <img src={thumbUrl(row.file_id, row.mtime, 2048, row.rotation)} alt={fileName(row.rel_path)} />
+      </div>
+      <div className="knapraekke drej">
+        <button className="lille" onClick={() => act.rotate(-90)} title="Rotate left (shortcut L)">⟲ Left</button>
+        <button className="lille" onClick={() => act.rotate(90)} title="Rotate right (shortcut R)">⟳ Right</button>
+        {row.rotation ? (
+          <button className="lille" onClick={() => invoke('img:rotate', { fileId: row.file_id, delta: 0 }).catch(onError)} title="Back to the automatic rotation">Reset</button>
+        ) : null}
       </div>
       <h3 title={row.rel_path}>{fileName(row.rel_path)}</h3>
       <p className="detaljer">

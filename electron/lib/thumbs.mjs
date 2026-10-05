@@ -56,7 +56,10 @@ export class Thumbnailer {
   // var en mislykket forhaandsvisning bare null, og aarsagen var vaek.
   constructor({
     cacheDir, rasterizeSvg = null, platform = process.platform, runner = run, onError = null,
+    rotationFor = () => 0,
   }) {
+    // Drejningen man selv har lagt paa en fil (0/90/180/270 med uret).
+    this.rotationFor = rotationFor;
     this.cacheDir = cacheDir;
     this.rasterizeSvg = rasterizeSvg;
     this.platform = platform;
@@ -160,6 +163,7 @@ export class Thumbnailer {
     const key = this.cacheKey(fileId, mtime, size);
     if (this.inflight.has(key)) return this.inflight.get(key);
     const p = this._generate(fileId, mtime, absPath, size)
+      .then((sti) => this._medDrejning(sti, fileId, absPath))
       .catch((err) => {
         this._report('preview', absPath, err);
         return null;
@@ -172,6 +176,47 @@ export class Thumbnailer {
       .finally(() => this.inflight.delete(key));
     this.inflight.set(key, p);
     return p;
+  }
+
+  // Lægger brugerens egen drejning oven paa den fil der netop er lavet.
+  async _medDrejning(sti, fileId, absPath) {
+    const grader = Number(this.rotationFor(fileId)) || 0;
+    if (!sti || !grader) return sti;
+    try {
+      const sharp = (await import('sharp')).default;
+      const tmp = `${sti}.tmp-${process.pid}${sti.endsWith('.png') ? '.png' : '.jpg'}`;
+      await sharp(sti).rotate(grader).toFile(tmp);
+      renameSync(tmp, sti);
+    } catch (err) {
+      this._report('rotate', absPath, err);
+    }
+    return sti;
+  }
+
+  // Glemmer alle forhaandsvisninger af en fil, fx efter en ny drejning.
+  forgetFile(fileId) {
+    const praefiks = `${fileId}-`;
+    try {
+      for (const navn of readdirSync(this.cacheDir)) {
+        if (navn.startsWith(praefiks)) rmSync(join(this.cacheDir, navn), { force: true });
+      }
+    } catch {
+      // cachen kan ikke laeses; saa er der intet at glemme
+    }
+    this.failed.delete(fileId);
+  }
+
+  // Retningen sips kender for en RAW-fil. Bruges naar selve filen ikke
+  // oplyser en retning, som hos nogle Canon-filer.
+  async _sipsRetning(absPath) {
+    if (this.platform !== 'darwin') return null;
+    try {
+      const { stdout } = await this._run('sips', ['-g', 'orientation', absPath]);
+      const m = /orientation:\s*(\d)/.exec(String(stdout ?? ''));
+      return m ? Number(m[1]) : null;
+    } catch {
+      return null;
+    }
   }
 
   async _generate(fileId, mtime, absPath, size) {
@@ -237,7 +282,8 @@ export class Thumbnailer {
         // retning 1 ind i den indbyggede JPEG, selv om billedet er taget
         // staaende, og sharp ville saa lade den ligge. Staar der ingen
         // retning paa RAW-filen, bruges JPEG'ens egen.
-        const filRetning = exifOrientation(absPath);
+        let filRetning = exifOrientation(absPath);
+        if (!filRetning || filRetning === 1) filRetning = await this._sipsRetning(absPath);
         img = filRetning && filRetning > 1
           ? medRetning(img, filRetning)
           : (meta.orientation ? img.rotate() : img);
