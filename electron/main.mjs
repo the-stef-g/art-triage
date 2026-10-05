@@ -401,7 +401,14 @@ app.whenReady().then(() => {
   settings = new Settings(app.getPath('userData'));
   aiLogPath = join(app.getPath('userData'), 'art-triage-ai.log');
   ai = new AiBridge(null);
-  ai.on('status', (s) => aiLog(`status: ${s.state} ${s.progress ?? 0}% ${s.detail || ''}`));
+  // Samme linje to gange i traek logges kun én gang.
+  let sidsteStatus = '';
+  ai.on('status', (s) => {
+    const linje = `status: ${s.state} ${s.progress ?? 0}% ${s.detail || ''}`;
+    if (linje === sidsteStatus) return;
+    sidsteStatus = linje;
+    aiLog(linje);
+  });
   aiLog(`--- Art Triage ${app.getVersion()} startet (${process.platform}, Electron ${process.versions.electron}) ---`);
   session = new AppSession({ settings, ai, rasterizeSvg, log: aiLog });
   // Er sharp med i den pakkede app? Det er den foerste ting at se efter

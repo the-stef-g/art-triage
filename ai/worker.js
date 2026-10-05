@@ -7,6 +7,7 @@
 // disk-cache uden CORS-bindinger). Inferens koerer enkelttraadet paa
 // WASM: langsommere end traade, men starter altid.
 import * as hf from '@huggingface/transformers';
+import { statusTrottle } from './throttle.js';
 
 const { env, AutoTokenizer, AutoProcessor, RawImage } = hf;
 
@@ -99,6 +100,10 @@ function stopPuls() {
 function progressReporter(hentFase, klargoerFase) {
   const files = new Map();
   let klargoer = false;
+  // Højst fire meldinger i sekundet, og kun naar procenten har flyttet sig.
+  const sendProcent = statusTrottle((pct) => {
+    send({ type: 'status', state: 'model', progress: pct, detail: hentFase });
+  });
   return (p) => {
     puls();
     if (p.status !== 'progress' || !p.file) return;
@@ -122,7 +127,7 @@ function progressReporter(hentFase, klargoerFase) {
     }
     klargoer = false;
     stopPuls();
-    send({ type: 'status', state: 'model', progress: pct, detail: hentFase });
+    sendProcent(pct);
   };
 }
 
