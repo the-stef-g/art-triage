@@ -97,6 +97,49 @@ describe('scanning', () => {
     expect(kopi.edited).toBe(1);
   });
 
+  it('stakker ikke nummererede filer eller filer af samme type', () => {
+    skriv('Ild.cr2', 'original');
+    catalog.sync();
+    skriv('Ild 9 1.cr2', 'nummereret, samme type');
+    skriv('Ild 7a.jpg', 'nummer med bogstav');
+    skriv('Ild 10.dng', 'nummer');
+    skriv('Ild-lumi.cr2', 'redigeret men samme type');
+    skriv('Ild-lumi.tif', 'redigeret, anden type');
+    catalog.sync();
+    const rows = catalog.listVersions({});
+    // Ild-lumi.cr2 og .tif hoerer sammen (samme navn); de andre er hver sit.
+    expect(new Set(rows.map((r) => r.image_id)).size).toBe(5);
+    expect(rows.filter((r) => r.version_count === 2)).toHaveLength(2);
+    expect(rows.find((r) => r.rel_path === 'Ild-lumi.tif').is_master).toBe(0);
+    expect(rows.find((r) => r.rel_path === 'Ild 9 1.cr2').is_master).toBe(1);
+  });
+
+  it('goer fejlagtigt stakkede versioner til egne billeder, og lader de rigtige staa', () => {
+    skriv('Ild.cr2', 'original');
+    catalog.sync();
+    const master = catalog.listVersions({})[0];
+    const nyFil = (rel) => catalog.db.run(
+      'INSERT INTO files(rel_path, size, mtime, hash, present, created_at) VALUES(?,?,?,?,1,?)',
+      rel, 5, 1, `h-${rel}`, 1
+    ).lastInsertRowid;
+    const stak = (rel, navn) => catalog.db.run(
+      'INSERT INTO versions(image_id, file_id, name, is_master, rating, edited, created_at) VALUES(?,?,?,0,?,1,1)',
+      master.image_id, nyFil(rel), navn, 'godkendt'
+    );
+    stak('Ild 9 1.cr2', '1');
+    stak('Ild 7a.jpg', '7a');
+    stak('Ild-lumi.tif', 'lumi');
+    expect(catalog._afstakFejl()).toBe(2);
+    const rows = catalog.listVersions({});
+    expect(new Set(rows.map((r) => r.image_id)).size).toBe(3);
+    const lumi = rows.find((r) => r.version_name === 'lumi');
+    expect(lumi.version_count).toBe(2);
+    const egen = rows.find((r) => r.rel_path === 'Ild 7a.jpg');
+    expect(egen.is_master).toBe(1);
+    expect(egen.rating).toBe('godkendt');
+    expect(catalog._afstakFejl()).toBe(0); // en gang er nok
+  });
+
   it('markerer forsvundne filer som fravaerende', () => {
     skriv('a.png', 'indhold');
     catalog.sync();

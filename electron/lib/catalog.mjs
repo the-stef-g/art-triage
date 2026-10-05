@@ -11,6 +11,19 @@ import {
   libraryAvailable,
 } from './util.mjs';
 
+// Hvornaar en fil er en redigeret udgave af en anden og skal stakkes som
+// version af den. Begge krav skal vaere opfyldt:
+//  1. Filtypen er en anden end originalens (IMG.CR2 og IMG-lumi.tif, ikke
+//     "Ild 9.CR2" og "Ild 9 1.CR2").
+//  2. Det der staar efter originalens navn ligner en redigering: et ord paa
+//     mindst to bogstaver (-lumi, _edit, -gigapixel) eller v1, v2. Et tal
+//     eller ét bogstav (7a, 1, 10) er nummerering, ikke redigering.
+export function erRedigeretUdgave(suffiks, ext, masterExt) {
+  if (String(ext).toLowerCase() === String(masterExt).toLowerCase()) return false;
+  const tekst = String(suffiks).replace(/^[-_. ()]+|[)]+$/g, '');
+  return /[a-zA-Z\u00c0-\u024f]{2,}/.test(tekst) || /^v\d+$/i.test(tekst);
+}
+
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS files(
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -157,10 +170,55 @@ export class Catalog extends EventEmitter {
     if (!filKolonner.includes('rotation')) {
       this.db.exec('ALTER TABLE files ADD COLUMN rotation INTEGER NOT NULL DEFAULT 0');
     }
+    // Aeldre versioner stakkede alle filer hvis navn begyndte med et andet
+    // navn (Ild 9 1.CR2 under Ild 9.dng). De der ikke opfylder den nuvaerende
+    // regel, gøres til egne billeder én gang.
+    const version = Number(this.db.get('PRAGMA user_version')?.user_version ?? 0);
+    if (version < 1) {
+      this._afstakFejl();
+      this.db.exec('PRAGMA user_version = 1');
+    }
     // De to trin var foer uafhaengige flag, saa et billede kunne staa som
     // baade under redigering og faerdigt. Faerdig vinder: det er det trin
     // man selv har sat sidst, og det er den tilstand der betyder noget.
     this.db.exec('UPDATE versions SET edited=0 WHERE edited=1 AND finished=1');
+  }
+
+  // Goer de versioner der er stakket ved en fejl til egne billeder. Kun
+  // versioner med en egen fil (fundet ved en skanning) roeres, aldrig
+  // virtuelle kopier. Filerne paa disken roeres ikke. Returnerer antallet.
+  _afstakFejl() {
+    const raekker = this.db.all(
+      `SELECT v.id AS vid, v.rating, v.image_id, f.id AS fid, f.rel_path AS rel,
+              m.rel_path AS master_rel, i.series_id
+       FROM versions v
+       JOIN files f ON f.id = v.file_id
+       JOIN images i ON i.id = v.image_id
+       JOIN files m ON m.id = i.master_file_id
+       WHERE v.is_master = 0 AND v.file_id IS NOT NULL`
+    );
+    let antal = 0;
+    this.db.transaction(() => {
+      for (const r of raekker) {
+        const stem = stemOf(posix.basename(r.rel));
+        const mStem = stemOf(posix.basename(r.master_rel));
+        // Samme navn og anden filtype hoerer sammen, og noget der slet ikke
+        // begynder med originalens navn er flyttet af brugeren: begge lades.
+        if (stem === mStem || !stem.startsWith(mStem)) continue;
+        if (erRedigeretUdgave(stem.slice(mStem.length), extOf(r.rel), extOf(r.master_rel))) continue;
+        const imageId = this.db.run(
+          'INSERT INTO images(master_file_id, series_id, created_at) VALUES(?,?,?)',
+          r.fid, r.series_id ?? null, this.now()
+        ).lastInsertRowid;
+        this.db.run(
+          'INSERT INTO versions(image_id, file_id, name, is_master, rating, created_at) VALUES(?,NULL,?,1,?,?)',
+          imageId, 'Original', r.rating, this.now()
+        );
+        this.db.run('DELETE FROM versions WHERE id=?', r.vid);
+        antal += 1;
+      }
+    });
+    return antal;
   }
 
   abs(rel) {
@@ -385,7 +443,8 @@ export class Catalog extends EventEmitter {
         if (!best || sStem.length > best.stemLen) best = { fileId: s.id, stemLen: sStem.length, suffix: '' };
       } else if (
         stem.startsWith(sStem) &&
-        /^[-_. ()]/.test(stem.slice(sStem.length))
+        /^[-_. ()]/.test(stem.slice(sStem.length)) &&
+        erRedigeretUdgave(stem.slice(sStem.length), extOf(rel), extOf(s.rel_path))
       ) {
         if (!best || sStem.length > best.stemLen) {
           best = { fileId: s.id, stemLen: sStem.length, suffix: stem.slice(sStem.length) };
