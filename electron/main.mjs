@@ -65,9 +65,16 @@ function aiLog(line) {
 // transformers.js afviser alle andre schemes i sine eksistenstjek.
 const MODEL_HOST = 'billedflow-models.local';
 
-function modelHeaders(relPath) {
+// size: svarets laengde i bytes. Den skal staa med som Content-Length.
+// Uden den laeser transformers.js svaret med "Will expand buffer when needed":
+// for hvert stykke der kommer, allokeres en ny buffer paa hele den hidtil
+// modtagne laengde og alt kopieres over. Arbejdet vokser med kvadratet af
+// filens stoerrelse: billedmodellen paa ca. 90 MB tog 33 sekunder at faa klar,
+// og tekstmodellen paa ca. 290 MB tog fem minutter, hver gang appen startede.
+function modelHeaders(relPath, size) {
   const headers = new Headers();
   headers.set('Content-Type', relPath.endsWith('.json') ? 'application/json' : 'application/octet-stream');
+  if (Number.isFinite(size)) headers.set('Content-Length', String(size));
   headers.set('Access-Control-Allow-Origin', '*');
   headers.set('Cross-Origin-Resource-Policy', 'cross-origin');
   return headers;
@@ -81,7 +88,8 @@ async function serveModelFile(pathname) {
   const modelCacheDir = join(app.getPath('userData'), 'model-cache');
   const cacheFile = join(modelCacheDir, relPath.split('/').join('__'));
   if (existsSync(cacheFile)) {
-    return new Response(readFileSync(cacheFile), { status: 200, headers: modelHeaders(relPath) });
+    const fil = readFileSync(cacheFile);
+    return new Response(fil, { status: 200, headers: modelHeaders(relPath, fil.length) });
   }
   const upstreams = [
     { base: 'https://huggingface.co/', navn: 'huggingface.co', token: settings.data.hfToken || null },
@@ -114,7 +122,7 @@ async function serveModelFile(pathname) {
         const tmp = `${cacheFile}.tmp-${process.pid}`;
         writeFileSync(tmp, buf);
         renameSync(tmp, cacheFile);
-        return new Response(buf, { status: 200, headers: modelHeaders(relPath) });
+        return new Response(buf, { status: 200, headers: modelHeaders(relPath, buf.length) });
       }
     } catch (err) {
       aiLog(`hfmodel GET ${relPath} -> netværksfejl (${up.navn}): ${err?.message || err}`);
@@ -363,17 +371,6 @@ function buildMenu() {
           },
         },
         {
-          label: 'Faster AI start (experimental)',
-          type: 'checkbox',
-          checked: Boolean(settings?.data?.aiFastText),
-          click: (item) => {
-            settings.data.aiFastText = item.checked;
-            settings.save();
-            aiLog(`faster AI start ${item.checked ? 'on' : 'off'}`);
-            restartAiWindow();
-          },
-        },
-        {
           label: 'Retry failed previews',
           click: () => mainWin?.webContents.send('evt', { type: 'genvej', cmd: 'retry-previews' }),
         },
@@ -418,11 +415,7 @@ app.whenReady().then(() => {
     const role = Object.keys(aiWins).find((r) => aiWins[r] && event.sender === aiWins[r].webContents);
     if (role) ai.handleMessage({ ...msg, role });
   });
-  ipcMain.handle('ai:init', () => ({
-    hfToken: settings.data.hfToken || null,
-    // Proeve af tekstmodellens start uden grafoptimering, se menuen.
-    textGraphOptimization: settings.data.aiFastText ? 'disabled' : null,
-  }));
+  ipcMain.handle('ai:init', () => ({ hfToken: settings.data.hfToken || null }));
   ipcMain.handle('app:info', () => ({
     version: app.getVersion(),
     hfToken: settings.data.hfToken || null,

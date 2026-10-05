@@ -3,7 +3,7 @@
 // RAW-fil uden JPEG skal ende i "N previews failed" med en Retry-knap.
 // Koeres i CI under Xvfb: `xvfb-run npm run smoke:previews`.
 import { _electron as electron } from 'playwright-core';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -91,7 +91,21 @@ try {
   const svar = await page.evaluate(() => window.artTriage.invoke('thumbs:retry'));
   if (svar.antal !== 1) throw new Error(`Retry skulle melde 1 fejlet forhaandsvisning, fik ${svar.antal}`);
 
-  console.log('SMOKE OK: RAW med indbygget JPEG, TIFF og PNG viser billeder; en fejlet forhaandsvisning kan proeves igen');
+  // Modelfilerne til AI-vinduet skal serveres med Content-Length. Uden den
+  // laeser transformers.js dem med en buffer der vokser et stykke ad gangen
+  // og kopieres hver gang, og en 290 MB tekstmodel tog fem minutter at faa klar.
+  const userData = await app.evaluate(({ app: a }) => a.getPath('userData'));
+  mkdirSync(join(userData, 'model-cache'), { recursive: true });
+  writeFileSync(join(userData, 'model-cache', 'smoketest__model.bin'), Buffer.alloc(1048576, 3));
+  const model = await app.evaluate(async ({ session }) => {
+    const r = await session.fromPartition('persist:ai').fetch('https://billedflow-models.local/smoketest/model.bin');
+    return { laengde: r.headers.get('content-length'), bytes: (await r.arrayBuffer()).byteLength };
+  });
+  if (model.laengde !== '1048576' || model.bytes !== 1048576) {
+    throw new Error(`Modelfilen skal serveres med Content-Length 1048576, fik ${JSON.stringify(model)}`);
+  }
+
+  console.log('SMOKE OK: RAW med indbygget JPEG, TIFF og PNG viser billeder; en fejlet forhaandsvisning kan proeves igen; modelfiler serveres med Content-Length');
   succes = true;
 } catch (err) {
   console.error('SMOKE FEJL:', err.message);

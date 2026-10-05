@@ -158,23 +158,14 @@ async function loadBilledModel(repo) {
   visionModel = vis;
 }
 
-async function loadTekstModel(repo, opts) {
+async function loadTekstModel(repo) {
   const pt = progressReporter('Downloading search model', 'Preparing search model');
   puls();
   const tok = await medStallVagt(AutoTokenizer.from_pretrained(repo, { progress_callback: pt }));
   logTrin('tokenizeren er indlaest');
   puls();
-  // Eksperiment (menuen "Faster AI start"): uden grafoptimering. Tekstmodellen
-  // har en meget stor ordtabel, og optimeringen kan lave den om til
-  // flydende tal ved hver opstart; en kort soegetekst har ikke brug for den.
-  const sessionOptions = opts.textGraphOptimization
-    ? { graphOptimizationLevel: opts.textGraphOptimization }
-    : undefined;
-  if (sessionOptions) logTrin(`tekstmodellen indlaeses med graphOptimizationLevel=${opts.textGraphOptimization}`);
   const txt = await medStallVagt(
-    TextModelClass.from_pretrained(repo, {
-      device: 'wasm', dtype: 'q8', progress_callback: pt, session_options: sessionOptions,
-    })
+    TextModelClass.from_pretrained(repo, { device: 'wasm', dtype: 'q8', progress_callback: pt })
   );
   logTrin('tekstmodellen er indlaest');
   tokenizer = tok;
@@ -215,7 +206,7 @@ async function init() {
       saetFase(fase, 0);
       try {
         if (rolle === 'text') {
-          await loadTekstModel(repo, opts);
+          await loadTekstModel(repo);
           // Foerste inferens varmer WASM op. Pulsen koerer videre her, saa
           // linjen ikke staar stille.
           saetFase('Starting the search model');
