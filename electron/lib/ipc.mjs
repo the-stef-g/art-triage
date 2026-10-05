@@ -14,6 +14,7 @@ import {
 } from './keywords.mjs';
 import { UndoManager } from './undo.mjs';
 import { Works } from './works.mjs';
+import { ClaudeWorkTexts, TEXT_IMAGE_SIZE } from './workTexts.mjs';
 import { debounce, dataDirFor } from './util.mjs';
 
 // Mappe-overvaageren (chokidar) faar sjaeldent fil-system-haendelser fra
@@ -46,6 +47,7 @@ export class AppSession {
     this.indexer = null;
     this.kwRunner = null;
     this.kwService = null;
+    this.textService = null;
     this.scanTimer = null;
     this.scanning = false;
     this.driveMissing = false;
@@ -250,6 +252,7 @@ export class AppSession {
   // en ny klient i stedet for at bruge den gamle noegle.
   resetKeywordService() {
     this.kwService = null;
+    this.textService = null;
   }
 
   _keywordRunner() {
@@ -272,6 +275,37 @@ export class AppSession {
     }
     this.kwRunner.service = this.kwService;
     return this.kwRunner;
+  }
+
+  // Tekster til vaerket. Foer noget sendes: vaerket skal vaere godkendt og
+  // faerdigt, og har Stef rettet i en tekst, spoerges der foer den
+  // overskrives. Svaret uden overwrite koster ingenting.
+  async writeWorkTexts({ imageId, overwrite = false }) {
+    const works = this.requireWorks();
+    const work = works.get(imageId);
+    if (!work.eligible) throw new Error('Only approved, finished works can get texts');
+    const apiKey = this.settings.data.claudeKey;
+    if (!apiKey) throw new Error('No Claude API key yet. Add it under Help.');
+    if (work.editedTexts.length && !overwrite) {
+      return { needsConfirm: true, edited: work.editedTexts };
+    }
+    const file = works.imageFile(imageId);
+    if (!file) throw new Error('The image file is not available right now');
+    const thumbPath = await this.thumbs.ensure(file.id, file.mtime, this.catalog.abs(file.rel_path), TEXT_IMAGE_SIZE);
+    if (!thumbPath) throw new Error('A preview of the image could not be made');
+    if (!this.textService || this.textService.model !== this.keywordModel()) {
+      this.textService = new ClaudeWorkTexts({ apiKey, model: this.keywordModel() });
+    }
+    this.broadcast('wt', { phase: 'koerer', cost: null });
+    try {
+      const res = await this.textService.write(thumbPath, work);
+      const saved = works.saveGeneratedTexts(imageId, res.texts);
+      this.broadcast('wt', { phase: 'faerdig', cost: res.cost });
+      return { work: saved, warnings: res.warnings, cost: res.cost };
+    } catch (err) {
+      this.broadcast('wt', { phase: 'fejl', cost: null });
+      throw err;
+    }
   }
 
   keywordStatus() {
@@ -475,6 +509,15 @@ export class AppSession {
     // Vaerket: tekster og shop-felter pr. billede (docs/plan-shop.md).
     handle('work:get', ({ imageId }) => this.requireWorks().get(imageId));
     handle('work:save', ({ imageId, patch }) => this.requireWorks().save(imageId, patch));
+    handle('work:pickVideo', async () => {
+      const res = await dialog.showOpenDialog(this.win, {
+        title: 'Choose video',
+        properties: ['openFile'],
+        filters: [{ name: 'Video', extensions: ['mp4', 'm4v', 'mov', 'webm'] }],
+      });
+      return res.canceled || !res.filePaths.length ? null : res.filePaths[0];
+    });
+    handle('work:writeTexts', (payload) => this.writeWorkTexts(payload));
     handle('work:setCrop', ({ imageId, versionId, format }) =>
       this.requireWorks().setCrop(imageId, versionId, format ?? null));
 

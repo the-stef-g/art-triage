@@ -121,6 +121,20 @@ export class Works {
     ));
   }
 
+  // Filen der sendes til Claude: den foerste godkendte og faerdige version,
+  // originalen foerst. Det er den udgave Stef har gjort faerdig, ikke
+  // noedvendigvis masteren.
+  imageFile(imageId) {
+    return this.db.get(
+      `SELECT f.* FROM versions v
+       JOIN images i ON i.id = v.image_id
+       JOIN files f ON f.id = COALESCE(v.file_id, i.master_file_id)
+       WHERE v.image_id=? AND v.rating='godkendt' AND v.finished=1 AND f.present=1
+       ORDER BY v.is_master DESC, v.id LIMIT 1`,
+      imageId
+    ) || null;
+  }
+
   cropsFor(imageId) {
     return this.db.all(
       'SELECT format, version_id FROM work_crops WHERE image_id=?',

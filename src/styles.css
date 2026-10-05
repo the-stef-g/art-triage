@@ -383,6 +383,24 @@ input:focus, select:focus { outline: 1px solid var(--accent); }
 .versionsinfo { color: var(--tekst-svag); font-size: 11px; }
 .versionsknapper { display: flex; gap: 2px; }
 
+/* ---------- Vaerk-panel ---------- */
+.vaerk label { display: flex; flex-direction: column; gap: 3px; margin: 6px 0; font-size: 11px; color: var(--tekst-svag); }
+.vaerk input, .vaerk select, .vaerk textarea { font-size: 12px; width: 100%; box-sizing: border-box; }
+.vaerk textarea { resize: vertical; font-family: inherit; line-height: 1.4; }
+.vaerk-raekke { display: flex; gap: 8px; }
+.vaerk-raekke label { flex: 1; min-width: 0; }
+.vaerk-note { color: var(--tekst-svag); font-size: 11px; line-height: 1.4; margin: 4px 0; }
+.vaerk-check { flex-direction: row !important; align-items: center; gap: 6px !important; color: inherit !important; font-size: 12px !important; }
+.vaerk-check input { width: auto; }
+.vaerk-video { display: flex; gap: 6px; align-items: center; }
+.vaerk-sti { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--tekst); font-size: 12px; }
+.vaerk-crop { display: flex; gap: 6px; align-items: center; margin: 3px 0; }
+.vaerk-crop select { flex: 1; min-width: 0; }
+.vaerk-format { width: 30px; font-size: 12px; font-variant-numeric: tabular-nums; }
+.vaerk-advarsler { margin: 6px 0; padding-left: 16px; font-size: 11px; color: var(--kandidat); }
+.vaerk-rettet { color: var(--redigeret); }
+.vaerk-tael { align-self: flex-end; font-size: 10px; }
+
 /* ---------- Statusbar ---------- */
 .statusbar {
   display: flex;

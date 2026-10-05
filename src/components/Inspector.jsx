@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { invoke, thumbUrl } from '../api';
 import { formatBytes, formatDate, fileName } from '../util';
+import WorkPanel from './WorkPanel';
 
 // dataRev taeller op hver gang kataloget melder en aendring. Uden den
 // blev noegleordene kun hentet naar man skiftede billede, saa ord Claude
 // lige havde skrevet foerst dukkede op hvis man gik væk og tilbage igen.
 export default function Inspector({
-  row, selectedCount, activeKeyword, editors, series, act, dataRev,
+  row, selectedCount, activeKeyword, editors, series, act, dataRev, hasKey, onError,
 }) {
   const [versions, setVersions] = useState([]);
   const [keywords, setKeywords] = useState([]);
@@ -218,6 +219,14 @@ export default function Inspector({
           <option value="ny">New series …</option>
         </select>
       </div>
+
+      <WorkPanel
+        key={row.image_id}
+        row={row}
+        versions={versions}
+        hasKey={hasKey}
+        onError={onError}
+      />
 
       <h4>Keywords</h4>
       {activeKeyword && keywords.some((k) => k.word === activeKeyword) && (

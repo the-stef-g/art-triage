@@ -39,6 +39,7 @@ export default function App() {
   const [appInfo, setAppInfo] = useState(null);
   const [drev, setDrev] = useState(null); // {missing, root} naar drevet skifter tilstand
   const [skanner, setSkanner] = useState(false);
+  const [textStatus, setTextStatus] = useState(null); // vaerk-tekster: koerer, seneste pris
   const [kwStatus, setKwStatus] = useState(null); // cloud-noegleord: noegle, model, koe
   // Taeller op ved hver katalog-aendring. Inspektoeren henter noegleord om
   // paa den, saa ord der bliver skrevet mens man kigger paa billedet, ogsaa
@@ -193,6 +194,8 @@ export default function App() {
       setKwStatus((s) => (s ? { ...s, progress: evt.progress, koerer: evt.progress.phase === 'koerer' } : s));
       if (evt.progress?.phase === 'fejl' && evt.progress.fejl) visFejl(evt.progress.fejl);
       if (evt.progress?.phase === 'faerdig') invoke('kw:status').then(setKwStatus).catch(() => {});
+    } else if (evt.type === 'wt') {
+      setTextStatus((s) => ({ koerer: evt.phase === 'koerer', cost: evt.cost ?? s?.cost ?? null }));
     } else if (evt.type === 'drev') {
       setDrev({ missing: evt.missing, root: evt.root });
     } else if (evt.type === 'besked') {
@@ -603,6 +606,8 @@ export default function App() {
           series={series}
           act={act}
           dataRev={dataRev}
+          hasKey={Boolean(kwStatus?.harKey)}
+          onError={visFejl}
         />
       </div>
       <StatusBar
@@ -615,6 +620,7 @@ export default function App() {
         version={appInfo?.version}
         drevMangler={Boolean(drev?.missing)}
         kwStatus={kwStatus}
+        textStatus={textStatus}
         kolonner={kolonner}
         setKolonner={(n) => {
           setKolonner(n);

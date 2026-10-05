@@ -2,7 +2,7 @@ export const MIN_KOLONNER = 3;
 export const MAX_KOLONNER = 10;
 
 export default function StatusBar({
-  counts, aiStatus, indexProgress, searchInfo, fejl, library, version, drevMangler, kwStatus,
+  counts, aiStatus, indexProgress, searchInfo, fejl, library, version, drevMangler, kwStatus, textStatus,
   kolonner, setKolonner,
 }) {
   const aiTekst = (() => {
@@ -32,6 +32,14 @@ export default function StatusBar({
     const p = kwStatus?.progress;
     if (!kwStatus?.koerer || !p) return '';
     return `Keywords ${p.done}/${p.total} · $${p.cost.toFixed(2)}`;
+  })();
+
+  // Samme princip som noegleordene: beloebet staar fremme, ogsaa efter
+  // kaldet, saa man kan laegge forbruget sammen.
+  const textTekst = (() => {
+    if (!textStatus) return '';
+    if (textStatus.koerer) return 'Writing texts …';
+    return textStatus.cost == null ? '' : `Texts · $${textStatus.cost.toFixed(3)}`;
   })();
 
   return (
@@ -67,6 +75,7 @@ export default function StatusBar({
         </span>
       )}
       {kwTekst && <span className="kw-status">{kwTekst}</span>}
+      {textTekst && <span className="kw-status">{textTekst}</span>}
       {indexTekst && <span className="index-status">{indexTekst}</span>}
       <span className={`ai-status ${aiStatus?.state || ''}`}>{aiTekst}</span>
       {fejl && <span className="fejl">{fejl}</span>}
