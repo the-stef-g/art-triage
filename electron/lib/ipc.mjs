@@ -55,17 +55,20 @@ export class AppSession {
     this.driveMissing = false;
     this.lastScanMs = 0;
 
+    // Billedmodellen er klar foer tekstmodellen. Indekseringen skal ikke
+    // vente paa soegningen, saa den startes her og ikke naar alt er klar.
+    this.ai.on('image-ready', ({ modelId }) => {
+      if (!this.indexer) return;
+      // AI-vinduet melder hvilken model det faktisk fik indlaest;
+      // katalog og soegeindeks skal foelge med.
+      if (modelId) {
+        this.searchIndex.setModel(modelId);
+        this.indexer.setModel(modelId);
+      }
+      this.indexer.kick();
+    });
     this.ai.on('status', (status) => {
       this.broadcast('ai', { status });
-      if (status.state === 'klar' && this.indexer) {
-        // AI-vinduet melder hvilken model den faktisk fik indlaest;
-        // katalog og soegeindeks skal foelge med.
-        if (status.modelId) {
-          this.searchIndex.setModel(status.modelId);
-          this.indexer.setModel(status.modelId);
-        }
-        this.indexer.kick();
-      }
     });
   }
 
@@ -395,7 +398,7 @@ export class AppSession {
     const keywordIds = catalog.filesWithKeywordLike(text);
     let semantiske = [];
     let advarsel = null;
-    if (this.ai.ready) {
+    if (this.ai.textReady) {
       this.searchIndex.ensureLoaded();
       if (this.searchIndex.size()) {
         const qvec = normalize(await this.ai.embedText(text));

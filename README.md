@@ -122,6 +122,10 @@ The Work panel in the Inspector holds everything that belongs to one artwork: ti
 
 The semantic search runs 100% locally on your Mac using Google's multilingual SigLIP model. The first time the app starts it downloads the model (about 250 MB) from Hugging Face and stores it locally. After that, analysis and search work without internet. The status bar at the bottom shows progress for both the download and the indexing. A large collection takes a while the first time; search works along the way on the images that have already been analysed.
 
+**Start-up.** The image model and the search model load at the same time, each in its own hidden window. Indexing starts as soon as the image model is ready, which is about half a minute, and does not wait for the search model. On an older Intel Mac the search model takes up to five minutes to start, and search is only available when it is done; until then the status bar says `Preparing search model`. The log now has a line for every step with the time since the window started (`[ai text] tokenizeren er indlaest (efter 4.1 s)`), so it can be seen whether the time goes on fetching the files or on creating the session.
+
+**Faster AI start (experimental)** in the Help menu loads the search model without graph optimisation. The search model has a very large vocabulary table, and the optimiser may turn it into floating point numbers at every start, which would be most of those five minutes. It is off by default, restarts the AI windows when switched, and the log says `faster AI start on`. Compare `[ai text] tekstmodellen er indlaest` with it on and off.
+
 If the AI misbehaves, there is a log file with all the details under Help > Show AI log. Send the contents and the fault can be pinned down precisely.
 
 ### If the model cannot be downloaded

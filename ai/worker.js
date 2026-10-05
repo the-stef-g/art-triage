@@ -46,7 +46,19 @@ env.backends.onnx.wasm.numThreads = 1;
 env.backends.onnx.wasm.proxy = false;
 
 const bridge = window.aiBridge;
-const send = (msg) => bridge.send(msg);
+
+// To vinduer, ét pr. model: "image" til billeder, "text" til soegning. De
+// indlaeses samtidig, hver i sin proces. Hovedprocessen saetter rollen paa
+// beskederne ud fra hvilket vindue de kom fra.
+const rolle = new URLSearchParams(location.search).get('role') === 'text' ? 'text' : 'image';
+const send = (msg) => bridge.send({ ...msg, role: rolle });
+
+// Tidtagning, som havner i loggen: hvor laenge hvert trin tager, saa det kan
+// ses om det er hentningen eller selve oprettelsen af sessionen der er
+// langsom.
+const t0 = performance.now();
+const tid = () => `${((performance.now() - t0) / 1000).toFixed(1)} s`;
+const logTrin = (tekst) => console.log(`[ai ${rolle}] ${tekst} (efter ${tid()})`);
 
 let processor = null;
 let visionModel = null;
@@ -103,6 +115,7 @@ function progressReporter(hentFase, klargoerFase) {
       // maalbart, saa der skiftes til puls i stedet for at staa paa 100%.
       if (!klargoer) {
         klargoer = true;
+        logTrin(`${hentFase}: filerne er modtaget, sessionen oprettes`);
         saetFase(klargoerFase);
       }
       return;
@@ -129,26 +142,41 @@ function medStallVagt(promise) {
   });
 }
 
-// Kun q8: fp32 kan ikke allokeres i 32-bit WASM. Alt tildeles foerst
-// naar hele parret er indlaest, saa en halv fejl ikke efterlader rod.
-async function loadModels(repo) {
+// Kun q8: fp32 kan ikke allokeres i 32-bit WASM. Hvert vindue indlaeser kun
+// sin egen model.
+async function loadBilledModel(repo) {
   const pv = progressReporter('Downloading image model', 'Preparing image model');
   puls();
   const proc = await medStallVagt(AutoProcessor.from_pretrained(repo, { progress_callback: pv }));
+  logTrin('billedbehandleren er indlaest');
   puls();
   const vis = await medStallVagt(
     VisionModelClass.from_pretrained(repo, { device: 'wasm', dtype: 'q8', progress_callback: pv })
   );
-  saetFase('Downloading text model', 50);
-  const pt = progressReporter('Downloading text model', 'Preparing text model');
-  puls();
-  const tok = await medStallVagt(AutoTokenizer.from_pretrained(repo, { progress_callback: pt }));
-  puls();
-  const txt = await medStallVagt(
-    TextModelClass.from_pretrained(repo, { device: 'wasm', dtype: 'q8', progress_callback: pt })
-  );
+  logTrin('billedmodellen er indlaest');
   processor = proc;
   visionModel = vis;
+}
+
+async function loadTekstModel(repo, opts) {
+  const pt = progressReporter('Downloading search model', 'Preparing search model');
+  puls();
+  const tok = await medStallVagt(AutoTokenizer.from_pretrained(repo, { progress_callback: pt }));
+  logTrin('tokenizeren er indlaest');
+  puls();
+  // Eksperiment (menuen "Faster AI start"): uden grafoptimering. Tekstmodellen
+  // har en meget stor ordtabel, og optimeringen kan lave den om til
+  // flydende tal ved hver opstart; en kort soegetekst har ikke brug for den.
+  const sessionOptions = opts.textGraphOptimization
+    ? { graphOptimizationLevel: opts.textGraphOptimization }
+    : undefined;
+  if (sessionOptions) logTrin(`tekstmodellen indlaeses med graphOptimizationLevel=${opts.textGraphOptimization}`);
+  const txt = await medStallVagt(
+    TextModelClass.from_pretrained(repo, {
+      device: 'wasm', dtype: 'q8', progress_callback: pt, session_options: sessionOptions,
+    })
+  );
+  logTrin('tekstmodellen er indlaest');
   tokenizer = tok;
   textModel = txt;
 }
@@ -174,24 +202,36 @@ function kandidatListe() {
 }
 
 async function init() {
+  let opts = {};
+  try {
+    opts = (await bridge.getInit()) || {};
+  } catch {
+    // uden opstartskonfiguration bruges standardvaerdierne
+  }
+  const fase = rolle === 'text' ? 'Downloading search model' : 'Downloading image model';
   for (let attempt = 0; ; attempt++) {
     let lastErr = null;
     for (const repo of kandidatListe()) {
-      saetFase('Downloading image model', 0);
+      saetFase(fase, 0);
       try {
-        await loadModels(repo);
-        // Foerste inferens varmer WASM op og er den tungeste enkeltdel paa
-        // en aeldre Mac. Pulsen koerer videre her, saa linjen ikke staar
-        // stille netop hvor ventetiden er laengst.
-        saetFase('Starting the model');
-        await medStallVagt(embedText('test'));
+        if (rolle === 'text') {
+          await loadTekstModel(repo, opts);
+          // Foerste inferens varmer WASM op. Pulsen koerer videre her, saa
+          // linjen ikke staar stille.
+          saetFase('Starting the search model');
+          await medStallVagt(embedText('test'));
+        } else {
+          await loadBilledModel(repo);
+          saetFase('Starting the image model');
+          await medStallVagt(varmBilledModelOp());
+        }
         stopPuls();
         try {
           localStorage.setItem(MODEL_KEY, repo);
         } catch {
           // kun en optimering
         }
-        console.log(`Model indlaest fra ${repo}`);
+        logTrin(`klar (${repo})`);
         send({ type: 'ready', device: 'wasm', modelId: modelId(repo) });
         return;
       } catch (err) {
@@ -215,6 +255,18 @@ async function init() {
   }
 }
 
+// Et blankt billede gennem modellen, saa det foerste rigtige billede ikke
+// betaler for opvarmningen.
+async function varmBilledModelOp() {
+  try {
+    const blank = new RawImage(new Uint8ClampedArray(224 * 224 * 3), 224, 224, 3);
+    const inputs = await processor(blank);
+    await visionModel(inputs);
+  } catch {
+    // opvarmningen er kun en optimering
+  }
+}
+
 async function embedText(text) {
   // SigLIP er traenet med max_length-padding til 64 tokens.
   const inputs = tokenizer([text], { padding: 'max_length', truncation: true, max_length: 64 });
@@ -232,9 +284,9 @@ async function embedImage(url) {
 bridge.onJob(async (job) => {
   try {
     let vec;
-    if (job.type === 'embed-text') vec = await embedText(job.text);
-    else if (job.type === 'embed-image') vec = await embedImage(job.url);
-    else throw new Error(`Unknown job type: ${job.type}`);
+    if (job.type === 'embed-text' && rolle === 'text') vec = await embedText(job.text);
+    else if (job.type === 'embed-image' && rolle === 'image') vec = await embedImage(job.url);
+    else throw new Error(`Unknown job type for the ${rolle} window: ${job.type}`);
     send({ id: job.id, type: 'result', vec });
   } catch (err) {
     send({ id: job.id, type: 'error', message: err?.message || String(err) });

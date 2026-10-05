@@ -35,7 +35,9 @@ protocol.registerSchemesAsPrivileged([
 ]);
 
 let mainWin = null;
-let aiWin = null;
+// To skjulte AI-vinduer, hvert i sin proces: billedmodellen og tekstmodellen
+// indlaeses samtidig.
+const aiWins = { image: null, text: null };
 let session = null;
 let ai = null;
 let settings = null;
@@ -228,9 +230,9 @@ function createMainWindow() {
   session.setWindow(mainWin);
 }
 
-function createAiWindow() {
-  if (aiWin && !aiWin.isDestroyed()) return;
-  aiWin = new BrowserWindow({
+function createAiWindow(role) {
+  if (aiWins[role] && !aiWins[role].isDestroyed()) return;
+  const win = new BrowserWindow({
     show: false,
     webPreferences: {
       preload: join(here, 'ai-preload.cjs'),
@@ -242,34 +244,40 @@ function createAiWindow() {
       partition: 'persist:ai',
     },
   });
-  aiWin.loadURL(pageUrl('ai.html'));
-  aiWin.webContents.on('console-message', (event, level, message) => {
+  aiWins[role] = win;
+  win.loadURL(`${pageUrl('ai.html')}?role=${role}`);
+  win.webContents.on('console-message', (event, level, message) => {
     const tekst = typeof message === 'string' ? message : event?.message ?? '';
-    aiLog(`console: ${tekst}`);
+    aiLog(`console[${role}]: ${tekst}`);
   });
-  aiWin.webContents.on('render-process-gone', () => {
-    aiLog('AI-processen doede; genstarter');
-    ai.windowGone();
-    const dead = aiWin;
-    aiWin = null;
+  win.webContents.on('render-process-gone', () => {
+    aiLog(`AI-processen (${role}) doede; genstarter`);
+    ai.windowGone(role);
+    const dead = aiWins[role];
+    aiWins[role] = null;
     if (dead && !dead.isDestroyed()) dead.destroy();
-    if (!app.isQuitting) setTimeout(() => createAiWindow(), 1500);
+    if (!app.isQuitting) setTimeout(() => createAiWindow(role), 1500);
   });
-  ai.sendToWindow = (msg) => {
-    if (aiWin && !aiWin.isDestroyed()) aiWin.webContents.send('ai:job', msg);
+  ai.sendToWindow = (r, msg) => {
+    const w = aiWins[r];
+    if (w && !w.isDestroyed()) w.webContents.send('ai:job', msg);
   };
 }
 
-// Genstarter AI-vinduet, fx efter at en Hugging Face-token er sat.
+function createAiWindows() {
+  createAiWindow('image');
+  createAiWindow('text');
+}
+
 function restartAiWindow() {
-  aiLog('AI-vinduet genstartes (ny konfiguration)');
-  if (aiWin && !aiWin.isDestroyed()) {
-    const dead = aiWin;
-    aiWin = null;
-    dead.destroy();
+  aiLog('AI-vinduerne genstartes (ny konfiguration)');
+  for (const role of Object.keys(aiWins)) {
+    const dead = aiWins[role];
+    aiWins[role] = null;
+    if (dead && !dead.isDestroyed()) dead.destroy();
   }
   ai.windowGone();
-  if (!process.env.ART_TRIAGE_DISABLE_AI) createAiWindow();
+  if (!process.env.ART_TRIAGE_DISABLE_AI) createAiWindows();
 }
 
 // SVG-previews rasteriseres af Chromium i et usynligt vindue.
@@ -355,6 +363,17 @@ function buildMenu() {
           },
         },
         {
+          label: 'Faster AI start (experimental)',
+          type: 'checkbox',
+          checked: Boolean(settings?.data?.aiFastText),
+          click: (item) => {
+            settings.data.aiFastText = item.checked;
+            settings.save();
+            aiLog(`faster AI start ${item.checked ? 'on' : 'off'}`);
+            restartAiWindow();
+          },
+        },
+        {
           label: 'Retry failed previews',
           click: () => mainWin?.webContents.send('evt', { type: 'genvej', cmd: 'retry-previews' }),
         },
@@ -395,9 +414,15 @@ app.whenReady().then(() => {
     .catch((err) => aiLog(`sharp could NOT be loaded (${process.platform}-${process.arch}): ${String(err?.message || err).slice(0, 300)}`));
 
   ipcMain.on('ai:msg', (event, msg) => {
-    if (aiWin && event.sender === aiWin.webContents) ai.handleMessage(msg);
+    // Hvilket vindue beskeden kom fra afgoer rollen, ikke hvad beskeden siger.
+    const role = Object.keys(aiWins).find((r) => aiWins[r] && event.sender === aiWins[r].webContents);
+    if (role) ai.handleMessage({ ...msg, role });
   });
-  ipcMain.handle('ai:init', () => ({ hfToken: settings.data.hfToken || null }));
+  ipcMain.handle('ai:init', () => ({
+    hfToken: settings.data.hfToken || null,
+    // Proeve af tekstmodellens start uden grafoptimering, se menuen.
+    textGraphOptimization: settings.data.aiFastText ? 'disabled' : null,
+  }));
   ipcMain.handle('app:info', () => ({
     version: app.getVersion(),
     hfToken: settings.data.hfToken || null,
@@ -459,7 +484,7 @@ app.whenReady().then(() => {
   buildMenu();
   createMainWindow();
   // ART_TRIAGE_DISABLE_AI=1 bruges i CI, hvor modeldownload ikke giver mening.
-  if (!process.env.ART_TRIAGE_DISABLE_AI) createAiWindow();
+  if (!process.env.ART_TRIAGE_DISABLE_AI) createAiWindows();
   // ART_TRIAGE_OPEN aabner et bibliotek direkte uden dialog (tests).
   if (process.env.ART_TRIAGE_OPEN) {
     session.openLibrary(process.env.ART_TRIAGE_OPEN).catch(() => {});
