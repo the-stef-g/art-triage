@@ -2,6 +2,7 @@
 // watcher, indeksering) og registrerer alle IPC-handlers som UI'et kalder.
 import { ipcMain, dialog, shell } from 'electron';
 import { join } from 'node:path';
+import { writeFileSync } from 'node:fs';
 import { openDatabase } from './db.mjs';
 import { Catalog } from './catalog.mjs';
 import { Thumbnailer } from './thumbs.mjs';
@@ -15,6 +16,7 @@ import {
 import { UndoManager } from './undo.mjs';
 import { Works } from './works.mjs';
 import { ClaudeWorkTexts, TEXT_IMAGE_SIZE } from './workTexts.mjs';
+import { ShopClient, ShopSync, DEFAULT_SHOP_URL, REFERENCE_PRODUCT_ID } from './shop.mjs';
 import { debounce, dataDirFor } from './util.mjs';
 
 // Mappe-overvaageren (chokidar) faar sjaeldent fil-system-haendelser fra
@@ -308,6 +310,53 @@ export class AppSession {
     }
   }
 
+  // ---------- Shop ----------
+
+  shopStatus() {
+    const d = this.settings.data;
+    return {
+      harWoo: Boolean(d.wooKey && d.wooSecret),
+      harWp: Boolean(d.wpUser && d.wpPassword),
+      url: d.shopUrl || DEFAULT_SHOP_URL,
+      harReference: Boolean(d.shopReferenceAt),
+    };
+  }
+
+  _shop() {
+    const works = this.requireWorks();
+    const d = this.settings.data;
+    return new ShopSync({
+      catalog: this.catalog,
+      works,
+      client: new ShopClient({
+        baseUrl: d.shopUrl || DEFAULT_SHOP_URL,
+        wooKey: d.wooKey, wooSecret: d.wooSecret, wpUser: d.wpUser, wpPassword: d.wpPassword,
+      }),
+    });
+  }
+
+  // Foer det foerste produkt sendes, skal produkt 20 vaere hentet, saa
+  // ACPT-formatet er set og ikke gaettet. Det er en kladde der sendes, men
+  // en forkert formateret kladde kan alligevel forstyrre sitets byg.
+  _requireReference() {
+    if (!this.settings.data.shopReferenceAt) {
+      throw new Error('Check the shop format first: the reference product has not been fetched yet');
+    }
+  }
+
+  // Samme maade at melde fremdrift paa som tekster og noegleord.
+  async _shopCall(fn) {
+    this.broadcast('shop', { phase: 'koerer' });
+    try {
+      const res = await fn(this._shop());
+      this.broadcast('shop', { phase: 'faerdig' });
+      return res;
+    } catch (err) {
+      this.broadcast('shop', { phase: 'fejl' });
+      throw err;
+    }
+  }
+
   keywordStatus() {
     return {
       harKey: Boolean(this.settings.data.claudeKey),
@@ -517,6 +566,22 @@ export class AppSession {
       });
       return res.canceled || !res.filePaths.length ? null : res.filePaths[0];
     });
+    handle('shop:status', () => this.shopStatus());
+    handle('shop:send', ({ imageId }) => {
+      this._requireReference();
+      return this._shopCall((shop) => shop.send(imageId));
+    });
+    handle('shop:publish', ({ imageId }) => this._shopCall((shop) => shop.publish(imageId)));
+    // Produkt 20 som det staar i Woo, gemt som en fil ved siden af
+    // kataloget, saa ACPT-formatet kan kopieres praecist.
+    handle('shop:reference', () => this._shopCall(async (shop) => {
+      const produkt = await shop.reference(REFERENCE_PRODUCT_ID);
+      const sti = join(dataDirFor(this.catalog.root), `reference-product-${REFERENCE_PRODUCT_ID}.json`);
+      writeFileSync(sti, JSON.stringify(produkt, null, 2));
+      this.settings.data.shopReferenceAt = Date.now();
+      this.settings.save();
+      return { sti, navn: produkt.name };
+    }));
     handle('work:writeTexts', (payload) => this.writeWorkTexts(payload));
     handle('work:setCrop', ({ imageId, versionId, format }) =>
       this.requireWorks().setCrop(imageId, versionId, format ?? null));

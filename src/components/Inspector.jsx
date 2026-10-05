@@ -7,7 +7,7 @@ import WorkPanel from './WorkPanel';
 // blev noegleordene kun hentet naar man skiftede billede, saa ord Claude
 // lige havde skrevet foerst dukkede op hvis man gik væk og tilbage igen.
 export default function Inspector({
-  row, selectedCount, activeKeyword, editors, series, act, dataRev, hasKey, onError,
+  row, selectedCount, activeKeyword, editors, series, act, dataRev, hasKey, shop, onShop, onError,
 }) {
   const [versions, setVersions] = useState([]);
   const [keywords, setKeywords] = useState([]);
@@ -225,6 +225,8 @@ export default function Inspector({
         row={row}
         versions={versions}
         hasKey={hasKey}
+        shop={shop}
+        onShop={onShop}
         onError={onError}
       />
 

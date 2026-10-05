@@ -12,8 +12,9 @@ const CHANNELS = new Set([
   'kw:top', 'kw:forFile', 'kw:add', 'kw:remove', 'kw:removeFromFiles',
   'kw:status', 'kw:run', 'kw:stop', 'kw:setModel', 'kw:reanalyse',
   'work:get', 'work:save', 'work:setCrop', 'work:writeTexts', 'work:pickVideo',
+  'shop:status', 'shop:send', 'shop:publish', 'shop:reference',
   'search:status', 'app:counts', 'app:undo', 'app:redo',
-  'app:info', 'app:setHfToken', 'app:setClaudeKey',
+  'app:info', 'app:setHfToken', 'app:setClaudeKey', 'app:setWooKey', 'app:setWpKey',
 ]);
 
 contextBridge.exposeInMainWorld('artTriage', {

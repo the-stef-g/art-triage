@@ -14,6 +14,7 @@ import { pathToFileURL, fileURLToPath } from 'node:url';
 import { Settings } from './lib/settings.mjs';
 import { AiBridge } from './lib/aiBridge.mjs';
 import { AppSession } from './lib/ipc.mjs';
+import { parseWooKey, parseWpLogin } from './lib/shop.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const distDir = join(here, '..', 'dist');
@@ -358,6 +359,14 @@ function buildMenu() {
           click: () => mainWin?.webContents.send('evt', { type: 'genvej', cmd: 'hf-token' }),
         },
         {
+          label: 'WooCommerce key …',
+          click: () => mainWin?.webContents.send('evt', { type: 'genvej', cmd: 'woo-key' }),
+        },
+        {
+          label: 'WordPress application password …',
+          click: () => mainWin?.webContents.send('evt', { type: 'genvej', cmd: 'wp-key' }),
+        },
+        {
           label: 'Claude API key …',
           click: () => mainWin?.webContents.send('evt', { type: 'genvej', cmd: 'claude-key' }),
         },
@@ -386,6 +395,8 @@ app.whenReady().then(() => {
     // Noeglen selv sendes aldrig til UI'et. Der er kun brug for at vide,
     // om der staar en, saa knappen kan sige det rigtige.
     harClaudeKey: Boolean(settings.data.claudeKey),
+    harWooKey: Boolean(settings.data.wooKey),
+    harWpKey: Boolean(settings.data.wpUser),
   }));
   ipcMain.handle('app:setHfToken', (_event, payload) => {
     settings.data.hfToken = String(payload?.token || '').trim() || null;
@@ -400,6 +411,27 @@ app.whenReady().then(() => {
     aiLog(`Claude-API-noegle ${settings.data.claudeKey ? 'sat' : 'fjernet'}`);
     session.resetKeywordService();
     return { harClaudeKey: Boolean(settings.data.claudeKey) };
+  });
+
+  // De to shop-noegler behandles som Claude-noeglen: de gemmes, og kun
+  // om de findes meldes tilbage. En tom indtastning fjerner dem.
+  ipcMain.handle('app:setWooKey', (_event, payload) => {
+    const tekst = String(payload?.key || '').trim();
+    const { key, secret } = tekst ? parseWooKey(tekst) : { key: null, secret: null };
+    settings.data.wooKey = key;
+    settings.data.wooSecret = secret;
+    settings.save();
+    aiLog(`WooCommerce-noegle ${key ? 'sat' : 'fjernet'}`);
+    return { harWooKey: Boolean(key) };
+  });
+  ipcMain.handle('app:setWpKey', (_event, payload) => {
+    const tekst = String(payload?.key || '').trim();
+    const { user, password } = tekst ? parseWpLogin(tekst) : { user: null, password: null };
+    settings.data.wpUser = user;
+    settings.data.wpPassword = password;
+    settings.save();
+    aiLog(`WordPress-adgangskode ${user ? 'sat' : 'fjernet'}`);
+    return { harWpKey: Boolean(user) };
   });
 
   registerProtocols(protocol);

@@ -13,7 +13,7 @@ const TEXT_LABELS = {
 // Vaerk-panelet (docs/plan-shop.md). Teksterne rettes kun her; Woo er en
 // kopi. Felterne gemmes naar man forlader dem, ikke for hver tast, saa
 // en igangvaerende rettelse aldrig bliver skrevet over af en genindlaesning.
-export default function WorkPanel({ row, versions, hasKey, onError }) {
+export default function WorkPanel({ row, versions, hasKey, shop, onShop, onError }) {
   const imageId = row.image_id;
   const [work, setWork] = useState(null);
   const [draft, setDraft] = useState({});
@@ -111,6 +111,33 @@ export default function WorkPanel({ row, versions, hasKey, onError }) {
 
   const cropVersion = (format) => work.crops.find((c) => c.format === format)?.versionId ?? '';
   const versionName = (v) => (v.is_master ? 'Original' : v.name);
+
+  // Shop-knapperne gaar gennem hovedprocessen, som ejer noeglerne.
+  const shopKald = async (kanal, besked) => {
+    setBusy(true);
+    try {
+      const res = await invoke(kanal, { imageId });
+      adopt(await invoke('work:get', { imageId }));
+      onShop(besked(res));
+    } catch (err) {
+      onError(err);
+    }
+    setBusy(false);
+  };
+
+  const sendToShop = () => shopKald('shop:send', (r) =>
+    (r.created ? `Created draft product ${r.productId} in the shop` : `Updated product ${r.productId} in the shop`));
+  const publish = () => shopKald('shop:publish', (r) => `Product ${r.productId} is now ${r.status}`);
+  const checkFormat = async () => {
+    setBusy(true);
+    try {
+      const res = await invoke('shop:reference');
+      onShop(`Fetched "${res.navn}" to ${res.sti}`);
+    } catch (err) {
+      onError(err);
+    }
+    setBusy(false);
+  };
 
   const kanSkrive = work.eligible && hasKey;
   const skriveHint = !work.eligible
@@ -221,6 +248,42 @@ export default function WorkPanel({ row, versions, hasKey, onError }) {
             />
           </label>
         </div>
+      )}
+
+      <h4>Shop</h4>
+      <p className="vaerk-note">
+        {work.wooProductId
+          ? `Product ${work.wooProductId} in the shop. Sending again overwrites the texts there.`
+          : 'Not in the shop yet. A new product is created as a draft.'}
+      </p>
+      <div className="knapraekke">
+        {shop?.harReference ? (
+          <button
+            disabled={busy || !work.eligible || !shop.harWoo || !shop.harWp}
+            onClick={sendToShop}
+            title={!work.eligible ? 'The image must be Approved and Finished'
+              : (!shop.harWoo || !shop.harWp) ? 'Add the WooCommerce key and the WordPress application password under Help' : ''}
+          >
+            Send to shop
+          </button>
+        ) : (
+          <button
+            disabled={busy || !shop?.harWoo}
+            onClick={checkFormat}
+            title="Fetches product 20 from the shop so the field format can be copied exactly"
+          >
+            Check shop format
+          </button>
+        )}
+        {work.wooProductId && (
+          <button disabled={busy} onClick={publish} title="Publish the draft in the shop">Publish</button>
+        )}
+      </div>
+      {!shop?.harReference && (
+        <p className="vaerk-note">
+          Sending is locked until the reference product (Desert Canyon 04) has been fetched once.
+          {!shop?.harWoo ? ' Add the WooCommerce key under Help first.' : ''}
+        </p>
       )}
 
       <h4>Crops</h4>

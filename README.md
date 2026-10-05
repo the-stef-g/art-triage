@@ -92,6 +92,26 @@ You can add your own keywords to an image in the Inspector, and they appear as c
 
 The fixed instruction and the word list are cached, so they are only paid for in full on the first image of a run. The list is fetched once per run and held constant, because changing it mid-run would break the cache and make every image cost full price. The image itself goes as a 512-pixel thumbnail, the same one the search index already made, not the full RAW.
 
+## Works and the shop
+
+The Work panel in the Inspector holds everything that belongs to one artwork: title, year, category, technique, series, template, section colour, catalogue number, video, print on/off, crops, dimensions and price (unique works only), your own notes and three texts. It is all saved in the catalogue, so it survives a restart and a rescan. The field list and the rules behind it are in `docs/plan-shop.md`.
+
+**Texts are edited here only.** The shop at shop.stefg.art is a copy. Anything changed in WooCommerce is overwritten the next time the work is sent, and the panel says so.
+
+**Defaults.** The title is the file name until you change it, and the year comes from the capture date in the original file (EXIF), not the file's own date. The catalogue number is the number at the end of the title until you type one. A file with no EXIF date leaves the year empty rather than guessing.
+
+**Crops.** A crop is a version (a virtual copy) marked with its format: 1:1, 2:3, 3:2, 1:2 or 2:1. One version has at most one format, and one format points at one version.
+
+**Write texts.** The button sends a 1024-pixel preview, the title, category, technique, series and your notes to Claude and gets a description, a short text and an alt text back in British English. It uses the same API key and model picker as the keywords, and the price shows in the status bar. Only approved, finished works can be written. If you have edited a text, the app asks before it replaces it. The rules Claude is given are in `electron/lib/workTexts.mjs`; a draft that breaks one (a cliché, a dash, the wrong length) is saved anyway but gets a warning under the button.
+
+**Send to shop.** The button uploads the main image and every crop to the WordPress media library (JPEG, about 3000 px, never the print master, alt text set on each) and creates the product the first time and updates it after that. The WooCommerce product id is stored, so a work is never created twice. A file is only uploaded again when it has changed since last time. New products are drafts; Publish is a separate button. Stock, orders and print variants are never touched.
+
+**Keys.** Two, stored like the Claude key: never shown again, never in the log, never sent to the interface.
+- Help > WooCommerce key: a REST key with Read/Write permission, entered as `ck_… cs_…`.
+- Help > WordPress application password: entered as `username:application password` (Users > Profile > Application Passwords).
+
+**Locked until the format is checked.** Before the first product is sent, use Check shop format. It fetches product 20 (Desert Canyon 04) from the shop and saves it as `reference-product-20.json` next to the catalogue, so the ACPT field format, including the hidden helper fields, is copied from the real thing and not guessed.
+
 ## The local AI model
 
 The semantic search runs 100% locally on your Mac using Google's multilingual SigLIP model. The first time the app starts it downloads the model (about 250 MB) from Hugging Face and stores it locally. After that, analysis and search work without internet. The status bar at the bottom shows progress for both the download and the indexing. A large collection takes a while the first time; search works along the way on the images that have already been analysed.
@@ -126,3 +146,23 @@ Code comments, internal identifiers and the database values (`godkendt`, `kasser
 5. Save from the editor and see that the version is marked as being edited, and that the preview updates.
 6. Wait until the status bar says the analysis is done, then search for something you know is in the images, for example "yellow flowers".
 7. Drag an image to another folder in the sidebar and check in Finder that the file has moved.
+
+## Checklist for works and the shop
+
+Without keys, steps 1 to 9 work. Steps 10 to 14 need the two shop keys.
+
+1. Open an image, scroll to the Work panel and check that the title field shows the file name as a placeholder and the year shows the capture year of the original.
+2. Type a year, click away, select another image and come back. The year is still there. Clear it and the capture year returns.
+3. Choose a category. For Paintings or Sculptures, Dimensions and Price appear; for the others they do not.
+4. Make two virtual copies. Under Crops give one the format 2:3 and the other 1:1. Give the second one 2:3 as well: the first one loses it.
+5. Type a section colour that is not a colour. You get an error and the field goes back to what was saved.
+6. Click Write texts on an image that is not approved and finished: the button is disabled and says why.
+7. Approve and finish the image, add notes, click Write texts. The three texts appear, the cost shows in the status bar, and the word and character counts are right.
+8. Edit the description, then click Write texts again. The app asks before it replaces your text. Say no and your text is kept.
+9. Look for dashes, "stunning", "unique" and mentions of AI or Photoshop in the texts. Any that slipped through show as a warning under the button.
+10. Add the WooCommerce key under Help. Send to shop is still locked; the button says Check shop format.
+11. Click Check shop format. A message names the file it wrote. Send me that file.
+12. Add the WordPress application password under Help, then click Send to shop on a finished work. In WooCommerce you find a draft product with the right title, texts, image and category.
+13. Change a text in the app and send again. The same product is updated, with no second one next to it. Change a text in WooCommerce and send again: the app's text wins.
+14. Click Publish and check the product goes live.
+

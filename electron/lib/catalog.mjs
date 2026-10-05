@@ -100,6 +100,17 @@ CREATE TABLE IF NOT EXISTS work_crops(
   format TEXT NOT NULL,
   UNIQUE(image_id, format)
 );
+-- Hvad der allerede er uploadet til WordPress' mediebibliotek, og af
+-- hvilken udgave af filen. Aendres filen ikke, uploades den ikke igen.
+CREATE TABLE IF NOT EXISTS work_media(
+  image_id INTEGER NOT NULL REFERENCES images(id) ON DELETE CASCADE,
+  role TEXT NOT NULL,
+  source_key TEXT NOT NULL,
+  media_id INTEGER NOT NULL,
+  source_url TEXT,
+  alt TEXT,
+  PRIMARY KEY(image_id, role)
+);
 CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT);
 CREATE INDEX IF NOT EXISTS idx_versions_image ON versions(image_id);
 CREATE INDEX IF NOT EXISTS idx_versions_file ON versions(file_id);

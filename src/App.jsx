@@ -39,6 +39,7 @@ export default function App() {
   const [appInfo, setAppInfo] = useState(null);
   const [drev, setDrev] = useState(null); // {missing, root} naar drevet skifter tilstand
   const [skanner, setSkanner] = useState(false);
+  const [shop, setShop] = useState(null); // shop-noegler og om formatet er tjekket
   const [textStatus, setTextStatus] = useState(null); // vaerk-tekster: koerer, seneste pris
   const [kwStatus, setKwStatus] = useState(null); // cloud-noegleord: noegle, model, koe
   // Taeller op ved hver katalog-aendring. Inspektoeren henter noegleord om
@@ -114,6 +115,7 @@ export default function App() {
       ['kw:top', setTopKeywords],
       ['ed:list', setEditors],
       ['kw:status', setKwStatus],
+      ['shop:status', setShop],
     ];
     const svar = await Promise.allSettled(dele.map(([kanal]) => invoke(kanal)));
     let foersteFejl = null;
@@ -160,6 +162,20 @@ export default function App() {
             onSubmit: (token) => invoke('app:setHfToken', { token }).catch(visFejl),
           });
         }).catch(visFejl);
+        return;
+      }
+      if (evt.cmd === 'woo-key' || evt.cmd === 'wp-key') {
+        // Som Claude-noeglen: feltet starter tomt, og en tom indtastning
+        // fjerner det der staar.
+        const woo = evt.cmd === 'woo-key';
+        setModal({
+          title: woo ? 'WooCommerce key' : 'WordPress application password',
+          value: '',
+          placeholder: woo ? 'ck_…  cs_…' : 'username:application password',
+          onSubmit: (key) => invoke(woo ? 'app:setWooKey' : 'app:setWpKey', { key })
+            .then(() => invoke('shop:status').then(setShop))
+            .catch(visFejl),
+        });
         return;
       }
       if (evt.cmd === 'claude-key') {
@@ -607,6 +623,11 @@ export default function App() {
           act={act}
           dataRev={dataRev}
           hasKey={Boolean(kwStatus?.harKey)}
+          shop={shop}
+          onShop={(besked) => {
+            visFejl(besked);
+            invoke('shop:status').then(setShop).catch(() => {});
+          }}
           onError={visFejl}
         />
       </div>
