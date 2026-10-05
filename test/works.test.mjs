@@ -271,3 +271,37 @@ describe('woo-id', () => {
     expect(works.get(id).wooProductId).toBe(4711);
   });
 });
+
+describe('seriens felter til shoppen', () => {
+  let id;
+  let serieId;
+  beforeEach(() => {
+    skriv('Blue Door 02.png');
+    catalog.sync();
+    id = imageIdFor('Blue Door 02.png');
+    serieId = catalog.createSeries('Blue Doors');
+    catalog.assignSeries([id], serieId);
+  });
+
+  it('er tomme som udgangspunkt, saa Woo ikke faar en standardvaerdi', () => {
+    expect(works.get(id).series).toEqual({ id: serieId, name: 'Blue Doors', intro: null, template: null, colour: null });
+  });
+
+  it('gemmer intro, skabelon og farve', () => {
+    catalog.setSeriesShop(serieId, { intro: ' Two lines ', template: 'wall', colour: '#ABC' });
+    expect(works.get(id).series).toMatchObject({ intro: 'Two lines', template: 'wall', colour: '#aabbcc' });
+    catalog.setSeriesShop(serieId, { template: '' });
+    expect(works.get(id).series.template).toBeNull();
+  });
+
+  it('afviser ukendt skabelon, farve og felt', () => {
+    expect(() => catalog.setSeriesShop(serieId, { template: 'grid' })).toThrow(/template/);
+    expect(() => catalog.setSeriesShop(serieId, { colour: 'gul' })).toThrow(/colour/);
+    expect(() => catalog.setSeriesShop(serieId, { name: 'x' })).toThrow(/Unknown/);
+  });
+
+  it('har ingen serie paa et vaerk uden serie', () => {
+    catalog.assignSeries([id], null);
+    expect(works.get(id).series).toBeNull();
+  });
+});

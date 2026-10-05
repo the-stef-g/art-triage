@@ -2,7 +2,6 @@
 // watcher, indeksering) og registrerer alle IPC-handlers som UI'et kalder.
 import { ipcMain, dialog, shell } from 'electron';
 import { join } from 'node:path';
-import { writeFileSync } from 'node:fs';
 import { openDatabase } from './db.mjs';
 import { Catalog } from './catalog.mjs';
 import { Thumbnailer } from './thumbs.mjs';
@@ -16,7 +15,7 @@ import {
 import { UndoManager } from './undo.mjs';
 import { Works } from './works.mjs';
 import { ClaudeWorkTexts, TEXT_IMAGE_SIZE } from './workTexts.mjs';
-import { ShopClient, ShopSync, DEFAULT_SHOP_URL, REFERENCE_PRODUCT_ID } from './shop.mjs';
+import { ShopClient, ShopSync, DEFAULT_SHOP_URL } from './shop.mjs';
 import { debounce, dataDirFor } from './util.mjs';
 
 // Mappe-overvaageren (chokidar) faar sjaeldent fil-system-haendelser fra
@@ -318,7 +317,10 @@ export class AppSession {
       harWoo: Boolean(d.wooKey && d.wooSecret),
       harWp: Boolean(d.wpUser && d.wpPassword),
       url: d.shopUrl || DEFAULT_SHOP_URL,
-      harReference: Boolean(d.shopReferenceAt),
+      // Resultatet af seneste formattjek: true, false eller null (aldrig
+      // tjekket). Kun et tjek der fandt en forskel spaerrer for afsendelse.
+      formatOk: d.shopFormatOk ?? null,
+      formatProblems: d.shopFormatProblems || [],
     };
   }
 
@@ -335,12 +337,13 @@ export class AppSession {
     });
   }
 
-  // Foer det foerste produkt sendes, skal produkt 20 vaere hentet, saa
-  // ACPT-formatet er set og ikke gaettet. Det er en kladde der sendes, men
-  // en forkert formateret kladde kan alligevel forstyrre sitets byg.
-  _requireReference() {
-    if (!this.settings.data.shopReferenceAt) {
-      throw new Error('Check the shop format first: the reference product has not been fetched yet');
+  // Et tjek der har fundet en forskel mellem shoppen og det format vi
+  // skriver, spaerrer for afsendelse til det er rettet. Et tjek der ikke er
+  // koert, eller som passede, spaerrer ikke.
+  _requireFormat() {
+    const d = this.settings.data;
+    if (d.shopFormatOk === false) {
+      throw new Error(`The shop's field format has changed: ${(d.shopFormatProblems || []).slice(0, 3).join('; ')}. Run Check shop format again once it is fixed.`);
     }
   }
 
@@ -476,6 +479,7 @@ export class AppSession {
       this.undoMgr.beforeSeries(imageIds);
       catalog.assignSeries(imageIds, seriesId ?? null);
     });
+    handle('ser:setShop', ({ seriesId, patch }) => this.requireCatalog().setSeriesShop(seriesId, patch));
     handle('ser:rename', ({ seriesId, name }) => this.requireCatalog().renameSeries(seriesId, name));
     handle('ser:delete', ({ seriesId }) => this.requireCatalog().deleteSeries(seriesId));
 
@@ -568,19 +572,18 @@ export class AppSession {
     });
     handle('shop:status', () => this.shopStatus());
     handle('shop:send', ({ imageId }) => {
-      this._requireReference();
+      this._requireFormat();
       return this._shopCall((shop) => shop.send(imageId));
     });
     handle('shop:publish', ({ imageId }) => this._shopCall((shop) => shop.publish(imageId)));
-    // Produkt 20 som det staar i Woo, gemt som en fil ved siden af
-    // kataloget, saa ACPT-formatet kan kopieres praecist.
-    handle('shop:reference', () => this._shopCall(async (shop) => {
-      const produkt = await shop.reference(REFERENCE_PRODUCT_ID);
-      const sti = join(dataDirFor(this.catalog.root), `reference-product-${REFERENCE_PRODUCT_ID}.json`);
-      writeFileSync(sti, JSON.stringify(produkt, null, 2));
-      this.settings.data.shopReferenceAt = Date.now();
+    // Tjekker at ACPT-felterne paa produkt 20 stadig ser ud som dem vi
+    // skriver, og husker resultatet.
+    handle('shop:checkFormat', () => this._shopCall(async (shop) => {
+      const { name, problems } = await shop.checkFormat();
+      this.settings.data.shopFormatOk = problems.length === 0;
+      this.settings.data.shopFormatProblems = problems;
       this.settings.save();
-      return { sti, navn: produkt.name };
+      return { name, problems };
     }));
     handle('work:writeTexts', (payload) => this.writeWorkTexts(payload));
     handle('work:setCrop', ({ imageId, versionId, format }) =>

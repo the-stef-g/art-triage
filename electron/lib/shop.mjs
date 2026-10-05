@@ -18,7 +18,8 @@ const run = promisify(execFile);
 export const DEFAULT_SHOP_URL = 'https://shop.stefg.art';
 export const SHOP_IMAGE_SIZE = 3000;
 export const SHOP_JPEG_QUALITY = 92;
-// Det produkt ACPT-felternes format kopieres fra (Desert Canyon 04).
+// Det produkt ACPT-formatet er hentet fra (Desert Canyon 04). Se
+// docs/reference-product-20.json.
 export const REFERENCE_PRODUCT_ID = 20;
 
 // ---------- Noegler ----------
@@ -218,62 +219,163 @@ export function cropMetaKey(format) {
   return `work_crop_${format.replace(':', 'x')}`;
 }
 
-// ACPT-felterne i meta_data. Noeglerne er dem planen angiver; formatet paa
-// vaerdierne og de skjulte hjaelpefelter (som _attachment_id) skal matches
-// mod produkt 20, Desert Canyon 04, foer noget sendes. Det er derfor samlet
-// her paa ét sted.
+// ACPT-felterne paa produktet, som de staar paa produkt 20
+// (docs/reference-product-20.json). Hvert felt gemmes som fire raekker:
+// vaerdien, evt. *_attachment_id (billeder og video), *_id (feltets
+// definitions-UUID, ens for alle produkter) og *_type. Mangler UUID'et
+// eller typen, kender ACPT ikke vaerdien igen i editoren.
+const IMAGE = { type: 'Image', attachment: true };
+export const ACPT_FIELDS = [
+  { key: 'work_template', id: '3692521e-3717-4beb-8d71-48a2ab9d96b9', type: 'Select' },
+  { key: 'work_section_colour', id: '466b6a47-09d1-4d87-976e-f92f28fafc8c', type: 'Color' },
+  { key: 'work_catalogue_number', id: 'ca4bd49f-2a9b-4eab-b2c2-3a052d364534', type: 'Text' },
+  { key: 'work_video', id: '7c6f9df0-0c40-4a52-bac0-b081270142bf', type: 'Video', attachment: true },
+  { key: 'work_prints', id: '2ef88b67-6284-4af0-a721-357d8ab655f6', type: 'Toggle' },
+  { key: 'work_crop_1x1', id: 'c1bf7238-d533-4184-b5d9-4cc7f34dc98f', ...IMAGE },
+  { key: 'work_crop_2x3', id: 'cf2ee705-aed9-499b-b3bf-275e54b10222', ...IMAGE },
+  { key: 'work_crop_3x2', id: 'ba11dc54-a9a1-4446-b2d5-a9584936d6d5', ...IMAGE },
+  { key: 'work_crop_1x2', id: 'a177734f-603a-4aec-b1e1-c041b583389f', ...IMAGE },
+  { key: 'work_crop_2x1', id: '55d0781f-0ca7-4365-8238-245b2d0c0cba', ...IMAGE },
+];
+
+// Rene vaerdier foer de pakkes ind som ACPT-raekker. Sektionsfarve og
+// katalognummer sendes kun naar Stef selv har udfyldt dem: tomt betyder
+// "seriens farve" og "tallet sidst i titlen", og det er Astro der regner
+// det ud (datamodel.md).
+function acptValue(field, work, media) {
+  switch (field.key) {
+    case 'work_template': return { value: work.template };
+    case 'work_section_colour': return { value: work.sectionColour || '' };
+    case 'work_catalogue_number': return { value: work.catalogueNumber || '' };
+    // Til/fra: tom naar fra, saa en streng som "0" aldrig kan laeses som sand.
+    case 'work_prints': return { value: work.prints ? '1' : '' };
+    case 'work_video': return mediaValue(media.video);
+    default: {
+      const format = CROP_FORMATS.find((f) => cropMetaKey(f) === field.key);
+      return mediaValue(media.crops[format]);
+    }
+  }
+}
+
+function mediaValue(m) {
+  return m ? { value: m.url || '', attachment: String(m.id) } : { value: '', attachment: '' };
+}
+
 export function acptMeta(work, media) {
-  const meta = [
-    { key: 'work_template', value: work.template },
-    { key: 'work_section_colour', value: work.sectionColour || '' },
-    { key: 'work_catalogue_number', value: work.effective.catalogueNumber || '' },
-    { key: 'work_video', value: media.video ? String(media.video.id) : '' },
-    { key: 'work_prints', value: work.prints ? '1' : '0' },
-  ];
-  for (const format of CROP_FORMATS) {
-    const m = media.crops[format];
-    meta.push({ key: cropMetaKey(format), value: m ? String(m.id) : '' });
+  const meta = [];
+  for (const field of ACPT_FIELDS) {
+    const { value, attachment } = acptValue(field, work, media);
+    meta.push({ key: field.key, value });
+    if (field.attachment) meta.push({ key: `${field.key}_attachment_id`, value: attachment });
+    meta.push({ key: `${field.key}_id`, value: field.id });
+    meta.push({ key: `${field.key}_type`, value: field.type });
   }
   return meta;
 }
 
+// Sammenligner et produkt fra Woo med det format vi skriver. Bruges af
+// "Check shop format": passer det, kan der sendes; passer det ikke, er
+// ACPT-felterne aendret paa shoppen, og det der skrives ville ikke blive
+// genkendt.
+export function compareFormat(product) {
+  const meta = new Map((product?.meta_data || []).map((m) => [m.key, m.value]));
+  const problems = [];
+  for (const field of ACPT_FIELDS) {
+    const noegler = [`${field.key}`, `${field.key}_id`, `${field.key}_type`];
+    if (field.attachment) noegler.push(`${field.key}_attachment_id`);
+    for (const k of noegler) {
+      if (!meta.has(k)) problems.push(`The product has no field ${k}`);
+    }
+    if (meta.has(`${field.key}_id`) && meta.get(`${field.key}_id`) !== field.id) {
+      problems.push(`${field.key} has a different field id in the shop`);
+    }
+    if (meta.has(`${field.key}_type`) && meta.get(`${field.key}_type`) !== field.type) {
+      problems.push(`${field.key} is ${meta.get(`${field.key}_type`)} in the shop, not ${field.type}`);
+    }
+  }
+  return problems;
+}
+
+// Det Art Triage ejer af attributterne. Alle andre (Format, Material,
+// Frame, Size og hvad der ellers kommer) er printvarianternes og roeres ikke.
+const EJEDE_ATTRIBUTTER = ['Year', 'Technique', 'Dimensions'];
+
+function ejedeVaerdier(work) {
+  return {
+    Year: work.effective.year ? String(work.effective.year) : null,
+    Technique: work.technique || null,
+    Dimensions: work.unique && work.dimensions ? work.dimensions : null,
+  };
+}
+
+// Flette de ejede attributter ind i dem produktet har. Woo erstatter hele
+// listen ved en opdatering, saa det der ikke er vores skal sendes med
+// uroert, ellers forsvinder printvarianternes Format, Material, Frame og Size.
+export function mergeAttributes(existing, work) {
+  const ejede = ejedeVaerdier(work);
+  const ud = [];
+  const set = new Set();
+  for (const attr of existing || []) {
+    if (!EJEDE_ATTRIBUTTER.includes(attr.name)) {
+      ud.push(attr);
+      continue;
+    }
+    set.add(attr.name);
+    if (ejede[attr.name]) ud.push({ ...attr, options: [ejede[attr.name]] });
+  }
+  // Nye ejede attributter foerst, i fast raekkefoelge, saa Year og
+  // Technique staar over variantattributterne som paa produkt 20.
+  const nye = EJEDE_ATTRIBUTTER
+    .filter((n) => ejede[n] && !set.has(n))
+    .map((n) => ({ name: n, visible: true, variation: false, options: [ejede[n]] }));
+  return [...nye, ...ud].map((a, i) => ({ ...a, position: i }));
+}
+
 // Produktet som Art Triage ejer det. Lager, ordrer og printvarianter
-// roeres ikke: ved en opdatering sendes kun felter herfra, og ved en
-// oprettelse kun det der skal til for at et unikt vaerk kan koebes.
-export function buildProduct(work, media, { categoryId = null, create = true } = {}) {
-  const attributter = [];
-  if (work.effective.year) {
-    attributter.push({ name: 'Year', visible: true, options: [String(work.effective.year)] });
-  }
-  if (work.technique) {
-    attributter.push({ name: 'Technique', visible: true, options: [work.technique] });
-  }
-  if (work.unique && work.dimensions) {
-    attributter.push({ name: 'Dimensions', visible: true, options: [work.dimensions] });
-  }
+// roeres ikke. Et unikt vaerk er et simpelt produkt med 1 paa lager; alle
+// andre er variable, som produkt 20, og faar deres varianter fra CSV'en.
+export function buildProduct(work, media, { categoryId = null, create = true, existingAttributes = [] } = {}) {
   const produkt = {
     name: work.effective.title,
     description: work.description || '',
     short_description: work.shortText || '',
     images: [{ id: media.main.id }],
-    attributes: attributter,
+    attributes: mergeAttributes(existingAttributes, work),
     meta_data: acptMeta(work, media),
+    // Skulpturer: Reduced rate. Alt andet: Standard (tom).
+    tax_class: work.category === 'Sculptures' ? 'reduced-rate' : '',
   };
   if (categoryId) produkt.categories = [{ id: categoryId }];
-  if (work.unique) {
-    // Paa et unikt vaerk er prisen Art Triages; lageret er det kun naar
-    // produktet oprettes (1 stk.), bagefter er det Woos.
-    if (work.price) produkt.regular_price = work.price;
-    if (create) {
-      produkt.type = 'simple';
+  if (work.unique && work.price) produkt.regular_price = work.price;
+  if (create) {
+    produkt.type = work.unique ? 'simple' : 'variable';
+    if (work.unique) {
+      // Lageret er kun vores naar produktet oprettes; bagefter er det Woos.
       produkt.manage_stock = true;
       produkt.stock_quantity = 1;
     }
-    if (work.category === 'Sculptures') produkt.tax_class = 'reduced-rate';
+    // Nye produkter er altid kladder. En opdatering rorer ikke status.
+    produkt.status = 'draft';
   }
-  // Nye produkter er altid kladder. En opdatering rorer ikke status.
-  if (create) produkt.status = 'draft';
   return produkt;
+}
+
+// WordPress svarer med HTML-entiteter i termnavne ("Funky &amp; Fire").
+function afkod(tekst) {
+  return String(tekst ?? '')
+    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCodePoint(parseInt(n, 16)))
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"')
+    .replace(/&amp;/g, '&');
+}
+
+// Seriens tre termfelter, som WP REST kalder dem under meta.
+function serieMeta(serie) {
+  const meta = {};
+  if (serie.intro) meta.series_data_intro = serie.intro;
+  if (serie.template) meta.series_data_series_template = serie.template;
+  if (serie.colour) meta.series_data_series_colour = serie.colour;
+  return meta;
 }
 
 export class ShopSync {
@@ -289,9 +391,31 @@ export class ShopSync {
     if (!name) return null;
     if (this.categoryIds.has(name)) return this.categoryIds.get(name);
     const svar = await this.client.wc('GET', `/products/categories?search=${encodeURIComponent(name)}&per_page=100`);
-    const fund = (svar || []).find((c) => c.name.toLowerCase() === name.toLowerCase());
+    const fund = (svar || []).find((c) => afkod(c.name).toLowerCase() === name.toLowerCase());
     if (!fund) throw new ShopError(`The shop has no product category called "${name}"`);
     this.categoryIds.set(name, fund.id);
+    return fund.id;
+  }
+
+  // Finder seriens term paa navn, og opretter den med sine tre felter hvis
+  // den ikke findes. En term der findes, faar kun de felter Stef har
+  // udfyldt i appen; tomme felter staar uroert i Woo.
+  async seriesTermId(serie) {
+    const svar = await this.client.wpApi('GET', `/series?search=${encodeURIComponent(serie.name)}&per_page=100`);
+    const fund = (svar || []).find((t) => afkod(t.name).toLowerCase() === serie.name.toLowerCase());
+    const meta = serieMeta(serie);
+    if (!fund) {
+      // En ny term faar altid en skabelon; datamodel.md kraever den.
+      const ny = await this.client.wpApi('POST', '/series', {
+        name: serie.name,
+        meta: { series_data_series_template: 'walkthrough', ...meta },
+      });
+      return ny.id;
+    }
+    const aendret = Object.entries(meta).filter(([k, v]) => (fund.meta?.[k] ?? '') !== v);
+    if (aendret.length) {
+      await this.client.wpApi('POST', `/series/${fund.id}`, { meta: Object.fromEntries(aendret) });
+    }
     return fund.id;
   }
 
@@ -304,9 +428,6 @@ export class ShopSync {
     if (!work.altText) mangler.push('The alt text is empty');
     if (!work.effective.year) mangler.push('Set the year');
     if (work.unique && !work.price) mangler.push('Set the price');
-    for (const c of work.crops) {
-      if (!CROP_FORMATS.includes(c.format)) mangler.push(`Unknown crop format ${c.format}`);
-    }
     return mangler;
   }
 
@@ -331,8 +452,21 @@ export class ShopSync {
     media.video = await this.media.ensureVideo(work.imageId, work.video, st.size, Math.floor(st.mtimeMs));
   }
 
+  // Produktet som det staar i Woo nu, eller null hvis det er slettet der.
+  // Woo erstatter hele attributlisten ved en opdatering, saa den skal hentes
+  // for at printvarianternes attributter kan sendes med uroert.
+  async _existing(id) {
+    try {
+      return await this.client.wc('GET', `/products/${id}`);
+    } catch (err) {
+      if (err.status === 404) return null;
+      throw err;
+    }
+  }
+
   // Opretter produktet foerste gang og opdaterer det bagefter. Woo-id'et
-  // gemmes straks, saa et afbrudt kald aldrig giver en dublet.
+  // gemmes straks, saa et afbrudt kald aldrig giver en dublet. Er produktet
+  // slettet i Woo, oprettes det paa ny.
   async send(imageId) {
     const work = this.works.get(imageId);
     const mangler = this.problems(work);
@@ -340,12 +474,21 @@ export class ShopSync {
     const media = await this._mediaFor(work);
     await this._videoFor(work, media);
     const categoryId = await this.categoryId(work.category);
-    const create = !work.wooProductId;
-    const body = buildProduct(work, media, { categoryId, create });
+    const termId = work.series ? await this.seriesTermId(work.series) : null;
+
+    const eksisterende = work.wooProductId ? await this._existing(work.wooProductId) : null;
+    if (work.wooProductId && !eksisterende) this.works.setWooProductId(imageId, null);
+    const create = !eksisterende;
+    const body = buildProduct(work, media, {
+      categoryId, create, existingAttributes: eksisterende?.attributes || [],
+    });
     const produkt = create
       ? await this.client.wc('POST', '/products', body)
       : await this.client.wc('PUT', `/products/${work.wooProductId}`, body);
     if (create) this.works.setWooProductId(imageId, produkt.id);
+    // Serien saettes ikke via wc/v3 men via WP REST paa selve produktet.
+    // Uden en serie i appen roeres den i Woo ikke.
+    if (termId) await this.client.wpApi('POST', `/product/${produkt.id}`, { series: [termId] });
     return { productId: produkt.id, status: produkt.status, link: produkt.permalink ?? null, created: create };
   }
 
@@ -356,8 +499,10 @@ export class ShopSync {
     return { productId: produkt.id, status: produkt.status, link: produkt.permalink ?? null };
   }
 
-  // Det rene produkt fra Woo, til at kopiere ACPT-formatet fra.
-  async reference(id = REFERENCE_PRODUCT_ID) {
-    return this.client.wc('GET', `/products/${id}`);
+  // Henter produkt 20 og tjekker at ACPT-felterne stadig ser ud, som vi
+  // skriver dem.
+  async checkFormat(id = REFERENCE_PRODUCT_ID) {
+    const produkt = await this.client.wc('GET', `/products/${id}`);
+    return { name: produkt.name, problems: compareFormat(produkt) };
   }
 }

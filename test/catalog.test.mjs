@@ -273,7 +273,9 @@ describe('serier', () => {
     catalog.assignSeries([a.image_id], serieId);
 
     expect(catalog.listSeries()).toEqual([
-      { id: serieId, name: 'Circular Blues', image_count: 1 },
+      {
+        id: serieId, name: 'Circular Blues', intro: null, template: null, colour: null, image_count: 1,
+      },
     ]);
     const filtreret = catalog.listVersions({ serieId });
     expect(filtreret).toHaveLength(1);

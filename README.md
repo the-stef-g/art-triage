@@ -110,7 +110,13 @@ The Work panel in the Inspector holds everything that belongs to one artwork: ti
 - Help > WooCommerce key: a REST key with Read/Write permission, entered as `ck_… cs_…`.
 - Help > WordPress application password: entered as `username:application password` (Users > Profile > Application Passwords).
 
-**Locked until the format is checked.** Before the first product is sent, use Check shop format. It fetches product 20 (Desert Canyon 04) from the shop and saves it as `reference-product-20.json` next to the catalogue, so the ACPT field format, including the hidden helper fields, is copied from the real thing and not guessed.
+**The field format.** The ACPT fields are written exactly as product 20 (Desert Canyon 04) has them: the value, `*_attachment_id` for images and video, the field's definition UUID in `*_id` and the field type in `*_type`. The reference is `docs/reference-product-20.json`, and a test checks that what Art Triage writes is identical to it. Colour and catalogue number are only sent when you have filled them in: empty means the series colour and the number at the end of the title, which the site works out. Print on/off is sent as `1` or empty.
+
+**Check shop format** fetches product 20 live and compares its fields with what Art Triage writes. If they match, nothing changes. If someone has changed the fields in WooCommerce, the differences are listed and Send to shop stays locked until a new check passes. Never having run the check does not lock anything.
+
+**Product type and attributes.** A unique work (Paintings, Sculptures) is a simple product with stock 1. Every other work is a variable product, like product 20, and gets its print variants from the CSV later. Art Triage only writes the attributes Year, Technique and Dimensions. When a product is updated, the print attributes (Format, Material, Frame, Size) are sent back unchanged, so the variants are not lost. Tax class is Reduced rate for sculptures and standard for everything else.
+
+**Series.** The series is set on the product through `/wp-json/wp/v2/product/{id}` with `series`. If the shop has no term with that name, Art Triage creates it with its three fields: intro, template (walkthrough or wall) and colour. They are edited in the Work panel under Shop. A new term always gets a template (walkthrough if you have not chosen one). A term that already exists only gets the fields you have filled in, and only if they differ. A work without a series leaves the product's series alone.
 
 ## The local AI model
 
@@ -149,7 +155,7 @@ Code comments, internal identifiers and the database values (`godkendt`, `kasser
 
 ## Checklist for works and the shop
 
-Without keys, steps 1 to 9 work. Steps 10 to 14 need the two shop keys.
+Without keys, steps 1 to 9 work. Steps 10 to 16 need the two shop keys.
 
 1. Open an image, scroll to the Work panel and check that the title field shows the file name as a placeholder and the year shows the capture year of the original.
 2. Type a year, click away, select another image and come back. The year is still there. Clear it and the capture year returns.
@@ -160,9 +166,10 @@ Without keys, steps 1 to 9 work. Steps 10 to 14 need the two shop keys.
 7. Approve and finish the image, add notes, click Write texts. The three texts appear, the cost shows in the status bar, and the word and character counts are right.
 8. Edit the description, then click Write texts again. The app asks before it replaces your text. Say no and your text is kept.
 9. Look for dashes, "stunning", "unique" and mentions of AI or Photoshop in the texts. Any that slipped through show as a warning under the button.
-10. Add the WooCommerce key under Help. Send to shop is still locked; the button says Check shop format.
-11. Click Check shop format. A message names the file it wrote. Send me that file.
-12. Add the WordPress application password under Help, then click Send to shop on a finished work. In WooCommerce you find a draft product with the right title, texts, image and category.
+10. Add the WooCommerce key under Help, then click Check shop format. It should say the format matches.
+11. Add the WordPress application password under Help. Put the image in a series, fill in intro, template and colour, and click Send to shop. In WooCommerce there is a draft product with the right title, texts, image, category, attributes and the series, and the series term has its three fields.
+12. Open the draft in WooCommerce and check that the fields under Work show the values (template, crops with their images, print on/off) and not empty boxes.
 13. Change a text in the app and send again. The same product is updated, with no second one next to it. Change a text in WooCommerce and send again: the app's text wins.
-14. Click Publish and check the product goes live.
-
+14. Send a work that is already a product with print variants (Desert Canyon 04 is a good one to try on a copy): Format, Material, Frame and Size are still there afterwards, and so are the variants.
+15. Send a work in a series that already exists in the shop. No second series is created, and fields you left empty in the app are left alone in the shop.
+16. Click Publish and check the product goes live.

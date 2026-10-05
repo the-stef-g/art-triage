@@ -83,7 +83,9 @@ export class Works {
 
   _image(imageId) {
     const row = this.db.get(
-      `SELECT i.id, i.series_id, s.name AS series_name, f.rel_path, f.id AS file_id
+      `SELECT i.id, i.series_id, s.name AS series_name, s.intro AS series_intro,
+              s.template AS series_template, s.colour AS series_colour,
+              f.rel_path, f.id AS file_id
        FROM images i
        JOIN files f ON f.id = i.master_file_id
        LEFT JOIN series s ON s.id = i.series_id
@@ -169,6 +171,13 @@ export class Works {
       crops: this.cropsFor(imageId),
       seriesId: img.series_id,
       seriesName: img.series_name,
+      series: img.series_id ? {
+        id: img.series_id,
+        name: img.series_name,
+        intro: img.series_intro,
+        template: img.series_template,
+        colour: img.series_colour,
+      } : null,
       // Det der faktisk bruges, naar feltet er tomt.
       effective: {
         title,

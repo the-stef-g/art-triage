@@ -132,6 +132,13 @@ export class Catalog extends EventEmitter {
     if (!kolonner.includes('manual')) {
       this.db.exec('ALTER TABLE keywords ADD COLUMN manual INTEGER NOT NULL DEFAULT 0');
     }
+    // Seriens felter til shoppen (taksonomien series paa shop.stefg.art).
+    // Skabelonen er tom indtil Stef vaelger den, saa en eksisterende term
+    // i Woo ikke faar sin skabelon overskrevet af en standardvaerdi.
+    const serieKolonner = this.db.all('PRAGMA table_info(series)').map((k) => k.name);
+    for (const kol of ['intro', 'template', 'colour']) {
+      if (!serieKolonner.includes(kol)) this.db.exec(`ALTER TABLE series ADD COLUMN ${kol} TEXT`);
+    }
     // De to trin var foer uafhaengige flag, saa et billede kunne staa som
     // baade under redigering og faerdigt. Faerdig vinder: det er det trin
     // man selv har sat sidst, og det er den tilstand der betyder noget.
@@ -531,7 +538,7 @@ export class Catalog extends EventEmitter {
 
   listSeries() {
     return this.db.all(
-      `SELECT s.id, s.name, COUNT(i.id) AS image_count
+      `SELECT s.id, s.name, s.intro, s.template, s.colour, COUNT(i.id) AS image_count
        FROM series s LEFT JOIN images i ON i.series_id = s.id
        GROUP BY s.id ORDER BY s.name COLLATE NOCASE`
     );
@@ -551,6 +558,39 @@ export class Catalog extends EventEmitter {
         this.db.run('UPDATE images SET series_id=? WHERE id=?', seriesId ?? null, id);
       }
     });
+    this.emit('changed');
+  }
+
+  // Seriens tre felter til shoppen: intro, skabelon (walkthrough eller
+  // wall) og farve. Tomme felter er tomme; saa roeres de ikke i Woo.
+  setSeriesShop(seriesId, patch) {
+    const s = this.db.get('SELECT id FROM series WHERE id=?', seriesId);
+    if (!s) throw new Error('That series does not exist');
+    const rens = {
+      intro: (v) => String(v ?? '').trim() || null,
+      template(v) {
+        const t = String(v ?? '').trim();
+        if (!t) return null;
+        if (!['walkthrough', 'wall'].includes(t)) throw new Error('The series template must be walkthrough or wall');
+        return t;
+      },
+      colour(v) {
+        const t = String(v ?? '').trim();
+        if (!t) return null;
+        const m = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(t);
+        if (!m) throw new Error('The colour must be a hex colour such as #dd9933');
+        const hex = m[1].length === 3 ? [...m[1]].map((c) => c + c).join('') : m[1];
+        return `#${hex.toLowerCase()}`;
+      },
+    };
+    const sets = [];
+    const params = [];
+    for (const [key, value] of Object.entries(patch || {})) {
+      if (!rens[key]) throw new Error(`Unknown series field: ${key}`);
+      sets.push(`${key}=?`);
+      params.push(rens[key](value));
+    }
+    if (sets.length) this.db.run(`UPDATE series SET ${sets.join(', ')} WHERE id=?`, ...params, seriesId);
     this.emit('changed');
   }
 

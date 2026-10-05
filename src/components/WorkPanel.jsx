@@ -131,12 +131,26 @@ export default function WorkPanel({ row, versions, hasKey, shop, onShop, onError
   const checkFormat = async () => {
     setBusy(true);
     try {
-      const res = await invoke('shop:reference');
-      onShop(`Fetched "${res.navn}" to ${res.sti}`);
+      const res = await invoke('shop:checkFormat');
+      onShop(res.problems.length
+        ? `The shop's field format differs from what Art Triage writes: ${res.problems.slice(0, 3).join('; ')}`
+        : `The shop format matches (${res.name})`);
     } catch (err) {
       onError(err);
     }
     setBusy(false);
+  };
+
+  // Seriens felter til shoppen. En ny serie faar altid en skabelon i
+  // shoppen; en der findes, faar kun de felter der er udfyldt her.
+  const saveSeries = async (patch) => {
+    try {
+      await invoke('ser:setShop', { seriesId: work.series.id, patch });
+      adopt(await invoke('work:get', { imageId }));
+    } catch (err) {
+      onError(err);
+      adopt(work);
+    }
   };
 
   const kanSkrive = work.eligible && hasKey;
@@ -257,33 +271,61 @@ export default function WorkPanel({ row, versions, hasKey, shop, onShop, onError
           : 'Not in the shop yet. A new product is created as a draft.'}
       </p>
       <div className="knapraekke">
-        {shop?.harReference ? (
-          <button
-            disabled={busy || !work.eligible || !shop.harWoo || !shop.harWp}
-            onClick={sendToShop}
-            title={!work.eligible ? 'The image must be Approved and Finished'
-              : (!shop.harWoo || !shop.harWp) ? 'Add the WooCommerce key and the WordPress application password under Help' : ''}
-          >
-            Send to shop
-          </button>
-        ) : (
-          <button
-            disabled={busy || !shop?.harWoo}
-            onClick={checkFormat}
-            title="Fetches product 20 from the shop so the field format can be copied exactly"
-          >
-            Check shop format
-          </button>
-        )}
+        <button
+          disabled={busy || !work.eligible || !shop?.harWoo || !shop?.harWp || shop?.formatOk === false}
+          onClick={sendToShop}
+          title={!work.eligible ? 'The image must be Approved and Finished'
+            : (!shop?.harWoo || !shop?.harWp) ? 'Add the WooCommerce key and the WordPress application password under Help'
+              : shop?.formatOk === false ? 'The shop format check found a difference' : ''}
+        >
+          Send to shop
+        </button>
         {work.wooProductId && (
           <button disabled={busy} onClick={publish} title="Publish the draft in the shop">Publish</button>
         )}
+        <button
+          className="lille"
+          disabled={busy || !shop?.harWoo}
+          onClick={checkFormat}
+          title="Fetches product 20 from the shop and checks that its fields look like what Art Triage writes"
+        >
+          Check shop format
+        </button>
       </div>
-      {!shop?.harReference && (
-        <p className="vaerk-note">
-          Sending is locked until the reference product (Desert Canyon 04) has been fetched once.
-          {!shop?.harWoo ? ' Add the WooCommerce key under Help first.' : ''}
-        </p>
+      {shop?.formatOk === false && (
+        <ul className="vaerk-advarsler">
+          {shop.formatProblems.slice(0, 4).map((p) => <li key={p}>{p}</li>)}
+        </ul>
+      )}
+      {work.series && (
+        <>
+          <p className="vaerk-note">Series «{work.series.name}» in the shop. Empty fields are left as they are there.</p>
+          <label>Series intro
+            <textarea
+              rows={2}
+              defaultValue={work.series.intro ?? ''}
+              key={`intro-${work.series.id}`}
+              onBlur={(e) => { if (e.target.value !== (work.series.intro ?? '')) saveSeries({ intro: e.target.value }); }}
+            />
+          </label>
+          <div className="vaerk-raekke">
+            <label>Series template
+              <select value={work.series.template || ''} onChange={(e) => saveSeries({ template: e.target.value })}>
+                <option value="">Not set</option>
+                <option value="walkthrough">Walkthrough</option>
+                <option value="wall">Wall</option>
+              </select>
+            </label>
+            <label>Series colour
+              <input
+                defaultValue={work.series.colour ?? ''}
+                key={`colour-${work.series.id}-${work.series.colour}`}
+                placeholder="#dd9933"
+                onBlur={(e) => { if (e.target.value !== (work.series.colour ?? '')) saveSeries({ colour: e.target.value }); }}
+              />
+            </label>
+          </div>
+        </>
       )}
 
       <h4>Crops</h4>

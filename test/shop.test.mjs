@@ -3,7 +3,7 @@
 // det gaar galt: dubletter i Woo, genupload af store filer, noegler der
 // ender i en fejlbesked, og at en opdatering ikke roerer lager eller status.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, writeFileSync, mkdirSync, rmSync, utimesSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, mkdirSync, rmSync, utimesSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { openDatabase } from '../electron/lib/db.mjs';
@@ -11,13 +11,16 @@ import { Catalog } from '../electron/lib/catalog.mjs';
 import { Works } from '../electron/lib/works.mjs';
 import {
   ShopClient, ShopSync, MediaSync, ShopError, parseWooKey, parseWpLogin,
-  buildProduct, acptMeta, cropMetaKey,
+  buildProduct, acptMeta, cropMetaKey, ACPT_FIELDS, compareFormat, mergeAttributes,
 } from '../electron/lib/shop.mjs';
 
 let root;
 let db;
 let catalog;
 let works;
+
+// Produkt 20 som det staar i Woo, hentet fra shoppen.
+const reference = JSON.parse(readFileSync(new URL('../docs/reference-product-20.json', import.meta.url), 'utf8'));
 
 function skriv(rel, indhold = rel) {
   const abs = join(root, rel);
@@ -51,6 +54,23 @@ function attrapShop(opts = {}) {
     }
     if (init.method === 'GET' && sti.startsWith('/wc/v3/products/categories')) {
       return svar(200, [{ id: 7, name: 'Photography' }, { id: 8, name: 'Sculptures' }, { id: 9, name: 'Paintings' }]);
+    }
+    if (init.method === 'GET' && sti.startsWith('/wp/v2/series?')) {
+      return svar(200, opts.serier || []);
+    }
+    if (init.method === 'POST' && sti === '/wp/v2/series') {
+      return svar(201, { id: 900, name: JSON.parse(init.body).name });
+    }
+    if (init.method === 'POST' && sti.startsWith('/wp/v2/series/')) {
+      return svar(200, { id: Number(sti.split('/').pop()) });
+    }
+    if (init.method === 'POST' && sti.startsWith('/wp/v2/product/')) {
+      return svar(200, { id: Number(sti.split('/').pop()) });
+    }
+    if (init.method === 'GET' && /^\/wc\/v3\/products\/\d+$/.test(sti)) {
+      const pid = Number(sti.split('/').pop());
+      if (opts.slettetProdukter?.includes(pid)) return svar(404, { message: 'Invalid ID' });
+      return svar(200, { id: pid, attributes: opts.attributter || [] });
     }
     if (init.method === 'POST' && sti === '/wc/v3/products') {
       return svar(201, { id: nextProduct++, status: 'draft', permalink: 'https://shop.stefg.art/p' });
@@ -211,42 +231,138 @@ describe('billeder', () => {
   });
 });
 
+describe('formatet fra produkt 20', () => {
+  // Alle ti felter, som referencefilen har dem. Vaerdierne her er dem
+  // produkt 20 har, saa en forskel i raekkefoelge, UUID eller type fanges.
+  const media = {
+    main: { id: 21, url: 'https://shop.stefg.art/wp-content/uploads/Desert-Canyon-04.png' },
+    crops: Object.fromEntries(['1:1', '2:3', '3:2', '1:2', '2:1'].map((f, i) => {
+      const meta = reference.meta_data;
+      const k = cropMetaKey(f);
+      return [f, {
+        id: Number(meta.find((m) => m.key === `${k}_attachment_id`).value),
+        url: meta.find((m) => m.key === k).value,
+        i,
+      }];
+    })),
+    video: null,
+  };
+  const work = { template: 'spread', sectionColour: null, catalogueNumber: null, prints: true };
+
+  it('skriver praecis de raekker produkt 20 har', () => {
+    expect(acptMeta(work, media)).toEqual(reference.meta_data);
+  });
+
+  it('har UUID og type for alle felter som i referencen', () => {
+    for (const f of ACPT_FIELDS) {
+      const id = reference.meta_data.find((m) => m.key === `${f.key}_id`).value;
+      const type = reference.meta_data.find((m) => m.key === `${f.key}_type`).value;
+      expect([f.key, f.id, f.type]).toEqual([f.key, id, type]);
+    }
+  });
+
+  it('tjekket passer paa produkt 20 og finder en aendret UUID, type eller manglende felt', () => {
+    expect(compareFormat(reference)).toEqual([]);
+    const aendret = JSON.parse(JSON.stringify(reference));
+    aendret.meta_data.find((m) => m.key === 'work_template_id').value = 'andet';
+    aendret.meta_data.find((m) => m.key === 'work_prints_type').value = 'Text';
+    aendret.meta_data = aendret.meta_data.filter((m) => m.key !== 'work_crop_2x1_attachment_id');
+    const fejl = compareFormat(aendret).join(' | ');
+    expect(fejl).toMatch(/work_template has a different field id/);
+    expect(fejl).toMatch(/work_prints is Text in the shop, not Toggle/);
+    expect(fejl).toMatch(/no field work_crop_2x1_attachment_id/);
+  });
+
+  it('sender tomme felter naar vaerdien ikke er sat', () => {
+    const m = acptMeta({ ...work, prints: false }, { main: { id: 1 }, crops: {}, video: null });
+    const v = (k) => m.find((x) => x.key === k).value;
+    expect(v('work_prints')).toBe('');
+    expect(v('work_crop_2x3')).toBe('');
+    expect(v('work_crop_2x3_attachment_id')).toBe('');
+    expect(v('work_video_attachment_id')).toBe('');
+    expect(v('work_crop_2x3_id')).toBe('cf2ee705-aed9-499b-b3bf-275e54b10222');
+  });
+
+  it('sender kun sektionsfarve og katalognummer naar Stef har skrevet dem', () => {
+    const m = acptMeta({ ...work, sectionColour: '#aabbcc', catalogueNumber: '7' }, media);
+    expect(m.find((x) => x.key === 'work_section_colour').value).toBe('#aabbcc');
+    expect(m.find((x) => x.key === 'work_catalogue_number').value).toBe('7');
+  });
+});
+
+describe('attributter', () => {
+  const eksisterende = reference.attributes;
+  const work = (over = {}) => ({
+    technique: 'Digital art', unique: false, dimensions: null,
+    effective: { year: 2025 }, ...over,
+  });
+
+  it('beholder printvarianternes attributter uroert', () => {
+    const ud = mergeAttributes(eksisterende, work({ effective: { year: 2026 } }));
+    expect(ud.map((a) => a.name)).toEqual(['Year', 'Technique', 'Format', 'Material', 'Frame', 'Size']);
+    expect(ud.find((a) => a.name === 'Year').options).toEqual(['2026']);
+    const format = ud.find((a) => a.name === 'Format');
+    expect(format.variation).toBe(true);
+    expect(format.options).toEqual(reference.attributes[2].options);
+  });
+
+  it('tilfoejer Year og Technique foerst paa et produkt der ingen har', () => {
+    const ud = mergeAttributes([reference.attributes[2]], work());
+    expect(ud.map((a) => a.name)).toEqual(['Year', 'Technique', 'Format']);
+    expect(ud.map((a) => a.position)).toEqual([0, 1, 2]);
+  });
+
+  it('fjerner en ejet attribut der er blevet tom, og kun den', () => {
+    const ud = mergeAttributes(eksisterende, work({ technique: null }));
+    expect(ud.map((a) => a.name)).not.toContain('Technique');
+    expect(ud.map((a) => a.name)).toContain('Size');
+  });
+
+  it('tager maal med for et unikt vaerk og ellers ikke', () => {
+    expect(mergeAttributes([], work({ unique: true, dimensions: '60 x 80 cm' })).map((a) => a.name))
+      .toEqual(['Year', 'Technique', 'Dimensions']);
+    expect(mergeAttributes([], work({ unique: false, dimensions: '60 x 80 cm' })).map((a) => a.name))
+      .not.toContain('Dimensions');
+  });
+});
+
 describe('produktet', () => {
   const baseWork = (over = {}) => ({
-    imageId: 1, template: 'spread', sectionColour: null, prints: true, technique: 'Digital art',
-    description: 'D', shortText: 'S', altText: 'A', category: 'Photography', unique: false,
-    dimensions: null, price: null, effective: { title: 'Desert Canyon 04', year: 2021, catalogueNumber: '04' },
+    imageId: 1, template: 'spread', sectionColour: null, catalogueNumber: null, prints: true,
+    technique: 'Digital art', description: 'D', shortText: 'S', altText: 'A', category: 'Photography',
+    unique: false, dimensions: null, price: null, effective: { title: 'Desert Canyon 04', year: 2021 },
     ...over,
   });
-  const media = { main: { id: 100 }, crops: { '2:3': { id: 101 } }, video: null };
+  const media = { main: { id: 100 }, crops: {}, video: null };
 
   it('opretter som kladde med de felter planen nævner', () => {
     const p = buildProduct(baseWork(), media, { categoryId: 7 });
     expect(p).toMatchObject({
       name: 'Desert Canyon 04', description: 'D', short_description: 'S',
-      images: [{ id: 100 }], categories: [{ id: 7 }], status: 'draft',
+      images: [{ id: 100 }], categories: [{ id: 7 }], status: 'draft', tax_class: '',
     });
-    expect(p.attributes).toEqual([
-      { name: 'Year', visible: true, options: ['2021'] },
-      { name: 'Technique', visible: true, options: ['Digital art'] },
-    ]);
+    expect(p.attributes.map((a) => a.name)).toEqual(['Year', 'Technique']);
   });
 
-  it('roerer hverken status eller lager ved en opdatering', () => {
+  it('opretter et print-vaerk som variabelt produkt, som produkt 20', () => {
+    expect(buildProduct(baseWork(), media).type).toBe('variable');
+    expect(buildProduct(baseWork(), media).manage_stock).toBeUndefined();
+  });
+
+  it('roerer hverken status, type eller lager ved en opdatering', () => {
     const p = buildProduct(baseWork({ unique: true, category: 'Paintings', price: '1200', dimensions: '60 x 80 cm' }),
       media, { create: false });
     expect(p.status).toBeUndefined();
+    expect(p.type).toBeUndefined();
     expect(p.manage_stock).toBeUndefined();
     expect(p.stock_quantity).toBeUndefined();
-    expect(p.type).toBeUndefined();
     expect(p.regular_price).toBe('1200');
   });
 
   it('goer et unikt vaerk til et simpelt produkt med 1 paa lager', () => {
     const p = buildProduct(baseWork({ unique: true, category: 'Paintings', price: '1200', dimensions: '60 x 80 cm' }), media);
-    expect(p).toMatchObject({ type: 'simple', manage_stock: true, stock_quantity: 1, regular_price: '1200' });
+    expect(p).toMatchObject({ type: 'simple', manage_stock: true, stock_quantity: 1, regular_price: '1200', tax_class: '' });
     expect(p.attributes.map((a) => a.name)).toContain('Dimensions');
-    expect(p.tax_class).toBeUndefined();
   });
 
   it('giver skulpturer momsklassen Reduced rate', () => {
@@ -259,24 +375,13 @@ describe('produktet', () => {
     expect(p.regular_price).toBeUndefined();
     expect(p.attributes.map((a) => a.name)).not.toContain('Dimensions');
   });
-
-  it('bruger noeglerne fra planen i meta_data', () => {
-    expect(cropMetaKey('1:1')).toBe('work_crop_1x1');
-    expect(cropMetaKey('2:1')).toBe('work_crop_2x1');
-    const keys = acptMeta(baseWork(), media).map((m) => m.key);
-    expect(keys).toEqual([
-      'work_template', 'work_section_colour', 'work_catalogue_number', 'work_video', 'work_prints',
-      'work_crop_1x1', 'work_crop_2x3', 'work_crop_3x2', 'work_crop_1x2', 'work_crop_2x1',
-    ]);
-    const crop = acptMeta(baseWork(), media).find((m) => m.key === 'work_crop_2x3');
-    expect(crop.value).toBe('101');
-  });
 });
 
 describe('send til shop', () => {
   async function sync(fetchImpl) {
     return new ShopSync({ catalog, works, client: klient(fetchImpl), exporter });
   }
+  const sti = (k) => `${k.method} ${k.sti}`;
 
   it('opretter produktet foerste gang og gemmer Woo-id', async () => {
     const { id } = klartVaerk('Desert Canyon 04.png');
@@ -284,8 +389,10 @@ describe('send til shop', () => {
     const res = await (await sync(fetchImpl)).send(id);
     expect(res).toMatchObject({ productId: 500, status: 'draft', created: true });
     expect(works.get(id).wooProductId).toBe(500);
-    const post = kald.find((k) => k.method === 'POST' && k.sti === '/wc/v3/products');
-    expect(JSON.parse(post.body)).toMatchObject({ name: 'Desert Canyon 04', status: 'draft', categories: [{ id: 7 }] });
+    const post = kald.find((k) => sti(k) === 'POST /wc/v3/products');
+    expect(JSON.parse(post.body)).toMatchObject({
+      name: 'Desert Canyon 04', status: 'draft', type: 'variable', categories: [{ id: 7 }],
+    });
   });
 
   it('opdaterer samme produkt bagefter og laver ingen dublet', async () => {
@@ -297,12 +404,35 @@ describe('send til shop', () => {
     kald.length = 0;
     const res = await shop.send(id);
     expect(res).toMatchObject({ productId: 500, created: false });
-    expect(kald.filter((k) => k.method === 'POST' && k.sti === '/wc/v3/products')).toHaveLength(0);
+    expect(kald.filter((k) => sti(k) === 'POST /wc/v3/products')).toHaveLength(0);
     const put = kald.find((k) => k.method === 'PUT');
     expect(put.sti).toBe('/wc/v3/products/500');
-    expect(JSON.parse(put.body)).toMatchObject({ description: 'Rettet' });
-    expect(JSON.parse(put.body).status).toBeUndefined();
-    expect(kald.some((k) => k.sti === '/wp/v2/media' && k.method === 'POST')).toBe(false);
+    const body = JSON.parse(put.body);
+    expect(body).toMatchObject({ description: 'Rettet' });
+    expect(body.status).toBeUndefined();
+    expect(body.type).toBeUndefined();
+    expect(kald.some((k) => sti(k) === 'POST /wp/v2/media')).toBe(false);
+  });
+
+  it('sender printvarianternes attributter med ved en opdatering', async () => {
+    const { id } = klartVaerk('Desert Canyon 04.png');
+    works.setWooProductId(id, 500);
+    const { kald, fetchImpl } = attrapShop({ attributter: reference.attributes });
+    const shop = await sync(fetchImpl);
+    await shop.send(id);
+    const put = kald.find((k) => k.method === 'PUT');
+    const navne = JSON.parse(put.body).attributes.map((a) => a.name);
+    expect(navne).toEqual(['Year', 'Technique', 'Format', 'Material', 'Frame', 'Size']);
+  });
+
+  it('opretter produktet paa ny hvis det er slettet i Woo', async () => {
+    const { id } = klartVaerk('Desert Canyon 04.png');
+    works.setWooProductId(id, 77);
+    const { kald, fetchImpl } = attrapShop({ slettetProdukter: [77] });
+    const res = await (await sync(fetchImpl)).send(id);
+    expect(res).toMatchObject({ created: true, productId: 500 });
+    expect(works.get(id).wooProductId).toBe(500);
+    expect(kald.some((k) => k.method === 'PUT')).toBe(false);
   });
 
   it('sender beskaeringerne med som medier og felter', async () => {
@@ -311,10 +441,12 @@ describe('send til shop', () => {
     works.setCrop(id, kopi, '2:3');
     const { kald, fetchImpl } = attrapShop();
     await (await sync(fetchImpl)).send(id);
-    const uploads = kald.filter((k) => k.method === 'POST' && k.sti === '/wp/v2/media');
-    expect(uploads).toHaveLength(2);
-    const body = JSON.parse(kald.find((k) => k.sti === '/wc/v3/products' && k.method === 'POST').body);
-    expect(body.meta_data.find((m) => m.key === 'work_crop_2x3').value).toBe('101');
+    expect(kald.filter((k) => sti(k) === 'POST /wp/v2/media')).toHaveLength(2);
+    const body = JSON.parse(kald.find((k) => sti(k) === 'POST /wc/v3/products').body);
+    const v = (k) => body.meta_data.find((m) => m.key === k).value;
+    expect(v('work_crop_2x3_attachment_id')).toBe('101');
+    expect(v('work_crop_2x3')).toBe('https://shop.stefg.art/m/101.jpg');
+    expect(v('work_crop_2x3_type')).toBe('Image');
   });
 
   it('nægter at sende et vaerk der ikke er klart, uden at kalde nettet', async () => {
@@ -322,8 +454,7 @@ describe('send til shop', () => {
     catalog.sync();
     const id = imageIdFor('a.png');
     const { kald, fetchImpl } = attrapShop();
-    const shop = await sync(fetchImpl);
-    await expect(shop.send(id)).rejects.toThrow(/Approved and Finished.*category.*description.*alt text/i);
+    await expect((await sync(fetchImpl)).send(id)).rejects.toThrow(/Approved and Finished.*category.*description.*alt text/i);
     expect(kald).toHaveLength(0);
   });
 
@@ -349,5 +480,81 @@ describe('send til shop', () => {
     kald.length = 0;
     expect(await shop.publish(id)).toMatchObject({ productId: 500, status: 'publish' });
     expect(JSON.parse(kald[0].body)).toEqual({ status: 'publish' });
+  });
+
+  it('tjekker formatet mod produkt 20', async () => {
+    const fetchImpl = async () => ({ ok: true, status: 200, text: async () => JSON.stringify({ ...reference, name: 'Desert Canyon 04' }) });
+    const res = await (await sync(fetchImpl)).checkFormat();
+    expect(res).toEqual({ name: 'Desert Canyon 04', problems: [] });
+  });
+});
+
+describe('serier', () => {
+  async function sync(fetchImpl) {
+    return new ShopSync({ catalog, works, client: klient(fetchImpl), exporter });
+  }
+  const sti = (k) => `${k.method} ${k.sti}`;
+
+  function medSerie(rel, felter = {}) {
+    const v = klartVaerk(rel);
+    const serieId = catalog.createSeries('Desert Canyon');
+    catalog.assignSeries([v.id], serieId);
+    if (Object.keys(felter).length) catalog.setSeriesShop(serieId, felter);
+    return { ...v, serieId };
+  }
+
+  it('opretter en ny serie med sine tre felter og saetter den paa produktet', async () => {
+    const { id } = medSerie('a.png', { intro: 'Two lines', template: 'wall', colour: '#DD9933' });
+    const { kald, fetchImpl } = attrapShop();
+    await (await sync(fetchImpl)).send(id);
+    const ny = kald.find((k) => sti(k) === 'POST /wp/v2/series');
+    expect(JSON.parse(ny.body)).toEqual({
+      name: 'Desert Canyon',
+      meta: { series_data_series_template: 'wall', series_data_intro: 'Two lines', series_data_series_colour: '#dd9933' },
+    });
+    const prod = kald.find((k) => sti(k) === 'POST /wp/v2/product/500');
+    expect(JSON.parse(prod.body)).toEqual({ series: [900] });
+  });
+
+  it('giver en ny serie skabelonen walkthrough naar Stef ikke har valgt en', async () => {
+    const { id } = medSerie('a.png');
+    const { kald, fetchImpl } = attrapShop();
+    await (await sync(fetchImpl)).send(id);
+    const ny = kald.find((k) => sti(k) === 'POST /wp/v2/series');
+    expect(JSON.parse(ny.body).meta).toEqual({ series_data_series_template: 'walkthrough' });
+  });
+
+  it('bruger en serie der findes, uden at oprette en ny', async () => {
+    const { id } = medSerie('a.png');
+    const { kald, fetchImpl } = attrapShop({ serier: [{ id: 20, name: 'Desert Canyon', meta: {} }] });
+    await (await sync(fetchImpl)).send(id);
+    expect(kald.some((k) => sti(k) === 'POST /wp/v2/series')).toBe(false);
+    expect(JSON.parse(kald.find((k) => sti(k) === 'POST /wp/v2/product/500').body)).toEqual({ series: [20] });
+  });
+
+  it('finder en serie paa navnet trods HTML-entiteter og store bogstaver', async () => {
+    const v = klartVaerk('a.png');
+    catalog.assignSeries([v.id], catalog.createSeries('Funky & Fire'));
+    const { kald, fetchImpl } = attrapShop({ serier: [{ id: 31, name: 'funky &amp; FIRE', meta: {} }] });
+    await (await sync(fetchImpl)).send(v.id);
+    expect(kald.some((k) => sti(k) === 'POST /wp/v2/series')).toBe(false);
+  });
+
+  it('opdaterer kun de termfelter Stef har udfyldt og som er aendret', async () => {
+    const { id } = medSerie('a.png', { intro: 'Ny intro', colour: '#dd9933' });
+    const { kald, fetchImpl } = attrapShop({
+      serier: [{ id: 20, name: 'Desert Canyon', meta: { series_data_intro: 'Gammel', series_data_series_colour: '#dd9933', series_data_series_template: 'wall' } }],
+    });
+    await (await sync(fetchImpl)).send(id);
+    const opd = kald.filter((k) => sti(k) === 'POST /wp/v2/series/20');
+    expect(opd).toHaveLength(1);
+    expect(JSON.parse(opd[0].body)).toEqual({ meta: { series_data_intro: 'Ny intro' } });
+  });
+
+  it('roerer ikke serien i Woo naar vaerket ingen serie har i appen', async () => {
+    const { id } = klartVaerk('a.png');
+    const { kald, fetchImpl } = attrapShop();
+    await (await sync(fetchImpl)).send(id);
+    expect(kald.some((k) => k.sti.startsWith('/wp/v2/series') || k.sti.startsWith('/wp/v2/product/'))).toBe(false);
   });
 });
