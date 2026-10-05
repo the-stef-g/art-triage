@@ -33,7 +33,9 @@ const MAX_PROCESSER = 3;
 // for at lade sips fremkalde RAW-filen.
 const MIN_INDBYGGET = 400;
 // Haeves naar forhaandsvisningernes retning eller udseende aendres.
-const CACHE_VERSION = '3';
+const CACHE_VERSION = '4';
+// Stoerrelsen paa det lille billede macOS fremkalder til at finde retningen.
+const PROBE_STOERRELSE = 128;
 
 // Retningen (EXIF 1 til 8) lagt paa et sharp-billede. En RAW-fils JPEG har
 // sjaeldent selv en retning, saa den kommer fra RAW-filen.
@@ -62,6 +64,7 @@ export class Thumbnailer {
     this.rotationFor = rotationFor;
     this.onInfo = onInfo;
     this._retningslog = 0;
+    this._probe = new Map();
     this.cacheDir = cacheDir;
     this.rasterizeSvg = rasterizeSvg;
     this.platform = platform;
@@ -200,7 +203,7 @@ export class Thumbnailer {
     const praefiks = `${fileId}-`;
     try {
       for (const navn of readdirSync(this.cacheDir)) {
-        if (navn.startsWith(praefiks)) rmSync(join(this.cacheDir, navn), { force: true });
+        if (navn.startsWith(praefiks) && !navn.endsWith('.orient')) rmSync(join(this.cacheDir, navn), { force: true });
       }
     } catch {
       // cachen kan ikke laeses; saa er der intet at glemme
@@ -208,16 +211,61 @@ export class Thumbnailer {
     this.failed.delete(fileId);
   }
 
-  // Retningen sips kender for en RAW-fil. Bruges naar selve filen ikke
-  // oplyser en retning, som hos nogle Canon-filer.
-  async _sipsRetning(absPath) {
-    if (this.platform !== 'darwin') return null;
+  // Drejningen (0, 90, 180 eller 270 grader med uret) som macOS selv ville
+  // give en RAW-fil. Nogle filer har retningen et sted ingen laeser kan
+  // finde den, men macOS viser dem rigtigt. Saa der fremkaldes et lille
+  // billede, og det sammenlignes med den indbyggede JPEG i alle fire
+  // drejninger. Svaret gemmes ved siden af, saa filen kun spoerges én gang.
+  _retningViaMac(key, absPath, jpegBuffer) {
+    if (this.platform !== 'darwin') return Promise.resolve(null);
+    const basis = key.replace(/-\d+$/, '');
+    const sidefil = join(this.cacheDir, `${basis}.orient`);
     try {
-      const { stdout } = await this._run('sips', ['-g', 'orientation', absPath]);
-      const m = /orientation:\s*(\d)/.exec(String(stdout ?? ''));
-      return m ? Number(m[1]) : null;
+      const gemt = Number(readFileSync(sidefil, 'utf8'));
+      if ([0, 90, 180, 270].includes(gemt)) return Promise.resolve(gemt);
     } catch {
+      // ikke spurgt endnu
+    }
+    if (this._probe.has(basis)) return this._probe.get(basis);
+    const p = this._maalRetning(absPath, jpegBuffer)
+      .then((grader) => {
+        if (grader !== null) {
+          try { writeFileSync(sidefil, String(grader)); } catch { /* kun en genvej */ }
+        }
+        return grader;
+      })
+      .finally(() => this._probe.delete(basis));
+    this._probe.set(basis, p);
+    return p;
+  }
+
+  async _maalRetning(absPath, jpegBuffer) {
+    const dir = mkdtempSync(join(tmpdir(), 'bf-or-'));
+    const lille = join(dir, 'probe.jpg');
+    try {
+      await this._run('sips', [
+        '-s', 'format', 'jpeg', '--resampleHeightWidthMax', String(PROBE_STOERRELSE),
+        absPath, '--out', lille,
+      ]);
+      const sharp = (await import('sharp')).default;
+      const raa = async (img) => (await img.resize(24, 24, { fit: 'fill' }).greyscale().raw().toBuffer());
+      const mac = await raa(sharp(lille, { failOn: 'none' }).rotate());
+      const afstand = [];
+      for (const grader of [0, 90, 180, 270]) {
+        const mig = await raa(sharp(jpegBuffer, { failOn: 'none' }).rotate().rotate(grader));
+        let sum = 0;
+        for (let i = 0; i < mac.length; i++) sum += Math.abs(mac[i] - mig[i]);
+        afstand.push(sum);
+      }
+      // En drejning skal vaere tydeligt bedre end ingen, ellers lades den.
+      let bedst = 0;
+      for (let i = 1; i < 4; i++) if (afstand[i] < afstand[bedst]) bedst = i;
+      return bedst !== 0 && afstand[bedst] < afstand[0] * 0.85 ? bedst * 90 : 0;
+    } catch (err) {
+      this._report('orientation-probe', absPath, err);
       return null;
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
     }
   }
 
@@ -287,24 +335,26 @@ export class Thumbnailer {
         const fraFil = exifOrientation(absPath);
         let filRetning = fraFil;
         let fraCanon = null;
-        let fraSips = null;
         if (!filRetning || filRetning === 1) {
           fraCanon = canonRetning(absPath);
           filRetning = fraCanon;
         }
-        if (!filRetning || filRetning === 1) {
-          fraSips = await this._sipsRetning(absPath);
-          filRetning = fraSips;
+        // Staar retningen ingen steder, spoerges macOS selv: den fremkalder
+        // et lille billede, og det der ligner den indbyggede JPEG mest
+        // drejet 0, 90, 180 eller 270 grader er svaret.
+        let fraProbe = null;
+        if ((!filRetning || filRetning === 1) && !meta.orientation) {
+          fraProbe = await this._retningViaMac(key, absPath, emb.buffer);
         }
         // De foerste par stykker i loggen, saa det kan ses hvor retningen
         // staar, hvis automatikken tager fejl.
         if (this._retningslog < 25) {
           this._retningslog += 1;
-          this.onInfo?.(`orientation (${basename(absPath)}): file=${fraFil} canon=${fraCanon} sips=${fraSips} jpeg=${meta.orientation ?? null} embedded=${emb.width}x${emb.height} used=${filRetning ?? meta.orientation ?? 1}`);
+          this.onInfo?.(`orientation (${basename(absPath)}): file=${fraFil} canon=${fraCanon} mac=${fraProbe} jpeg=${meta.orientation ?? null} embedded=${emb.width}x${emb.height} used=${filRetning ?? meta.orientation ?? fraProbe ?? 0}`);
         }
-        img = filRetning && filRetning > 1
-          ? medRetning(img, filRetning)
-          : (meta.orientation ? img.rotate() : img);
+        if (filRetning && filRetning > 1) img = medRetning(img, filRetning);
+        else if (meta.orientation) img = img.rotate();
+        else if (fraProbe) img = img.rotate(fraProbe);
         await img
           .resize(size, size, { fit: 'inside', withoutEnlargement: true })
           .jpeg({ quality: 85 })

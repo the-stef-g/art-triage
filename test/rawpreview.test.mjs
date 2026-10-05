@@ -175,8 +175,8 @@ describe('forhaandsvisning af en RAW-fil', () => {
     const sti = await t.ensure(1, 5, fil, 1024);
     expect(sti).toMatch(/1-5-1024\.jpg$/);
     // Kun et spoergsmaal om retningen, ingen forhaandsvisning laves af sips.
-    expect(kald.filter((k) => !k[1].includes('-g'))).toEqual([]);
-    expect(fejl).toEqual([]);
+    expect(kald.filter((k) => !k[1].includes('128'))).toEqual([]);
+    expect(fejl.filter((f) => f.stage !== 'orientation-probe')).toEqual([]);
     const m = await sharp(sti).metadata();
     expect([m.width, m.height]).toEqual([1024, 640]);
   });
@@ -212,12 +212,37 @@ describe('forhaandsvisning af en RAW-fil', () => {
     expect([m.width, m.height]).toEqual([1000, 1600]);
   });
 
-  it('spoerger sips om retningen, naar RAW-filen og JPEG\'en ingen har', async () => {
+  it('maaler retningen via macOS, naar den ikke staar nogen steder', async () => {
     const fil = join(dir, 'ukendt.cr2');
-    writeFileSync(fil, Buffer.concat([tiffMedRetning(1), await medHjoerne(1600, 1000)]));
-    const { t } = lav(async (cmd, args) => ({ stdout: `${args[2]}\n  orientation: 6\n` }));
-    const m = await sharp(await t.ensure(8, 5, fil, 2048)).metadata();
-    expect([m.width, m.height]).toEqual([1000, 1600]);
+    const orig = await medHjoerne(1600, 1000); // markeret hjoerne oppe til venstre
+    writeFileSync(fil, Buffer.concat([tiffMedRetning(1), orig]));
+    let kald = 0;
+    // macOS viser billedet drejet 270 grader med uret (staaende), som den
+    // egentlig har vaeret taget.
+    const { t } = lav(async (cmd, args) => {
+      kald += 1;
+      await sharp(orig).rotate(270).resize(128, 128, { fit: 'inside' }).jpeg().toFile(args[args.indexOf('--out') + 1]);
+    });
+    const sti = await t.ensure(8, 5, fil, 512);
+    const { data, info } = await sharp(sti).raw().toBuffer({ resolveWithObject: true });
+    expect(info.height).toBeGreaterThan(info.width);
+    const roed = (x, y) => data[(y * info.width + x) * info.channels] > 200;
+    expect(roed(2, info.height - 3)).toBe(true); // hjoernet er nu nede til venstre
+    expect(roed(2, 2)).toBe(false);
+    // Et andet stoerrelse spoerger ikke macOS igen.
+    await t.ensure(8, 5, fil, 2048);
+    expect(kald).toBe(1);
+  });
+
+  it('lader et liggende billede ligge, naar macOS viser det liggende', async () => {
+    const fil = join(dir, 'liggende.cr2');
+    const orig = await medHjoerne(1600, 1000);
+    writeFileSync(fil, Buffer.concat([tiffMedRetning(1), orig]));
+    const { t } = lav(async (cmd, args) => {
+      await sharp(orig).resize(128, 128, { fit: 'inside' }).jpeg().toFile(args[args.indexOf('--out') + 1]);
+    });
+    const m = await sharp(await t.ensure(11, 5, fil, 512)).metadata();
+    expect(m.width).toBeGreaterThan(m.height);
   });
 
   it('lægger brugerens egen drejning oven paa, og glemmer cachen ved ny drejning', async () => {
