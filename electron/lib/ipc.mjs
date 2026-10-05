@@ -13,6 +13,7 @@ import {
   ClaudeKeywords, KeywordRunner, KEYWORD_MODELS, DEFAULT_KEYWORD_MODEL,
 } from './keywords.mjs';
 import { UndoManager } from './undo.mjs';
+import { Works } from './works.mjs';
 import { debounce, dataDirFor } from './util.mjs';
 
 // Mappe-overvaageren (chokidar) faar sjaeldent fil-system-haendelser fra
@@ -135,6 +136,7 @@ export class AppSession {
     });
     this.searchIndex = new SearchIndex(this.catalog, MODEL_ID);
     this.undoMgr = new UndoManager(this.catalog);
+    this.works = new Works(this.catalog);
     this.indexer = new Indexer({
       catalog: this.catalog,
       thumbs: this.thumbs,
@@ -193,6 +195,7 @@ export class AppSession {
     this.thumbs = null;
     this.searchIndex = null;
     this.indexer = null;
+    this.works = null;
   }
 
   async closeLibrary() {
@@ -223,11 +226,17 @@ export class AppSession {
     this.thumbs = null;
     this.searchIndex = null;
     this.undoMgr = null;
+    this.works = null;
   }
 
   requireCatalog() {
     if (!this.catalog) throw new Error('No library is open');
     return this.catalog;
+  }
+
+  requireWorks() {
+    this.requireCatalog();
+    return this.works;
   }
 
   // ---------- Cloud-noegleord ----------
@@ -462,6 +471,12 @@ export class AppSession {
     handle('kw:remove', ({ fileId, word }) => this.requireCatalog().removeKeyword(fileId, word));
     handle('kw:removeFromFiles', ({ fileIds, word }) =>
       this.requireCatalog().removeKeywordFromFiles(fileIds, word));
+
+    // Vaerket: tekster og shop-felter pr. billede (docs/plan-shop.md).
+    handle('work:get', ({ imageId }) => this.requireWorks().get(imageId));
+    handle('work:save', ({ imageId, patch }) => this.requireWorks().save(imageId, patch));
+    handle('work:setCrop', ({ imageId, versionId, format }) =>
+      this.requireWorks().setCrop(imageId, versionId, format ?? null));
 
     handle('search:status', () => ({
       ai: this.ai.status,

@@ -65,6 +65,41 @@ CREATE TABLE IF NOT EXISTS keyword_runs(
   words INTEGER NOT NULL,
   run_at INTEGER NOT NULL
 );
+-- Vaerkets tekster og shop-felter (docs/plan-shop.md). Et vaerk er et
+-- billede; raekken oprettes foerste gang billedet aabnes i vaerk-panelet.
+-- Tomme felter er tomme i databasen; standardvaerdierne (titel fra
+-- filnavnet, aar fra EXIF) regnes ud naar vaerket laeses.
+CREATE TABLE IF NOT EXISTS works(
+  image_id INTEGER PRIMARY KEY REFERENCES images(id) ON DELETE CASCADE,
+  title TEXT,
+  year INTEGER,
+  exif_year INTEGER,
+  exif_checked INTEGER NOT NULL DEFAULT 0,
+  category TEXT,
+  technique TEXT,
+  template TEXT NOT NULL DEFAULT 'spread',
+  section_colour TEXT,
+  catalogue_number TEXT,
+  video TEXT,
+  prints INTEGER NOT NULL DEFAULT 0,
+  dimensions TEXT,
+  price TEXT,
+  notes TEXT,
+  description TEXT,
+  short_text TEXT,
+  alt_text TEXT,
+  generated TEXT,
+  woo_product_id INTEGER,
+  updated_at INTEGER NOT NULL
+);
+-- Hvilken version der er hvilken beskaering. En version har hoejst ét
+-- format, og et format peger hoejst paa én version pr. vaerk.
+CREATE TABLE IF NOT EXISTS work_crops(
+  version_id INTEGER PRIMARY KEY REFERENCES versions(id) ON DELETE CASCADE,
+  image_id INTEGER NOT NULL REFERENCES images(id) ON DELETE CASCADE,
+  format TEXT NOT NULL,
+  UNIQUE(image_id, format)
+);
 CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT);
 CREATE INDEX IF NOT EXISTS idx_versions_image ON versions(image_id);
 CREATE INDEX IF NOT EXISTS idx_versions_file ON versions(file_id);

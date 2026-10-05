@@ -11,6 +11,7 @@ const CHANNELS = new Set([
   'ed:list', 'ed:open', 'ed:pick',
   'kw:top', 'kw:forFile', 'kw:add', 'kw:remove', 'kw:removeFromFiles',
   'kw:status', 'kw:run', 'kw:stop', 'kw:setModel', 'kw:reanalyse',
+  'work:get', 'work:save', 'work:setCrop',
   'search:status', 'app:counts', 'app:undo', 'app:redo',
   'app:info', 'app:setHfToken', 'app:setClaudeKey',
 ]);
