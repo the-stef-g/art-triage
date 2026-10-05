@@ -5,3 +5,4 @@ public/ort/
 *.log
 .DS_Store
 smoke-*.png
+release-linux/

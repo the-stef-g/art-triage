@@ -119,30 +119,54 @@ export class ShopClient {
 
 // ---------- Billeder ----------
 
-// En JPEG i hoej kvalitet paa ca. 3000 px, aldrig printmasteren. Samme
-// to veje som thumbnails: sips paa macOS, sharp ellers.
-export async function exportJpeg(absPath, size = SHOP_IMAGE_SIZE, quality = SHOP_JPEG_QUALITY) {
+// En JPEG i hoej kvalitet paa ca. 3000 px, aldrig printmasteren. Paa macOS
+// er det sips, og kan det ikke, falder det tilbage paa sharp; andre steder
+// er det sharp. Fejler begge, staar begge aarsager i fejlbeskeden.
+async function viaSips(absPath, size, quality, out, runner) {
+  await runner('sips', [
+    '-s', 'format', 'jpeg', '-s', 'formatOptions', String(quality),
+    '--resampleHeightWidthMax', String(size), absPath, '--out', out,
+  ]);
+}
+
+async function viaSharp(absPath, size, quality, out) {
+  if (!RASTER_EXTS.has(extOf(absPath))) throw new Error(`sharp cannot read .${extOf(absPath)} files`);
+  const sharp = (await import('sharp')).default;
+  await sharp(absPath, { failOn: 'truncated' })
+    .rotate()
+    .resize(size, size, { fit: 'inside', withoutEnlargement: true })
+    .flatten({ background: '#ffffff' })
+    .jpeg({ quality })
+    .toFile(out);
+}
+
+function kortAarsag(err) {
+  return String(err?.stderr || err?.message || err).trim().replace(/\s+/g, ' ').slice(0, 200);
+}
+
+export async function exportJpeg(
+  absPath,
+  size = SHOP_IMAGE_SIZE,
+  quality = SHOP_JPEG_QUALITY,
+  { platform = process.platform, runner = run } = {}
+) {
   const dir = mkdtempSync(join(tmpdir(), 'at-shop-'));
   const out = join(dir, 'export.jpg');
+  const veje = platform === 'darwin'
+    ? [['sips', viaSips], ['sharp', viaSharp]]
+    : [['sharp', viaSharp]];
+  const aarsager = [];
   try {
-    if (process.platform === 'darwin') {
-      await run('sips', [
-        '-s', 'format', 'jpeg', '-s', 'formatOptions', String(quality),
-        '--resampleHeightWidthMax', String(size), absPath, '--out', out,
-      ]);
-    } else {
-      if (!RASTER_EXTS.has(extOf(absPath))) throw new Error('unsupported');
-      const sharp = (await import('sharp')).default;
-      await sharp(absPath, { failOn: 'truncated' })
-        .rotate()
-        .resize(size, size, { fit: 'inside', withoutEnlargement: true })
-        .flatten({ background: '#ffffff' })
-        .jpeg({ quality })
-        .toFile(out);
+    for (const [navn, fn] of veje) {
+      try {
+        await fn(absPath, size, quality, out, runner);
+        return readFileSync(out);
+      } catch (err) {
+        aarsager.push(`${navn}: ${kortAarsag(err)}`);
+        rmSync(out, { force: true });
+      }
     }
-    return readFileSync(out);
-  } catch {
-    throw new ShopError(`The image ${basename(absPath)} could not be exported as a JPEG`);
+    throw new ShopError(`The image ${basename(absPath)} could not be exported as a JPEG (${aarsager.join('; ')})`);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

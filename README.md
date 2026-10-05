@@ -139,6 +139,8 @@ The source lives in this repository and is an Electron project with Vite and Rea
     npm run smoke      # UI smoke test of the built app
     npm run dist:mac   # builds art-triage-mac-x64.zip (requires macOS)
 
+Previews are made with sips on macOS, then Quick Look, then sharp. If a step fails, the real reason goes in the log (Help > Show AI log) as `preview sips (file.tif): …`, even when a later step saves the day. Write texts and Send to shop fall back to a preview already in the cache if a fresh one cannot be made. sharp is a regular dependency, unpacked from the asar (`asarUnpack`), and the build checks that the Intel binary is in the app. At startup the log says `sharp loaded` or `sharp could NOT be loaded` with the reason.
+
 Catalogue data per library lives in `.art-triage/katalog.sqlite`, previews in `.art-triage/cache/`. Delete the `.art-triage` folder and the catalogue is rebuilt on the next open, but ratings, series and virtual copies are lost.
 
 Code comments, internal identifiers and the database values (`godkendt`, `kasseret`, `kandidat`, `ubedomt`) are still in Danish on purpose. Translating the stored rating values would mean migrating every existing catalogue for no gain the user can see.

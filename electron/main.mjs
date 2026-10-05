@@ -383,7 +383,12 @@ app.whenReady().then(() => {
   ai = new AiBridge(null);
   ai.on('status', (s) => aiLog(`status: ${s.state} ${s.progress ?? 0}% ${s.detail || ''}`));
   aiLog(`--- Art Triage ${app.getVersion()} startet (${process.platform}, Electron ${process.versions.electron}) ---`);
-  session = new AppSession({ settings, ai, rasterizeSvg });
+  session = new AppSession({ settings, ai, rasterizeSvg, log: aiLog });
+  // Er sharp med i den pakkede app? Det er den foerste ting at se efter
+  // naar en forhaandsvisning ikke kan laves.
+  import('sharp')
+    .then(() => aiLog(`sharp loaded (${process.platform}-${process.arch})`))
+    .catch((err) => aiLog(`sharp could NOT be loaded (${process.platform}-${process.arch}): ${String(err?.message || err).slice(0, 300)}`));
 
   ipcMain.on('ai:msg', (event, msg) => {
     if (aiWin && event.sender === aiWin.webContents) ai.handleMessage(msg);

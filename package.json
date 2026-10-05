@@ -1,7 +1,7 @@
 {
   "name": "art-triage",
   "productName": "Art Triage",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "description": "Sort and organise image files on macOS",
   "author": "Steffen Graumann",
   "license": "UNLICENSED",
@@ -19,6 +19,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",
     "chokidar": "^4.0.3",
+    "sharp": "^0.34.2",
     "sql.js": "^1.13.0"
   },
   "devDependencies": {
@@ -31,7 +32,6 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-window": "^1.8.11",
-    "sharp": "^0.34.2",
     "vite": "^6.3.5",
     "vitest": "^3.2.3"
   },
@@ -39,6 +39,10 @@
     "appId": "dk.stefs.art-triage",
     "productName": "Art Triage",
     "asar": true,
+    "asarUnpack": [
+      "node_modules/sharp/**/*",
+      "node_modules/@img/**/*"
+    ],
     "files": [
       "dist/**",
       "electron/**",

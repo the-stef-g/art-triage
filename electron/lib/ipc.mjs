@@ -35,8 +35,9 @@ const RESCAN_DUTY = 10;
 const AUTOKW_RYDDET = 'autokw_ryddet';
 
 export class AppSession {
-  constructor({ settings, ai, rasterizeSvg }) {
+  constructor({ settings, ai, rasterizeSvg, log = () => {} }) {
     this.settings = settings;
+    this.log = log;
     this.ai = ai;
     this.rasterizeSvg = rasterizeSvg;
     this.win = null;
@@ -136,6 +137,9 @@ export class AppSession {
     this.thumbs = new Thumbnailer({
       cacheDir: join(dataDir, 'cache'),
       rasterizeSvg: this.rasterizeSvg,
+      // Hvert trin der svigter staar i loggen, ogsaa naar et senere trin
+      // redder forhaandsvisningen.
+      onError: ({ stage, file, message }) => this.log(`preview ${stage} (${file}): ${message}`),
     });
     this.searchIndex = new SearchIndex(this.catalog, MODEL_ID);
     this.undoMgr = new UndoManager(this.catalog);
@@ -292,8 +296,15 @@ export class AppSession {
     }
     const file = works.imageFile(imageId);
     if (!file) throw new Error('The image file is not available right now');
-    const thumbPath = await this.thumbs.ensure(file.id, file.mtime, this.catalog.abs(file.rel_path), TEXT_IMAGE_SIZE);
-    if (!thumbPath) throw new Error('A preview of the image could not be made');
+    const preview = await this.thumbs.previewFor(
+      file.id, file.mtime, this.catalog.abs(file.rel_path), TEXT_IMAGE_SIZE
+    );
+    if (!preview) {
+      const grund = this.thumbs.lastError ? ` (${this.thumbs.lastError.slice(0, 160)})` : '';
+      this.log(`write texts: no preview for ${file.rel_path}${grund}`);
+      throw new Error(`A preview of the image could not be made${grund}. The details are in the log under Help > Show AI log.`);
+    }
+    const thumbPath = preview.path;
     if (!this.textService || this.textService.model !== this.keywordModel()) {
       this.textService = new ClaudeWorkTexts({ apiKey, model: this.keywordModel() });
     }

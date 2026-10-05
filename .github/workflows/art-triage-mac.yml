@@ -66,6 +66,21 @@ jobs:
         timeout-minutes: 8
         env:
           ELECTRON_DISABLE_SANDBOX: '1'
+      # Smoke-testen koerer fra kildemappen og ser derfor aldrig hvad
+      # electron-builder pakker. Her pakkes appen, og sharp indlaeses fra
+      # den pakkede asar, saa en sharp der faldt ud af pakken fanges her.
+      - name: Pack for Linux and load sharp from the packed app
+        run: |
+          npx electron-builder --linux dir --x64 --publish never -c.directories.output=release-linux
+          node scripts/check-packaged-sharp.mjs release-linux/linux-unpacked/resources linux-x64
+          ELECTRON_RUN_AS_NODE=1 ELECTRON_DISABLE_SANDBOX=1 release-linux/linux-unpacked/art-triage -e "
+            const sharp = require('./release-linux/linux-unpacked/resources/app.asar/node_modules/sharp');
+            sharp({ create: { width: 300, height: 200, channels: 3, background: '#0963c7' } }).tiff().toBuffer()
+              .then((b) => sharp(b).resize(100, 100, { fit: 'inside' }).jpeg().toBuffer())
+              .then((o) => console.log('packed sharp ok,', o.length, 'bytes'))
+              .catch((e) => { console.error('packed sharp FAILED:', e.message); process.exit(1); });
+          "
+        timeout-minutes: 6
       - name: Upload smoke screenshots
         if: always()
         uses: actions/upload-artifact@v7
@@ -87,7 +102,19 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
       - run: npm ci
+      # Runneren er ikke nødvendigvis Intel. sharp henter sin binær efter
+      # maskinens processor, saa x64-binaeren til Intel-Macen skal hentes
+      # udtrykkeligt, ellers pakkes en arm64-binaer ind i en x64-app.
+      - name: Fetch the x64 build of sharp
+        run: |
+          v=$(node -p "require('./package-lock.json').packages['node_modules/sharp'].version")
+          npm install --no-save --ignore-scripts --os=darwin --cpu=x64 "sharp@$v"
       - run: npm run dist:mac
+      - name: Check that sharp is packaged, unpacked and built for Intel
+        run: |
+          rm -rf release/check && mkdir -p release/check
+          unzip -q release/art-triage-mac-x64.zip -d release/check
+          node scripts/check-packaged-sharp.mjs "release/check/Art Triage.app/Contents/Resources" darwin-x64
       - name: Upload app artifact
         uses: actions/upload-artifact@v7
         with:
