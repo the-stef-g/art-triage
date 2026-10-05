@@ -11,7 +11,7 @@ import { join, basename } from 'node:path';
 import { tmpdir } from 'node:os';
 import { extOf, RASTER_EXTS, openFdCount } from './util.mjs';
 import { indbyggetJpeg, RAW_EXTS_MED_FORHAANDSVISNING } from './rawpreview.mjs';
-import { exifOrientation } from './exif.mjs';
+import { exifOrientation, canonRetning } from './exif.mjs';
 
 const run = promisify(execFile);
 
@@ -286,7 +286,12 @@ export class Thumbnailer {
         // retning paa RAW-filen, bruges JPEG'ens egen.
         const fraFil = exifOrientation(absPath);
         let filRetning = fraFil;
+        let fraCanon = null;
         let fraSips = null;
+        if (!filRetning || filRetning === 1) {
+          fraCanon = canonRetning(absPath);
+          filRetning = fraCanon;
+        }
         if (!filRetning || filRetning === 1) {
           fraSips = await this._sipsRetning(absPath);
           filRetning = fraSips;
@@ -295,7 +300,7 @@ export class Thumbnailer {
         // staar, hvis automatikken tager fejl.
         if (this._retningslog < 25) {
           this._retningslog += 1;
-          this.onInfo?.(`orientation (${basename(absPath)}): file=${fraFil} sips=${fraSips} jpeg=${meta.orientation ?? null} embedded=${emb.width}x${emb.height} used=${filRetning ?? meta.orientation ?? 1}`);
+          this.onInfo?.(`orientation (${basename(absPath)}): file=${fraFil} canon=${fraCanon} sips=${fraSips} jpeg=${meta.orientation ?? null} embedded=${emb.width}x${emb.height} used=${filRetning ?? meta.orientation ?? 1}`);
         }
         img = filRetning && filRetning > 1
           ? medRetning(img, filRetning)

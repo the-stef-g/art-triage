@@ -132,6 +132,49 @@ export function exifOrientationFromBuffer(buf) {
   }
 }
 
+// Canon skriver ikke altid retningen i IFD0 paa sine RAW-filer. Den staar
+// i kameraets egen blok (MakerNote, tag 0x0004 "ShotInfo", felt 27
+// "AutoRotate": 0 ingen, 1 90 grader med uret, 2 180, 3 270 med uret), og
+// det er den macOS selv bruger. Giver EXIF-retning 1, 6, 3 eller 8, eller null.
+const TAG_MAKERNOTE = 0x927c;
+const TAG_CANON_SHOTINFO = 0x0004;
+const SHOTINFO_AUTOROTATE = 27;
+const AUTOROTATE_TIL_RETNING = [1, 6, 3, 8];
+
+export function canonRetningFromBuffer(buf) {
+  try {
+    const tiff = findTiff(buf);
+    if (!tiff) return null;
+    const start = tiff.start;
+    const le = buf[start] === 0x49;
+    const u16 = (p) => (le ? buf.readUInt16LE(p) : buf.readUInt16BE(p));
+    const u32 = (p) => (le ? buf.readUInt32LE(p) : buf.readUInt32BE(p));
+    const ifd0 = readIfd(buf, start, u32(start + 4), le);
+    const exifPtr = ifd0.get(TAG_EXIF_IFD);
+    if (!exifPtr) return null;
+    const exif = readIfd(buf, start, exifPtr.rawLong, le);
+    const note = exif.get(TAG_MAKERNOTE);
+    if (!note || note.count < 8) return null;
+    // MakerNote er en IFD for sig selv, med afstande regnet fra TIFF-starten.
+    const noteStart = note.count > 4 ? note.rawLong : null;
+    if (noteStart === null) return null;
+    const canon = readIfd(buf, start, noteStart, le);
+    const info = canon.get(TAG_CANON_SHOTINFO);
+    if (!info || info.type !== 3 || info.count <= SHOTINFO_AUTOROTATE) return null;
+    const felt = info.count * 2 > 4 ? start + info.rawLong : null;
+    if (felt === null || felt + (SHOTINFO_AUTOROTATE + 1) * 2 > buf.length) return null;
+    const v = u16(felt + SHOTINFO_AUTOROTATE * 2);
+    return v >= 0 && v < AUTOROTATE_TIL_RETNING.length ? AUTOROTATE_TIL_RETNING[v] : null;
+  } catch {
+    return null;
+  }
+}
+
+export function canonRetning(absPath) {
+  const buf = laesHoved(absPath);
+  return buf ? canonRetningFromBuffer(buf) : null;
+}
+
 function laesHoved(absPath) {
   let fd;
   try {

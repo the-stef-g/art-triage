@@ -7,7 +7,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync } from 'node:
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { indbyggetJpeg, jpegHoved } from '../electron/lib/rawpreview.mjs';
-import { exifOrientationFromBuffer } from '../electron/lib/exif.mjs';
+import { exifOrientationFromBuffer, canonRetningFromBuffer } from '../electron/lib/exif.mjs';
 import { Thumbnailer, medRetning } from '../electron/lib/thumbs.mjs';
 
 let dir;
@@ -37,6 +37,21 @@ function tiffMedRetning(retning, le = true) {
   w16(1, 8); w16(0x0112, 10); w16(3, 12);
   le ? b.writeUInt32LE(1, 14) : b.writeUInt32BE(1, 14);
   w16(retning, 18);
+  return b;
+}
+
+
+// En CR2 hvor retningen kun staar i Canons egen blok: IFD0 -> EXIF-IFD ->
+// MakerNote (en IFD) -> tag 4 (ShotInfo), felt 27 (AutoRotate).
+function canonMedAutoRotate(v, le = true) {
+  const b = Buffer.alloc(62 + 60);
+  const w16 = (x, o) => (le ? b.writeUInt16LE(x, o) : b.writeUInt16BE(x, o));
+  const w32 = (x, o) => (le ? b.writeUInt32LE(x, o) : b.writeUInt32BE(x, o));
+  b.write(le ? 'II' : 'MM', 0, 'latin1'); w16(42, 2); w32(8, 4);
+  w16(1, 8); w16(0x8769, 10); w16(4, 12); w32(1, 14); w32(26, 18);
+  w16(1, 26); w16(0x927c, 28); w16(7, 30); w32(78, 32); w32(44, 36);
+  w16(1, 44); w16(0x0004, 46); w16(3, 48); w32(30, 50); w32(62, 54);
+  w16(v, 62 + 27 * 2);
   return b;
 }
 
@@ -108,6 +123,13 @@ describe('indbygget JPEG', () => {
 });
 
 describe('retning', () => {
+  it('laeser Canons AutoRotate og oversaetter den til en EXIF-retning', () => {
+    expect([0, 1, 2, 3].map((v) => canonRetningFromBuffer(canonMedAutoRotate(v)))).toEqual([1, 6, 3, 8]);
+    expect(canonRetningFromBuffer(canonMedAutoRotate(3, false))).toBe(8);
+    expect(canonRetningFromBuffer(tiffMedRetning(6))).toBeNull();
+    expect(canonRetningFromBuffer(Buffer.from('nej'))).toBeNull();
+  });
+
   it('laeser retningen fra IFD0, baade little og big endian', () => {
     expect(exifOrientationFromBuffer(tiffMedRetning(6, true))).toBe(6);
     expect(exifOrientationFromBuffer(tiffMedRetning(8, false))).toBe(8);
@@ -180,6 +202,14 @@ describe('forhaandsvisning af en RAW-fil', () => {
       const m = await sharp(await t.ensure(id, 5, fil, str)).metadata();
       expect(m.height).toBeGreaterThan(m.width);
     }
+  });
+
+  it('bruger Canons AutoRotate, naar IFD0 ingen retning har', async () => {
+    const fil = join(dir, 'canon.cr2');
+    writeFileSync(fil, Buffer.concat([canonMedAutoRotate(3), await medHjoerne(1600, 1000)]));
+    const { t } = lav(ingenProgrammer);
+    const m = await sharp(await t.ensure(10, 5, fil, 2048)).metadata();
+    expect([m.width, m.height]).toEqual([1000, 1600]);
   });
 
   it('spoerger sips om retningen, naar RAW-filen og JPEG\'en ingen har', async () => {
