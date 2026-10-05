@@ -7,7 +7,7 @@ import {
 } from 'node:fs';
 import { join, dirname, basename, extname, posix } from 'node:path';
 import {
-  walkImages, walkDirs, quickHash, stemOf, slug, uniquePath, extOf, daCollator,
+  walkImages, walkImagesAsync, walkDirs, quickHash, quickHashAsync, mapGraense, stemOf, slug, uniquePath, extOf, daCollator,
   libraryAvailable,
 } from './util.mjs';
 
@@ -117,6 +117,18 @@ CREATE INDEX IF NOT EXISTS idx_versions_file ON versions(file_id);
 CREATE INDEX IF NOT EXISTS idx_keywords_word ON keywords(word);
 `;
 
+// De filer mindst én version peger paa, med en bestemt vurdering. Den staar
+// som sin egen, materialiserede maengde. Skrevet som EXISTS (... WHERE
+// COALESCE(v.file_id, i.master_file_id) = f.id ...) kan udtrykket ikke bruge
+// noget indeks, og databasen laeste alle versioner igennem for hver eneste
+// fil: ved 15.000 billeder tog noegleordslisten 70 sekunder og koeen til
+// analyse 19, og de koerte i hovedprocessen ved hver aendring.
+function effektiveFiler(betingelse) {
+  return `SELECT DISTINCT COALESCE(v.file_id, i.master_file_id) AS fid
+          FROM versions v JOIN images i ON i.id = v.image_id
+          WHERE ${betingelse}`;
+}
+
 export class Catalog extends EventEmitter {
   constructor(db, root) {
     super();
@@ -156,7 +168,8 @@ export class Catalog extends EventEmitter {
   // ---------- Scanning og synkronisering ----------
 
   // Koerer en fuld afstemning mellem disk og database. Idempotent, saa
-  // watcheren kan kalde den ved enhver aendring.
+  // watcheren kan kalde den ved enhver aendring. Den synkrone udgave bruges
+  // af testene; appen bruger syncAsync, som ikke holder hovedprocessen.
   sync() {
     // Er drevet ikke tilsluttet, ligner biblioteket en tom mappe, og en
     // synkronisering ville markere hver eneste fil som forsvundet. Meld
@@ -165,7 +178,46 @@ export class Catalog extends EventEmitter {
     if (!libraryAvailable(this.root)) {
       return { changed: 0, edited: 0, unavailable: true };
     }
-    const disk = new Map(walkImages(this.root).map((f) => [f.rel, f]));
+    return this._afstem(new Map(walkImages(this.root).map((f) => [f.rel, f])), null);
+  }
+
+  // Det samme, men filsystemet laeses uden at blokere: mapperne, filernes
+  // stoerrelse og tid, og hashen af de filer der er nye eller aendrede. Selve
+  // afstemningen mod databasen er hurtig og koerer til sidst i ét stykke.
+  async syncAsync() {
+    if (!libraryAvailable(this.root)) {
+      return { changed: 0, edited: 0, unavailable: true };
+    }
+    const liste = await walkImagesAsync(this.root);
+    const kendte = new Map(this.db.all('SELECT rel_path, size, mtime FROM files').map((r) => [r.rel_path, r]));
+    const skalHashes = liste.filter((f) => {
+      const k = kendte.get(f.rel);
+      return !k || k.size !== f.size || k.mtime !== f.mtime;
+    });
+    const hashes = new Map();
+    await mapGraense(skalHashes, 8, async (f) => {
+      try {
+        hashes.set(f.rel, await quickHashAsync(this.abs(f.rel), f.size));
+      } catch {
+        hashes.set(f.rel, null); // kunne ikke laeses; springes over
+      }
+    });
+    // Drevet kan vaere taget ud mens der blev laest. Saa er listen tom, og
+    // en afstemning ville markere alt som forsvundet.
+    if (!libraryAvailable(this.root)) return { changed: 0, edited: 0, unavailable: true };
+    return this._afstem(new Map(liste.map((f) => [f.rel, f])), hashes);
+  }
+
+  // hashes: forudberegnede hashes fra syncAsync, eller null.
+  _afstem(disk, hashes) {
+    const hashAf = (rel, size) => {
+      if (hashes && hashes.has(rel)) {
+        const h = hashes.get(rel);
+        if (h === null) throw new Error('unreadable');
+        return h;
+      }
+      return quickHash(this.abs(rel), size);
+    };
     const dbFiles = this.db.all('SELECT * FROM files');
     const missing = [];
     const changedFileIds = [];
@@ -186,7 +238,7 @@ export class Catalog extends EventEmitter {
         if (d.size !== row.size || d.mtime !== row.mtime) {
           let hash = row.hash;
           try {
-            hash = quickHash(this.abs(row.rel_path), d.size);
+            hash = hashAf(row.rel_path, d.size);
           } catch {
             continue;
           }
@@ -209,7 +261,7 @@ export class Catalog extends EventEmitter {
       for (const n of newEntries) {
         let hash;
         try {
-          hash = quickHash(this.abs(n.rel), n.size);
+          hash = hashAf(n.rel, n.size);
         } catch {
           continue;
         }
@@ -234,6 +286,10 @@ export class Catalog extends EventEmitter {
         }
       }
 
+      // Filerne pr. mappe, bygget én gang. Foer blev hver ny fil slaaet op
+      // med en LIKE over alle filer i kataloget, saa en foerste skanning af
+      // 15.000 billeder tog 11 sekunder og voksede med kvadratet.
+      const mappeIndeks = this._mappeIndeks();
       // Resterende nye filer: stack paa eksisterende billede eller opret nyt.
       // Korteste stier foerst, saa grundfiler oprettes foer deres afledte
       // varianter og stacking rammer rigtigt ved foerste scanning.
@@ -247,7 +303,7 @@ export class Catalog extends EventEmitter {
           n.rel, n.size, n.mtime, n.hash, this.now()
         ).lastInsertRowid;
 
-        const stackImage = this._findStackTarget(n.rel);
+        const stackImage = this._findStackTarget(n.rel, mappeIndeks);
         if (stackImage) {
           this.db.run(
             'INSERT INTO versions(image_id, file_id, name, is_master, rating, edited, created_at) VALUES(?,?,?,0,?,1,?)',
@@ -263,6 +319,7 @@ export class Catalog extends EventEmitter {
             imageId, 'Original', this.now()
           );
         }
+        this._indeksTilfoej(mappeIndeks, fileId, n.rel);
         changedFileIds.push(fileId);
       }
     });
@@ -287,15 +344,32 @@ export class Catalog extends EventEmitter {
   // Finder det billede en ny, afledt fil hoerer til: samme mappe og et
   // stem der starter med et eksisterende billedes stem (fx
   // "IMG_1234-gigapixel.tif" hoerer til "IMG_1234.CR2").
-  _findStackTarget(rel) {
+  _mappeIndeks() {
+    const indeks = new Map();
+    for (const f of this.db.all('SELECT id, rel_path FROM files WHERE present=1')) {
+      this._indeksTilfoej(indeks, f.id, f.rel_path);
+    }
+    return indeks;
+  }
+
+  _indeksTilfoej(indeks, id, relPath) {
+    const dir = posix.dirname(relPath);
+    const liste = indeks.get(dir);
+    if (liste) liste.push({ id, rel_path: relPath });
+    else indeks.set(dir, [{ id, rel_path: relPath }]);
+  }
+
+  _findStackTarget(rel, indeks = null) {
     const dir = posix.dirname(rel);
     const stem = stemOf(posix.basename(rel));
     const prefix = dir === '.' ? '' : `${dir}/`;
-    const siblings = this.db.all(
-      `SELECT f.id, f.rel_path FROM files f
-       WHERE f.present=1 AND f.rel_path LIKE ? AND f.rel_path NOT LIKE ?`,
-      `${prefix}%`, `${prefix}%/%`
-    );
+    const siblings = indeks
+      ? (indeks.get(dir) || [])
+      : this.db.all(
+        `SELECT f.id, f.rel_path FROM files f
+         WHERE f.present=1 AND f.rel_path LIKE ? AND f.rel_path NOT LIKE ?`,
+        `${prefix}%`, `${prefix}%/%`
+      );
     let best = null;
     for (const s of siblings) {
       if (s.rel_path === rel) continue; // ikke matche sig selv
@@ -695,33 +769,48 @@ export class Catalog extends EventEmitter {
   // Flytter filer hvor ALLE tilknyttede versioner er kasserede til _kasseret/.
   moveDiscarded() {
     const rows = this.db.all(
-      `SELECT DISTINCT f.id FROM files f
+      `WITH alle AS MATERIALIZED (${effektiveFiler('1=1')}),
+            levende AS MATERIALIZED (${effektiveFiler("v.rating != 'kasseret'")})
+       SELECT f.id FROM files f
+       JOIN alle a ON a.fid = f.id
        WHERE f.present=1 AND f.rel_path NOT LIKE '\\_kasseret/%' ESCAPE '\\'
-       AND EXISTS (
-         SELECT 1 FROM versions v JOIN images i ON i.id=v.image_id
-         WHERE COALESCE(v.file_id, i.master_file_id)=f.id
-       )
-       AND NOT EXISTS (
-         SELECT 1 FROM versions v JOIN images i ON i.id=v.image_id
-         WHERE COALESCE(v.file_id, i.master_file_id)=f.id AND v.rating != 'kasseret'
-       )`
+         AND f.id NOT IN (SELECT fid FROM levende)`
     );
     return this.moveFiles(rows.map((r) => r.id), '_kasseret');
   }
 
   // ---------- Embeddings og noegleord ----------
 
-  filesNeedingEmbedding(model) {
+  // limit: indekseringen henter en bunke ad gangen. Foer hentes hele
+  // ventelisten (op til alle billeder) for hver eneste fil, saa arbejdet
+  // voksede med kvadratet paa bibliotekets stoerrelse.
+  filesNeedingEmbedding(model, limit = null) {
     return this.db.all(
       `SELECT f.id, f.rel_path, f.mtime FROM files f
        WHERE f.present=1
-       AND NOT EXISTS (SELECT 1 FROM embeddings e WHERE e.file_id=f.id AND e.model=?)`,
-      model
+       AND NOT EXISTS (SELECT 1 FROM embeddings e WHERE e.file_id=f.id AND e.model=?)
+       ${limit ? 'ORDER BY f.id LIMIT ?' : ''}`,
+      ...(limit ? [model, limit] : [model])
     );
   }
 
+  countNeedingEmbedding(model) {
+    return this.db.get(
+      `SELECT COUNT(*) AS c FROM files f
+       WHERE f.present=1
+       AND NOT EXISTS (SELECT 1 FROM embeddings e WHERE e.file_id=f.id AND e.model=?)`,
+      model
+    ).c;
+  }
+
   saveEmbedding(fileId, model, vec) {
-    const buf = Buffer.from(vec.buffer, vec.byteOffset, vec.byteLength);
+    // En tom vektor er markeringen "kan ikke indekseres". node:sqlite binder
+    // en tom buffer som NULL, og kolonnen er NOT NULL, saa markeringen
+    // fik indekseringen til at kaste og stoppe paa den allerfoerste fil uden
+    // forhaandsvisning. Den faar derfor én byte; dim=0 siger at den er tom.
+    const buf = vec.length
+      ? Buffer.from(vec.buffer, vec.byteOffset, vec.byteLength)
+      : Buffer.alloc(1);
     this.db.run(
       `INSERT INTO embeddings(file_id, model, dim, vec, indexed_at) VALUES(?,?,?,?,?)
        ON CONFLICT(file_id) DO UPDATE SET model=excluded.model, dim=excluded.dim,
@@ -756,13 +845,10 @@ export class Catalog extends EventEmitter {
   // versionerne deler motiv.
   filesNeedingKeywords(limit = 5000) {
     return this.db.all(
-      `SELECT f.id, f.rel_path, f.mtime FROM files f
+      `WITH godkendte AS MATERIALIZED (${effektiveFiler("v.rating = 'godkendt'")})
+       SELECT f.id, f.rel_path, f.mtime FROM files f
+       JOIN godkendte g ON g.fid = f.id
        WHERE f.present=1
-         AND EXISTS (
-           SELECT 1 FROM versions v JOIN images i ON i.id = v.image_id
-           WHERE COALESCE(v.file_id, i.master_file_id) = f.id
-             AND v.rating = 'godkendt'
-         )
          AND NOT EXISTS (SELECT 1 FROM keyword_runs r WHERE r.file_id = f.id)
        ORDER BY f.id LIMIT ?`,
       limit
@@ -773,13 +859,10 @@ export class Catalog extends EventEmitter {
   // hvor mange der bliver sendt, foer der trykkes.
   keywordQueueSize() {
     return this.db.get(
-      `SELECT COUNT(*) AS c FROM files f
+      `WITH godkendte AS MATERIALIZED (${effektiveFiler("v.rating = 'godkendt'")})
+       SELECT COUNT(*) AS c FROM files f
+       JOIN godkendte g ON g.fid = f.id
        WHERE f.present=1
-         AND EXISTS (
-           SELECT 1 FROM versions v JOIN images i ON i.id = v.image_id
-           WHERE COALESCE(v.file_id, i.master_file_id) = f.id
-             AND v.rating = 'godkendt'
-         )
          AND NOT EXISTS (SELECT 1 FROM keyword_runs r WHERE r.file_id = f.id)`
     ).c;
   }
@@ -904,16 +987,12 @@ export class Catalog extends EventEmitter {
   // hele enden af alfabetet forsvinde uden varsel.
   topKeywords(limit = 500) {
     return this.db.all(
-      `SELECT word, antal FROM (
+      `WITH levende AS MATERIALIZED (${effektiveFiler("v.rating != 'kasseret'")})
+       SELECT word, antal FROM (
          SELECT k.word AS word, COUNT(DISTINCT k.file_id) AS antal
          FROM keywords k
-         JOIN files f ON f.id = k.file_id
-         WHERE f.present=1
-           AND EXISTS (
-             SELECT 1 FROM versions v JOIN images i ON i.id = v.image_id
-             WHERE COALESCE(v.file_id, i.master_file_id) = k.file_id
-               AND v.rating != 'kasseret'
-           )
+         JOIN files f ON f.id = k.file_id AND f.present=1
+         JOIN levende l ON l.fid = k.file_id
          GROUP BY k.word ORDER BY antal DESC, k.word LIMIT ?
        ) ORDER BY lower(word)`,
       limit

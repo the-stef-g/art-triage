@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { openSync, readSync, closeSync, existsSync, readdirSync, statSync } from 'node:fs';
+import { open as aabn, readdir as laesMappe, stat as statAsync } from 'node:fs/promises';
 import { join, extname, basename, dirname } from 'node:path';
 
 // Filtyper appen haandterer. RAW-listen daekker de gaengse kameramaerker.
@@ -33,6 +34,34 @@ export function quickHash(absPath, size) {
     closeSync(fd);
   }
   return h.digest('hex');
+}
+
+// Samme signatur som quickHash, men uden at blokere hovedprocessen mens
+// filen laeses. Giver noejagtig samme vaerdi.
+export async function quickHashAsync(absPath, size) {
+  const h = createHash('sha1');
+  h.update(String(size));
+  const fil = await aabn(absPath, 'r');
+  try {
+    const buf = Buffer.alloc(Math.min(size, 1024 * 1024));
+    const { bytesRead } = await fil.read(buf, 0, buf.length, 0);
+    h.update(buf.subarray(0, bytesRead));
+  } finally {
+    await fil.close();
+  }
+  return h.digest('hex');
+}
+
+// Koerer fn paa hvert element, hoejst `graense` ad gangen.
+export async function mapGraense(liste, graense, fn) {
+  let naeste = 0;
+  const arbejdere = Array.from({ length: Math.min(graense, liste.length) }, async () => {
+    while (naeste < liste.length) {
+      const i = naeste++;
+      await fn(liste[i], i);
+    }
+  });
+  await Promise.all(arbejdere);
 }
 
 export const IGNORED_DIRS = new Set(['.art-triage', '.billedflow', 'node_modules']);
@@ -95,6 +124,43 @@ export function walkImages(root) {
         }
       }
     }
+  }
+  return out;
+}
+
+// Det samme som walkImages, men giver tid tilbage til brugerfladen mens
+// der laeses. Paa et eksternt drev tager 15.000 stat-kald sekunder, og den
+// synkrone version holdt hele appen i den tid ved hver genskanning.
+export async function walkImagesAsync(root) {
+  const out = [];
+  const stack = [''];
+  while (stack.length) {
+    const rel = stack.pop();
+    const abs = rel ? join(root, rel) : root;
+    let entries;
+    try {
+      entries = await laesMappe(abs, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    const filer = [];
+    for (const ent of entries) {
+      if (ent.name.startsWith('.')) continue;
+      const childRel = rel ? `${rel}/${ent.name}` : ent.name;
+      if (ent.isDirectory()) {
+        if (!IGNORED_DIRS.has(ent.name)) stack.push(childRel);
+      } else if (ent.isFile() && isSupported(ent.name)) {
+        filer.push(childRel);
+      }
+    }
+    await mapGraense(filer, 32, async (childRel) => {
+      try {
+        const st = await statAsync(join(root, childRel));
+        out.push({ rel: childRel, size: st.size, mtime: Math.floor(st.mtimeMs) });
+      } catch {
+        // fil forsvandt midt i scanningen
+      }
+    });
   }
   return out;
 }
@@ -162,4 +228,18 @@ export function debounce(fn, ms) {
       fn(...args);
     }, ms);
   };
+}
+
+// Hvor mange filer processen har aabne lige nu, eller null hvis det ikke
+// kan ses. En proces der naar sin graense kan ikke starte programmer
+// (spawn EBADF) eller aabne filer, saa tallet hoerer med i fejlloggen.
+export function openFdCount() {
+  for (const dir of ['/dev/fd', '/proc/self/fd']) {
+    try {
+      return readdirSync(dir).length;
+    } catch {
+      // proever den naeste
+    }
+  }
+  return null;
 }

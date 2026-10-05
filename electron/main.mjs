@@ -355,6 +355,10 @@ function buildMenu() {
           },
         },
         {
+          label: 'Retry failed previews',
+          click: () => mainWin?.webContents.send('evt', { type: 'genvej', cmd: 'retry-previews' }),
+        },
+        {
           label: 'Hugging Face token …',
           click: () => mainWin?.webContents.send('evt', { type: 'genvej', cmd: 'hf-token' }),
         },

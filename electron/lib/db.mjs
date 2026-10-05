@@ -14,6 +14,14 @@ class NodeSqliteDb {
     this.db = new DatabaseSync(filePath);
     this.db.exec('PRAGMA journal_mode = WAL');
     this.db.exec('PRAGMA foreign_keys = ON');
+    // Kataloget ligger paa biblioteksdrevet, ofte et eksternt drev. FULL
+    // venter paa disken ved hver enkelt aendring; med WAL er NORMAL lige
+    // sikker mod en odelagt database og kan hoejst miste de allersidste
+    // aendringer ved strømsvigt. Standardcachen er kun 2 MB og for lille til
+    // en database paa flere hundrede MB.
+    this.db.exec('PRAGMA synchronous = NORMAL');
+    this.db.exec('PRAGMA cache_size = -65536');
+    this.db.exec('PRAGMA temp_store = MEMORY');
     this.stmts = new Map();
     this.engine = 'node:sqlite';
   }
@@ -133,8 +141,10 @@ class SqlJsDb {
   }
 }
 
-export async function openDatabase(filePath) {
+// engine: 'sqljs' tvinger fallback-motoren, saa begge kan maales og testes.
+export async function openDatabase(filePath, { engine = null } = {}) {
   try {
+    if (engine === 'sqljs') throw new Error('sql.js requested');
     const { DatabaseSync } = await import('node:sqlite');
     return new NodeSqliteDb(DatabaseSync, filePath);
   } catch {

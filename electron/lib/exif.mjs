@@ -10,6 +10,7 @@ import { openSync, readSync, closeSync } from 'node:fs';
 
 const LAES_BYTES = 1024 * 1024;
 
+const TAG_ORIENTATION = 0x0112;
 const TAG_DATETIME = 0x0132;
 const TAG_EXIF_IFD = 0x8769;
 const TAG_DATETIME_ORIGINAL = 0x9003;
@@ -80,7 +81,7 @@ function readIfd(buf, tiffStart, offset, le) {
     // Vaerdier paa op til fire bytes ligger i selve feltet.
     const size = type === 2 ? count : 0;
     const valueAt = size > 4 ? tiffStart + u32(pos + 8) : pos + 8;
-    out.set(tag, { type, count, valueAt, rawLong: u32(pos + 8) });
+    out.set(tag, { type, count, valueAt, rawLong: u32(pos + 8), short: u16(pos + 8) });
   }
   return out;
 }
@@ -113,6 +114,41 @@ export function exifYearFromBuffer(buf) {
     // Beskaaret eller mærkelig fil: intet aar er bedre end et forkert.
     return null;
   }
+}
+
+// Billedets retning (1 til 8) fra IFD0, eller null. En RAW-fils JPEG har
+// sjaeldent selv en retning; den staar paa selve filen.
+export function exifOrientationFromBuffer(buf) {
+  try {
+    const tiff = findTiff(buf);
+    if (!tiff) return null;
+    const start = tiff.start;
+    const le = buf[start] === 0x49;
+    const ifd0 = readIfd(buf, start, le ? buf.readUInt32LE(start + 4) : buf.readUInt32BE(start + 4), le);
+    const e = ifd0.get(TAG_ORIENTATION);
+    return e && e.type === 3 && e.short >= 1 && e.short <= 8 ? e.short : null;
+  } catch {
+    return null;
+  }
+}
+
+function laesHoved(absPath) {
+  let fd;
+  try {
+    fd = openSync(absPath, 'r');
+    const buf = Buffer.alloc(LAES_BYTES);
+    const n = readSync(fd, buf, 0, LAES_BYTES, 0);
+    return buf.subarray(0, n);
+  } catch {
+    return null;
+  } finally {
+    if (fd !== undefined) closeSync(fd);
+  }
+}
+
+export function exifOrientation(absPath) {
+  const buf = laesHoved(absPath);
+  return buf ? exifOrientationFromBuffer(buf) : null;
 }
 
 export function exifYear(absPath) {

@@ -18,6 +18,8 @@ import { normalize } from './searchIndex.mjs';
 // falder tilbage til en anden kandidat, og meldes via ready-beskeden.
 export const MODEL_ID = 'siglip2-base-patch16-224';
 
+const BUNKE = 50;
+
 export class Indexer extends EventEmitter {
   constructor({ catalog, thumbs, ai, searchIndex, model = MODEL_ID }) {
     super();
@@ -59,17 +61,26 @@ export class Indexer extends EventEmitter {
 
   async _loop() {
     if (!this.ai.ready) return; // kick() kaldes igen naar AI melder klar
+    const total = this.catalog.countNeedingEmbedding(this.model);
+    if (!total) {
+      this.setProgress({ phase: 'faerdig', done: 0, total: 0 });
+      return;
+    }
+    this.setProgress({ phase: 'billeder', total: this.progress.total || total });
     for (;;) {
       if (this.stopped) return;
-      const pending = this.catalog.filesNeedingEmbedding(this.model);
-      if (!pending.length) {
+      // En bunke ad gangen: at hente hele ventelisten for hver fil gjorde
+      // indekseringen kvadratisk i bibliotekets stoerrelse.
+      const bunke = this.catalog.filesNeedingEmbedding(this.model, BUNKE);
+      if (!bunke.length) {
         this.setProgress({ phase: 'faerdig', done: 0, total: 0 });
         return;
       }
-      this.setProgress({ phase: 'billeder', total: this.progress.total || pending.length });
-      const file = pending[0];
-      await this._indexFile(file);
-      this.setProgress({ done: this.progress.done + 1 });
+      for (const file of bunke) {
+        if (this.stopped) return;
+        await this._indexFile(file);
+        this.setProgress({ done: this.progress.done + 1 });
+      }
     }
   }
 

@@ -13,6 +13,7 @@ const CHANNELS = new Set([
   'kw:status', 'kw:run', 'kw:stop', 'kw:setModel', 'kw:reanalyse',
   'work:get', 'work:save', 'work:setCrop', 'work:writeTexts', 'work:pickVideo',
   'shop:status', 'shop:send', 'shop:publish', 'shop:checkFormat',
+  'thumbs:status', 'thumbs:retry',
   'search:status', 'app:counts', 'app:undo', 'app:redo',
   'app:info', 'app:setHfToken', 'app:setClaudeKey', 'app:setWooKey', 'app:setWpKey',
 ]);

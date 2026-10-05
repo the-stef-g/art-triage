@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { invoke, onEvent, harBro } from './api';
+import { invoke, onEvent, harBro, setThumbRetry } from './api';
 import Welcome from './components/Welcome';
 import Toolbar from './components/Toolbar';
 import Sidebar from './components/Sidebar';
@@ -39,6 +39,8 @@ export default function App() {
   const [appInfo, setAppInfo] = useState(null);
   const [drev, setDrev] = useState(null); // {missing, root} naar drevet skifter tilstand
   const [skanner, setSkanner] = useState(false);
+  const [thumbStatus, setThumbStatus] = useState({ failed: 0 }); // forhaandsvisninger der fejlede
+  const [thumbRev, setThumbRev] = useState(0);
   const [shop, setShop] = useState(null); // shop-noegler og om formatet er tjekket
   const [textStatus, setTextStatus] = useState(null); // vaerk-tekster: koerer, seneste pris
   const [kwStatus, setKwStatus] = useState(null); // cloud-noegleord: noegle, model, koe
@@ -75,7 +77,7 @@ export default function App() {
     setTimeout(() => setFejl(null), 6000);
   }, []);
 
-  const refresh = useCallback(async () => {
+  const refreshEn = useCallback(async () => {
     try {
       const res = await invoke('img:list', filterRef.current);
       // Husk det fokuserede indeks fra den gamle liste: forsvinder hele
@@ -105,6 +107,28 @@ export default function App() {
     }
   }, [visFejl]);
 
+  // Meldinger kommer i byger: en rettelse, en genskanning og
+  // noeglesordskoeren kan melde 'changed' i traek. Hver hentning er alle
+  // billederne, saa en hentning der allerede koerer faar kun ét ekstra
+  // gennemløb til sidst i stedet for ét pr. besked.
+  const refreshKoerer = useRef(false);
+  const refreshIgen = useRef(false);
+  const refresh = useCallback(async () => {
+    if (refreshKoerer.current) {
+      refreshIgen.current = true;
+      return;
+    }
+    refreshKoerer.current = true;
+    try {
+      do {
+        refreshIgen.current = false;
+        await refreshEn();
+      } while (refreshIgen.current);
+    } finally {
+      refreshKoerer.current = false;
+    }
+  }, [refreshEn]);
+
   // Hver del af sidepanelet hentes for sig. Med et samlet Promise.all
   // ville ét fejlende kald tage mappetraeet, serierne og noegleordene med
   // sig og efterlade panelet halvtomt uden at sige hvorfor.
@@ -113,9 +137,7 @@ export default function App() {
       ['fold:tree', setTree],
       ['ser:list', setSeries],
       ['kw:top', setTopKeywords],
-      ['ed:list', setEditors],
       ['kw:status', setKwStatus],
-      ['shop:status', setShop],
     ];
     const svar = await Promise.allSettled(dele.map(([kanal]) => invoke(kanal)));
     let foersteFejl = null;
@@ -125,6 +147,37 @@ export default function App() {
     });
     if (foersteFejl) visFejl(foersteFejl);
   }, [visFejl]);
+
+  // Det der ikke aendrer sig af at kataloget aendrer sig: installerede
+  // editors (laeser /Applications) og shop-noegler. Hentes kun naar et
+  // bibliotek aabnes, ikke ved hver aendring.
+  const refreshFast = useCallback(async () => {
+    invoke('ed:list').then(setEditors).catch(() => {});
+    invoke('shop:status').then(setShop).catch(() => {});
+    invoke('thumbs:status').then(setThumbStatus).catch(() => {});
+  }, []);
+
+  // Sidepanelets tal er tungere at regne end selve listen. Den foerste
+  // besked henter med det samme, saa mappetallene staar rigtigt med det
+  // samme; kommer der flere mens det koerer, faar de ét ekstra gennemloeb til
+  // sidst i stedet for ét hver.
+  const metaKoerer = useRef(false);
+  const metaIgen = useRef(false);
+  const refreshMetaSnart = useCallback(async () => {
+    if (metaKoerer.current) {
+      metaIgen.current = true;
+      return;
+    }
+    metaKoerer.current = true;
+    try {
+      do {
+        metaIgen.current = false;
+        await refreshMeta();
+      } while (metaIgen.current);
+    } finally {
+      metaKoerer.current = false;
+    }
+  }, [refreshMeta]);
 
   // Ved opstart: genaabn seneste bibliotek hvis muligt.
   useEffect(() => {
@@ -148,8 +201,14 @@ export default function App() {
   useEffect(() => onEvent((evt) => {
     if (evt.type === 'changed') {
       refresh();
-      refreshMeta();
+      refreshMetaSnart();
       setDataRev((n) => n + 1);
+    } else if (evt.type === 'thumbs') {
+      setThumbStatus((s) => ({ ...s, failed: evt.failed }));
+      if (evt.retry) {
+        setThumbRetry(evt.retry);
+        setThumbRev(evt.retry);
+      }
     } else if (evt.type === 'genvej') {
       if (evt.cmd === 'hf-token') {
         // Hjaelp-menuen: indtast/ret Hugging Face-token.
@@ -162,6 +221,12 @@ export default function App() {
             onSubmit: (token) => invoke('app:setHfToken', { token }).catch(visFejl),
           });
         }).catch(visFejl);
+        return;
+      }
+      if (evt.cmd === 'retry-previews') {
+        invoke('thumbs:retry')
+          .then((r) => visFejl(r.antal ? `Retrying ${r.antal} failed preview${r.antal === 1 ? '' : 's'}` : 'No failed previews to retry'))
+          .catch(visFejl);
         return;
       }
       if (evt.cmd === 'woo-key' || evt.cmd === 'wp-key') {
@@ -220,17 +285,24 @@ export default function App() {
     } else if (evt.type === 'library') {
       setLibrary({ root: evt.root });
     }
-  }), [refresh, refreshMeta, visFejl]);
+  }), [refresh, refreshMeta, refreshMetaSnart, visFejl]);
 
+  // Et nyt bibliotek henter alt. Et nyt filter henter kun listen: sidepanelet
+  // haenger ikke paa filteret.
   useEffect(() => {
     if (!library) return;
-    refresh();
     refreshMeta();
+    refreshFast();
     invoke('search:status').then((s) => {
       setAiStatus(s.ai);
       setIndexProgress(s.index);
     }).catch(() => {});
-  }, [library, filter, refresh, refreshMeta]);
+  }, [library, refreshMeta, refreshFast]);
+
+  useEffect(() => {
+    if (!library) return;
+    refresh();
+  }, [library, filter, refresh]);
 
   const focusedRow = rows.find((r) => r.version_id === active) || null;
 
@@ -606,6 +678,7 @@ export default function App() {
             onColumns={(c) => { columnsRef.current = c; }}
             ankerRef={ankerRef}
             columns={kolonner}
+            thumbRev={thumbRev}
           />
           {showPreview && focusedRow && (
             <PreviewOverlay
@@ -642,6 +715,8 @@ export default function App() {
         drevMangler={Boolean(drev?.missing)}
         kwStatus={kwStatus}
         textStatus={textStatus}
+        thumbStatus={thumbStatus}
+        onRetryPreviews={() => invoke('thumbs:retry').catch(visFejl)}
         kolonner={kolonner}
         setKolonner={(n) => {
           setKolonner(n);

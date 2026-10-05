@@ -16,9 +16,9 @@ import { UndoManager } from './undo.mjs';
 import { Works } from './works.mjs';
 import { ClaudeWorkTexts, TEXT_IMAGE_SIZE } from './workTexts.mjs';
 import { ShopClient, ShopSync, DEFAULT_SHOP_URL } from './shop.mjs';
-import { debounce, dataDirFor } from './util.mjs';
+import { debounce, dataDirFor, openFdCount } from './util.mjs';
 
-// Mappe-overvaageren (chokidar) faar sjaeldent fil-system-haendelser fra
+// Mappe-overvaageren (fs.watch) faar sjaeldent fil-system-haendelser fra
 // eksterne drev paa macOS, og Stefs billeder ligger netop eksternt. Den
 // periodiske genskanning er derfor ikke et sikkerhedsnet men den baerende
 // mekanisme: uden den dukker nye filer foerst op efter en genstart.
@@ -84,14 +84,15 @@ export class AppSession {
   // aldrig koere oven i hinanden: en fuld gennemgang af et stort
   // bibliotek paa et eksternt drev tager tid, og to ad gangen ville bare
   // traekke hinanden ned.
-  runSync(reason = 'auto') {
+  async runSync(reason = 'auto') {
     if (!this.catalog) return { skipped: true, reason };
     if (this.scanning) return { skipped: true, reason };
     this.scanning = true;
     const start = Date.now();
+    const katalog = this.catalog;
     let res;
     try {
-      res = this.catalog.sync();
+      res = await katalog.syncAsync();
     } catch {
       // En enkelt mislykket skanning maa ikke vaelte noget; uret proever igen.
       res = { changed: 0, edited: 0, unavailable: false };
@@ -116,8 +117,8 @@ export class AppSession {
   _scheduleScan() {
     clearTimeout(this.scanTimer);
     const delay = Math.max(RESCAN_MIN_MS, (this.lastScanMs || 0) * RESCAN_DUTY);
-    this.scanTimer = setTimeout(() => {
-      this.runSync('ur');
+    this.scanTimer = setTimeout(async () => {
+      await this.runSync('ur');
       this._scheduleScan();
     }, delay);
     // Uret maa hverken holde appen vaagen eller forsinke en afslutning.
@@ -141,6 +142,8 @@ export class AppSession {
       // redder forhaandsvisningen.
       onError: ({ stage, file, message }) => this.log(`preview ${stage} (${file}): ${message}`),
     });
+    // Statuslinjen viser hvor mange forhaandsvisninger der fejlede.
+    this.thumbs.onFailedChange = debounce((failed) => this.broadcast('thumbs', { failed }), 300);
     this.searchIndex = new SearchIndex(this.catalog, MODEL_ID);
     this.undoMgr = new UndoManager(this.catalog);
     this.works = new Works(this.catalog);
@@ -163,7 +166,7 @@ export class AppSession {
 
     this.driveMissing = false;
     this.lastScanMs = 0;
-    this.runSync('aabning');
+    await this.runSync('aabning');
     // Foerste aabning efter at de automatiske noegleord blev taget ud af
     // drift: fjern de gamle gaet, saa chips og soegning ikke bliver ved
     // med at vise dem. Stefs egne ord staar uroert.
@@ -178,7 +181,10 @@ export class AppSession {
     }
     // Watcheren beholdes: paa interne diske er den oejeblikkelig. Paa
     // eksterne drev tier den, og der er det uret nedenfor der leverer.
-    this.watcher = watchLibrary(root, () => this.runSync('watcher'));
+    this.watcher = watchLibrary(root, () => this.runSync('watcher'), {
+      onError: (err) => this.log(`watcher: ${err?.message || err}`),
+    });
+    this.log(`library opened: ${this.catalog.db.engine}, open files: ${openFdCount()}`);
     this._scheduleScan();
     this.settings.rememberLibrary(root);
     this.broadcast('library', { root });
@@ -422,9 +428,9 @@ export class AppSession {
     handle('lib:current', () => (this.catalog ? { root: this.catalog.root } : null));
     // "Skan igen": naar drevet lige er tilsluttet igen, eller naar der er
     // lagt filer i mappen og man ikke gider vente paa uret.
-    handle('lib:rescan', () => {
+    handle('lib:rescan', async () => {
       this.requireCatalog();
-      const res = this.runSync('manuel');
+      const res = await this.runSync('manuel');
       if (!res.skipped) this.indexer?.kick();
       return res;
     });
@@ -599,6 +605,17 @@ export class AppSession {
     handle('work:writeTexts', (payload) => this.writeWorkTexts(payload));
     handle('work:setCrop', ({ imageId, versionId, format }) =>
       this.requireWorks().setCrop(imageId, versionId, format ?? null));
+
+    // Forhaandsvisninger der ikke kunne laves, og en knap der proever dem igen.
+    handle('thumbs:status', () => ({ failed: this.thumbs ? this.thumbs.failed.size : 0 }));
+    handle('thumbs:retry', () => {
+      if (!this.thumbs) return { antal: 0 };
+      const antal = this.thumbs.retryFailed();
+      this.log(`retry failed previews: ${antal}`);
+      // Et nyt tal i adressen faar fliserne til at spoerge igen.
+      this.broadcast('thumbs', { failed: 0, retry: Date.now() });
+      return { antal };
+    });
 
     handle('search:status', () => ({
       ai: this.ai.status,

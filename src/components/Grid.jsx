@@ -39,7 +39,7 @@ function Badges({ row }) {
 // isActive er billedet man staar paa inde i markeringen. Det er det
 // inspektoeren viser, og det pilene flytter, saa det skal kunne skelnes
 // fra resten af de markerede.
-function Tile({ row, isSelected, isActive, onClick, onDoubleClick, onDragStart }) {
+function Tile({ row, isSelected, isActive, onClick, onDoubleClick, onDragStart, thumbRev }) {
   return (
     <div
       className={`tile ${isSelected ? 'valgt' : ''} ${isActive ? 'aktiv' : ''} ${row.rating === 'kasseret' ? 'nedtonet' : ''} ${row.rating === 'kandidat' ? 'kandidat' : ''}`}
@@ -48,7 +48,7 @@ function Tile({ row, isSelected, isActive, onClick, onDoubleClick, onDragStart }
       draggable
       onDragStart={onDragStart}
     >
-      <div className="tile-billede">
+      <div className="tile-billede" key={thumbRev}>
         <img
           src={thumbUrl(row.file_id, row.mtime, 512)}
           alt={fileName(row.rel_path)}
@@ -73,7 +73,7 @@ function Tile({ row, isSelected, isActive, onClick, onDoubleClick, onDragStart }
 // omraade-markeringen fra det samme udgangspunkt.
 export default function Grid({
   rows, selected, active, setSelected, setActive, focusIndex, harSoegning,
-  onOpenPreview, onColumns, ankerRef, columns,
+  onOpenPreview, onColumns, ankerRef, columns, thumbRev = 0,
 }) {
   const [ref, size] = useSize();
   const gridRef = useRef(null);
@@ -150,10 +150,11 @@ export default function Grid({
             onOpenPreview();
           }}
           onDragStart={(e) => handleDragStart(row, e)}
+          thumbRev={thumbRev}
         />
       </div>
     );
-  }, [rows, columns, selectedSet, active, handleClick, handleDragStart, setSelected, setActive, onOpenPreview]);
+  }, [rows, columns, selectedSet, active, handleClick, handleDragStart, setSelected, setActive, onOpenPreview, thumbRev]);
 
   return (
     // Billedhoejden gives videre som CSS-variabel: den skal skalere med

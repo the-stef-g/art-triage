@@ -37,6 +37,8 @@ const lib = mkdtempSync(join(tmpdir(), 'art-triage-smoke-'));
 await lavTestbilleder(lib);
 
 const app = await electron.launch({
+  // ELECTRON_PATH: en anden Electron-binaer, fx en udpakket fra electron-builder.
+  executablePath: process.env.ELECTRON_PATH || undefined,
   args: ['.'],
   cwd: projectRoot,
   timeout: 60000,

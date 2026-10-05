@@ -2,7 +2,7 @@ export const MIN_KOLONNER = 3;
 export const MAX_KOLONNER = 10;
 
 export default function StatusBar({
-  counts, aiStatus, indexProgress, searchInfo, fejl, library, version, drevMangler, kwStatus, textStatus,
+  counts, aiStatus, indexProgress, searchInfo, fejl, library, version, drevMangler, kwStatus, textStatus, thumbStatus, onRetryPreviews,
   kolonner, setKolonner,
 }) {
   const aiTekst = (() => {
@@ -76,6 +76,13 @@ export default function StatusBar({
       )}
       {kwTekst && <span className="kw-status">{kwTekst}</span>}
       {textTekst && <span className="kw-status">{textTekst}</span>}
+      {thumbStatus?.failed > 0 && (
+        <span className="fejl">
+          {thumbStatus.failed} preview{thumbStatus.failed === 1 ? '' : 's'} failed
+          {' '}
+          <button className="lille" onClick={onRetryPreviews} title="Try the failed previews again. The reason for each is in Help > Show AI log.">Retry</button>
+        </span>
+      )}
       {indexTekst && <span className="index-status">{indexTekst}</span>}
       <span className={`ai-status ${aiStatus?.state || ''}`}>{aiTekst}</span>
       {fejl && <span className="fejl">{fejl}</span>}

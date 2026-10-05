@@ -4,18 +4,48 @@
 // callback. Paa Linux (udvikling/CI) bruges sharp til standardformaterne.
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { existsSync, mkdirSync, renameSync, mkdtempSync, rmSync, readdirSync } from 'node:fs';
+import {
+  existsSync, mkdirSync, renameSync, mkdtempSync, rmSync, readdirSync, writeFileSync,
+} from 'node:fs';
 import { join, basename } from 'node:path';
 import { tmpdir } from 'node:os';
-import { extOf, RASTER_EXTS } from './util.mjs';
+import { extOf, RASTER_EXTS, openFdCount } from './util.mjs';
+import { indbyggetJpeg, RAW_EXTS_MED_FORHAANDSVISNING } from './rawpreview.mjs';
+import { exifOrientation } from './exif.mjs';
 
 const run = promisify(execFile);
 
 // Hvad der gik galt, paa en linje. execFile lægger programmets egen
 // besked i stderr; err.message er kun "Command failed: ...".
 function kortFejl(err) {
-  const tekst = String(err?.stderr || err?.message || err || 'unknown error').trim();
-  return tekst.replace(/\s+/g, ' ').slice(0, 300);
+  const tekst = String(err?.stderr || err?.message || err || 'unknown error').trim().replace(/\s+/g, ' ');
+  // "spawn EBADF" er processen der ikke kan starte et program, typisk fordi
+  // den har for mange filer aabne. Antallet staar med, saa det kan ses.
+  const fds = /\bspawn E(BADF|MFILE|NFILE|AGAIN)\b/.test(tekst) ? openFdCount() : null;
+  return `${tekst.slice(0, 300)}${fds === null ? '' : ` [open files: ${fds}]`}`;
+}
+
+const SPAWN_FEJL = new Set(['EBADF', 'EMFILE', 'ENFILE', 'EAGAIN']);
+// Hoejst så mange sips/qlmanage ad gangen. Griddet beder om dusinvis af
+// forhaandsvisninger paa én gang, og hver af dem er en ny proces.
+const MAX_PROCESSER = 3;
+// Der skal findes mindst saa stor en indbygget JPEG, foer den bruges i stedet
+// for at lade sips fremkalde RAW-filen.
+const MIN_INDBYGGET = 400;
+
+// Retningen (EXIF 1 til 8) lagt paa et sharp-billede. En RAW-fils JPEG har
+// sjaeldent selv en retning, saa den kommer fra RAW-filen.
+export function medRetning(img, retning) {
+  switch (retning) {
+    case 2: return img.flop();
+    case 3: return img.rotate(180);
+    case 4: return img.flip();
+    case 5: return img.rotate(270).flop();
+    case 6: return img.rotate(90);
+    case 7: return img.rotate(90).flop();
+    case 8: return img.rotate(270);
+    default: return img;
+  }
 }
 
 export class Thumbnailer {
@@ -32,7 +62,53 @@ export class Thumbnailer {
     this.onError = onError;
     this.lastError = null;
     this.inflight = new Map();
+    // Filer hvor en forhaandsvisning ikke kunne laves, til "Retry failed".
+    this.failed = new Map();
+    this.onFailedChange = null;
+    this._aktive = 0;
+    this._koe = [];
     mkdirSync(cacheDir, { recursive: true });
+  }
+
+  // Koerer et eksternt program, hoejst MAX_PROCESSER ad gangen, og prover
+  // igen et par gange hvis processen ikke kunne startes. Fejlen kan vaere
+  // forbigaaende, fx naar der lige er for mange filer aabne.
+  async _run(cmd, args) {
+    if (this._aktive >= MAX_PROCESSER) await new Promise((ok) => this._koe.push(ok));
+    this._aktive += 1;
+    try {
+      for (let forsoeg = 0; ; forsoeg++) {
+        try {
+          return await this.runner(cmd, args);
+        } catch (err) {
+          if (forsoeg < 2 && SPAWN_FEJL.has(err?.code)) {
+            await new Promise((ok) => setTimeout(ok, 150 * (forsoeg + 1)));
+            continue;
+          }
+          throw err;
+        }
+      }
+    } finally {
+      this._aktive -= 1;
+      this._koe.shift()?.();
+    }
+  }
+
+  _noteFailed(fileId, mtime, absPath) {
+    this.failed.set(fileId, { mtime, file: basename(absPath), reason: this.lastError });
+    this.onFailedChange?.(this.failed.size);
+  }
+
+  _noteOk(fileId) {
+    if (this.failed.delete(fileId)) this.onFailedChange?.(this.failed.size);
+  }
+
+  // "Retry failed": glemmer de fejlede, saa naeste foresporgsel prover paa ny.
+  retryFailed() {
+    const antal = this.failed.size;
+    this.failed.clear();
+    this.onFailedChange?.(0);
+    return antal;
   }
 
   _report(stage, absPath, err) {
@@ -69,6 +145,11 @@ export class Thumbnailer {
         this._report('preview', absPath, err);
         return null;
       })
+      .then((sti) => {
+        if (sti) this._noteOk(fileId);
+        else this._noteFailed(fileId, mtime, absPath);
+        return sti;
+      })
       .finally(() => this.inflight.delete(key));
     this.inflight.set(key, p);
     return p;
@@ -90,17 +171,72 @@ export class Thumbnailer {
       return out;
     }
 
-    if (this.platform === 'darwin') {
-      return this._generateMac(key, absPath, size);
+    // RAW: den indbyggede JPEG foerst. Den kraever intet program og er
+    // hurtigere end at fremkalde RAW-filen.
+    let lille = null;
+    if (RAW_EXTS_MED_FORHAANDSVISNING.has(ext)) {
+      const emb = this._indbygget(absPath);
+      if (emb && Math.max(emb.width, emb.height) >= MIN_INDBYGGET) {
+        const sti = await this._skrivIndbygget(key, absPath, emb, size);
+        if (sti) return sti;
+      } else if (emb) {
+        lille = emb; // kun en miniature; sips og qlmanage proeves foerst
+      }
     }
-    return this._generateSharp(key, absPath, size);
+
+    const sti = this.platform === 'darwin'
+      ? await this._generateMac(key, absPath, size)
+      : await this._generateSharp(key, absPath, size);
+    if (sti) return sti;
+    // Intet andet virkede, saa hellere en miniature end ingenting.
+    if (lille) return this._skrivIndbygget(key, absPath, lille, size);
+    return null;
+  }
+
+  _indbygget(absPath) {
+    const emb = indbyggetJpeg(absPath);
+    if (!emb) this._report('embedded-jpeg', absPath, 'no embedded JPEG preview found in the RAW file');
+    return emb;
+  }
+
+  // Den indbyggede JPEG gjort til en forhaandsvisning i den oenskede
+  // stoerrelse og retning. Uden sharp gemmes JPEG'en som den er.
+  async _skrivIndbygget(key, absPath, emb, size) {
+    const out = join(this.cacheDir, `${key}.jpg`);
+    const tmp = `${out}.tmp-${process.pid}.jpg`;
+    let sharp = null;
+    try {
+      sharp = (await import('sharp')).default;
+    } catch (err) {
+      this._report('sharp', absPath, `sharp could not be loaded: ${kortFejl(err)}`);
+    }
+    try {
+      if (sharp) {
+        const meta = await sharp(emb.buffer, { failOn: 'none' }).metadata();
+        let img = sharp(emb.buffer, { failOn: 'none' });
+        // En JPEG med egen retning rettes af sharp; ellers bruges RAW-filens.
+        img = meta.orientation ? img.rotate() : medRetning(img, exifOrientation(absPath));
+        await img
+          .resize(size, size, { fit: 'inside', withoutEnlargement: true })
+          .jpeg({ quality: 85 })
+          .toFile(tmp);
+      } else {
+        writeFileSync(tmp, emb.buffer);
+      }
+      renameSync(tmp, out);
+      return out;
+    } catch (err) {
+      this._report('embedded-jpeg', absPath, err);
+      rmSync(tmp, { force: true });
+      return null;
+    }
   }
 
   async _generateMac(key, absPath, size) {
     const out = join(this.cacheDir, `${key}.jpg`);
     const tmp = `${out}.tmp-${process.pid}.jpg`;
     try {
-      await this.runner('sips', [
+      await this._run('sips', [
         '-s', 'format', 'jpeg',
         '-s', 'formatOptions', '85',
         '--resampleHeightWidthMax', String(size),
@@ -115,7 +251,7 @@ export class Thumbnailer {
     // Quick Look som fallback (bl.a. .ai og eksotiske formater).
     const qlDir = mkdtempSync(join(tmpdir(), 'bf-ql-'));
     try {
-      await this.runner('qlmanage', ['-t', '-s', String(size), '-o', qlDir, absPath]);
+      await this._run('qlmanage', ['-t', '-s', String(size), '-o', qlDir, absPath]);
       const produced = readdirSync(qlDir).find((f) => f.endsWith('.png'));
       if (produced) {
         const outPng = join(this.cacheDir, `${key}.png`);

@@ -13,6 +13,14 @@ export function onEvent(callback) {
   return bridge.onEvent(callback);
 }
 
+// "Retry failed previews" skifter dette tal. Det haenges paa adressen, saa
+// browseren spoerger igen i stedet for at huske at billedet ikke kunne hentes.
+let thumbRetry = 0;
+
+export function setThumbRetry(n) {
+  thumbRetry = n;
+}
+
 export function thumbUrl(fileId, mtime, size = 512) {
-  return `thumb://img/${fileId}?s=${size}&v=${mtime}`;
+  return `thumb://img/${fileId}?s=${size}&v=${mtime}${thumbRetry ? `&r=${thumbRetry}` : ''}`;
 }
