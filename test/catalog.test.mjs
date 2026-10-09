@@ -561,6 +561,31 @@ describe('mappedrevet arbejdsgang', () => {
     expect(existsSync(join(root, 'Import/Ahl Strand/x.cr2'))).toBe(true);
   });
 
+  it('Discarded ligger i roden, i én mappe opkaldt efter den mappe filen kom fra', () => {
+    skriv('Ahl Strand/Strand 2/dybt.cr2', 'd');
+    skriv('Frankrig/fr.cr2', 'f');
+    skriv('lige-i-roden.cr2', 'r');
+    catalog.sync();
+    for (const rel of ['Ahl Strand/Strand 2/dybt.cr2', 'Frankrig/fr.cr2', 'lige-i-roden.cr2']) {
+      catalog.setRating([raekke(rel).version_id], 'kasseret');
+    }
+    expect(existsSync(join(root, 'Discarded/Strand 2/dybt.cr2'))).toBe(true);
+    expect(existsSync(join(root, 'Discarded/Frankrig/fr.cr2'))).toBe(true);
+    expect(existsSync(join(root, 'Discarded/lige-i-roden.cr2'))).toBe(true);
+    // Kasseres den igen, bliver den hvor den er.
+    catalog.setRating([raekke('Discarded/Frankrig/fr.cr2').version_id], 'kasseret');
+    expect(existsSync(join(root, 'Discarded/Frankrig/fr.cr2'))).toBe(true);
+  });
+
+  it('et kasseret vaerk lægges i en mappe med vaerkets navn', () => {
+    skriv('Desert Canyon.cr2', 'dc');
+    catalog.sync();
+    catalog.setRating([raekke('Desert Canyon.cr2').version_id], 'godkendt');
+    const nyt = raekke('Approved/Desert Canyon/Originals/Desert Canyon.cr2');
+    catalog.setRating([nyt.version_id], 'kasseret');
+    expect(existsSync(join(root, 'Discarded/Desert Canyon/Desert Canyon.cr2'))).toBe(true);
+  });
+
   it('en ubedoemt fil uden for de styrede mapper bliver liggende', () => {
     skriv('Ahl Strand/y.cr2', 'y');
     catalog.sync();

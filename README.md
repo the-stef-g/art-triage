@@ -71,11 +71,11 @@ Approved/<file name>/   one work folder per approved image
     Print files/        production files with colour profiles for each print medium
 ```
 
-Rating a file Candidate or Discarded moves it into that folder, and the sub-folder it came from is kept. Clear moves it back to Import, but only if it was in one of these folders; an unrated file that lives somewhere else stays where it is. Approving creates the work folder with all four folders and moves the original into `Originals`. Only the original is moved. Undo moves it back.
+Rating a file Candidate moves it into `Candidate`, and the sub-folder it came from is kept. Discarded works differently, to keep the archive easy to read: the file goes to `Discarded` in the library root, into a single folder named after the folder it came from (for an approved work, the name of the work). `Ahl Strand/Strand 2/x.cr2` ends up in `Discarded/Strand 2/`. Clear moves it back to Import, but only if it was in one of these folders; an unrated file that lives somewhere else stays where it is. Approving creates the work folder with all four folders and moves the original into `Originals`. Only the original is moved. Undo moves it back.
 
 **The workflow stage follows the work folder.** The stage only exists for Approved images: no rating means no stage, and only Approved can have one. Save an edit in `Edits` and the image becomes *Being edited*; put the master in `Masters` and it becomes *Finished*. Any file saved in `Edits` or `Masters` is added as a version of the original, whatever it is called. The buttons are still there to set the stage by hand, and they are disabled for images that are not Approved. The work folder buttons in the right-hand column open `Originals`, `Edits`, `Masters` and `Print files` in Finder. The `Print files` folder is not scanned.
 
-Nothing is moved until you change a rating, so existing files stay where they are. "Clean up" moves every file whose versions are all discarded into `Discarded`.
+Nothing is moved until you change a rating, so existing files stay where they are. "Clean up" moves every file whose versions are all discarded into `Discarded`, by the same rule.
 
 **Series.** Select one or more images and pick "New series" or an existing series in the Inspector. Click a series in the sidebar to see only its images. Hover a series in the sidebar and two buttons appear: the pencil renames it, the bin deletes it. Deleting a series does not touch the images, they only lose their link to it.
 

@@ -699,12 +699,30 @@ export class Catalog extends EventEmitter {
     // En fil der ligger uden for de styrede mapper og ikke er bedoemt, bliver
     // hvor den er. Faar den en bedoemmelse, hentes mappens navn ind foran.
     if (rating === 'ubedomt' && !styret) return null;
+    if (rating === 'kasseret') {
+      // Alle kasserede ligger i Discarded i roden, i én mappe med samme navn
+      // som den mappe filen kom fra (ved et vaerk: vaerkets navn).
+      const navn = this._oprindelsesmappe(rel);
+      const mal = navn ? `Discarded/${navn}` : 'Discarded';
+      return mal === dir ? null : mal;
+    }
     // Under Approved er der arbejdsmapper; tilbage gaar filen til roden af
     // den nye mappe, ellers bevares undermappen den kom fra.
     const under = topmappe === 'Approved' ? '' : (styret ? dir.split('/').slice(1).join('/') : dir);
     const top = BEDOEMMELSESMAPPE[rating];
     const mal = under ? `${top}/${under}` : top;
     return mal === dir ? null : mal;
+  }
+
+  // Navnet paa den mappe en fil kom fra, uden de styrede topmapper:
+  // "Import/Ahl Strand/x.cr2" og "Ahl Strand/x.cr2" giver begge "Ahl Strand",
+  // og "Approved/Desert/Originals/x.cr2" giver vaerkets navn "Desert".
+  _oprindelsesmappe(rel) {
+    const am = arbejdsmappeFor(rel);
+    if (am) return am.work;
+    const dele = posix.dirname(rel) === '.' ? [] : posix.dirname(rel).split('/');
+    if (dele.length && STYREDE_TOPMAPPER.includes(dele[0])) dele.shift();
+    return dele.length ? dele[dele.length - 1] : '';
   }
 
   // Hvor langt et billede er i arbejdet. Det er ét trin ad gangen: enten
@@ -1002,7 +1020,17 @@ export class Catalog extends EventEmitter {
          AND f.rel_path NOT LIKE 'Discarded/%'
          AND f.id NOT IN (SELECT fid FROM levende)`
     );
-    return this.moveFiles(rows.map((r) => r.id), 'Discarded');
+    // Hver fil til Discarded/<mappen den kom fra>.
+    const grupper = new Map();
+    for (const r of rows) {
+      const f = this.getFile(r.id);
+      const mal = this._maalmappe(f.rel_path, 'kasseret') ?? posix.dirname(f.rel_path);
+      if (!grupper.has(mal)) grupper.set(mal, []);
+      grupper.get(mal).push(r.id);
+    }
+    const moved = [];
+    for (const [mal, ids] of grupper) moved.push(...this.moveFiles(ids, mal === '.' ? '' : mal));
+    return moved;
   }
 
   // ---------- Embeddings og noegleord ----------
