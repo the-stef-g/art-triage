@@ -1,7 +1,7 @@
 {
   "name": "art-triage",
   "productName": "Stef G Art",
-  "version": "0.11.2",
+  "version": "0.12.0",
   "description": "Sort and organise image files on macOS",
   "author": "Steffen Graumann",
   "license": "UNLICENSED",
@@ -16,6 +16,7 @@
     "smoke": "node test/smoke.mjs",
     "dist:mac": "npm run build && electron-builder --mac zip --x64 --publish never",
     "smoke:previews": "node test/smoke-previews.mjs",
+    "smoke:crop": "node test/smoke-crop.mjs",
     "bench": "node scripts/bench.mjs"
   },
   "dependencies": {

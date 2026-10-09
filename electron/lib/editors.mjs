@@ -16,6 +16,16 @@ const KNOWN = [
   { re: /gimp/i, label: 'GIMP' },
 ];
 
+// Programmerne der altid kan vaelges som status under Edits, ogsaa naar
+// appen ikke finder dem i Applications. Appen opfinder ikke andre navne.
+export const FASTE_STATUSER = ['Luminar Neo', 'Topaz Photo AI', 'Photoshop'];
+
+// Alle navne en Edits-status kan have: de faste, og de programmer appen
+// kender fra Applications og fra "Other app".
+export function statusNavne(customApps = []) {
+  return [...new Set([...FASTE_STATUSER, ...detectEditors(customApps).map((e) => e.label)])];
+}
+
 function appsIn(dir, depth = 1) {
   const out = [];
   let entries;

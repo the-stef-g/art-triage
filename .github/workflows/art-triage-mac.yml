@@ -66,6 +66,11 @@ jobs:
         timeout-minutes: 8
         env:
           ELECTRON_DISABLE_SANDBOX: '1'
+      - name: Smoke test of cropping (a new file in Masters)
+        run: xvfb-run --auto-servernum npm run smoke:crop
+        timeout-minutes: 5
+        env:
+          ELECTRON_DISABLE_SANDBOX: '1'
       - name: Smoke test of previews (RAW, TIFF, failed and retried)
         run: xvfb-run --auto-servernum npm run smoke:previews
         timeout-minutes: 5

@@ -3,11 +3,12 @@
 import { ipcMain, dialog, shell } from 'electron';
 import { join } from 'node:path';
 import { existsSync } from 'node:fs';
+import { cropMaster } from './crop.mjs';
 import { openDatabase } from './db.mjs';
 import { Catalog } from './catalog.mjs';
 import { Thumbnailer } from './thumbs.mjs';
 import { watchLibrary } from './watcher.mjs';
-import { detectEditors, openInApp } from './editors.mjs';
+import { detectEditors, openInApp, statusNavne } from './editors.mjs';
 import { SearchIndex, normalize } from './searchIndex.mjs';
 import { Indexer, MODEL_ID } from './indexer.mjs';
 import {
@@ -478,7 +479,7 @@ export class AppSession {
     handle('img:setEditor', ({ versionIds, editor }) => {
       const catalog = this.requireCatalog();
       if (editor != null) {
-        const kendte = detectEditors(this.settings.data.customEditors).map((e) => e.label);
+        const kendte = statusNavne(this.settings.data.customEditors);
         if (!kendte.includes(editor)) throw new Error(`Unknown editor: ${editor}`);
       }
       this.undoMgr.beforeStage(versionIds);
@@ -515,8 +516,29 @@ export class AppSession {
       this.log(`rotate: ${ids.length} file(s) by ${delta} degrees`);
       return { antal: ids.length };
     });
+    // Beskaering. Kun et faerdigt vaerk kan beskaeres, altsaa en fil i Masters,
+    // og resultatet er en ny fil i Masters.
+    handle('crop:save', async ({ versionId, rect, ratio }) => {
+      const catalog = this.requireCatalog();
+      const v = catalog.getVersion(versionId);
+      const f = v ? catalog.getFile(v.effective_file_id) : null;
+      if (!f || !f.present) throw new Error('The file is not available right now');
+      if (!/^Approved\/[^/]+\/Masters\//.test(f.rel_path)) {
+        throw new Error('Only finished works can be cropped: the file must be in the Masters folder');
+      }
+      if (!rect || ![rect.x, rect.y, rect.w, rect.h].every(Number.isFinite) || rect.w <= 0 || rect.h <= 0) {
+        throw new Error('The crop is empty');
+      }
+      const res = await cropMaster({
+        kilde: catalog.abs(f.rel_path), rect, rotation: f.rotation || 0, ratio,
+      });
+      this.log(`crop: ${f.rel_path} -> ${res.path.slice(catalog.root.length + 1)}${res.bit8 ? ' (8 bit)' : ''}`);
+      // Den nye fil bliver en version af vaerket med det samme.
+      await this.runSync('beskaering');
+      return { rel: res.path.slice(catalog.root.length + 1), bit8: res.bit8 };
+    });
     // Aabner en af arbejdsmappens undermapper i Finder.
-    handle('img:openWorkFolder', async ({ versionId, del }) => {
+    handle('img:openWorkFolder', async ({ versionId, del = null }) => {
       const abs = this.requireCatalog().workFolder(versionId, del);
       if (!abs) throw new Error('This image has no work folder. Only Approved images do.');
       await shell.openPath(abs);
@@ -559,6 +581,7 @@ export class AppSession {
     handle('app:redo', () => (this.undoMgr ? this.undoMgr.redo() : null));
 
     handle('ed:list', () => detectEditors(this.settings.data.customEditors));
+    handle('ed:statusNames', () => statusNavne(this.settings.data.customEditors));
     handle('ed:open', async ({ versionId, appPath }) => {
       const catalog = this.requireCatalog();
       const v = catalog.getVersion(versionId);

@@ -694,8 +694,8 @@ export class Catalog extends EventEmitter {
 
   // Arbejdsmappens undermappe (Originals, Edits, Masters, Print files) for et
   // godkendt billede, eller null hvis billedet ikke har en arbejdsmappe.
-  workFolder(versionId, del) {
-    if (!ARBEJDSMAPPER.includes(del)) return null;
+  workFolder(versionId, del = null) {
+    if (del !== null && !ARBEJDSMAPPER.includes(del)) return null;
     const v = this.getVersion(versionId);
     if (!v) return null;
     const master = this.db.get(
@@ -703,7 +703,8 @@ export class Catalog extends EventEmitter {
     );
     const am = master ? arbejdsmappeFor(master.rel_path) : null;
     if (!am) return null;
-    const abs = join(this.root, 'Approved', am.work, del);
+    // Uden en undermappe er det vaerkets egen mappe.
+    const abs = del ? join(this.root, 'Approved', am.work, del) : join(this.root, 'Approved', am.work);
     mkdirSync(abs, { recursive: true });
     return abs;
   }

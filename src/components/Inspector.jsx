@@ -2,17 +2,19 @@ import { useEffect, useState } from 'react';
 import { invoke, thumbUrl } from '../api';
 import { formatBytes, formatDate, fileName } from '../util';
 import WorkPanel from './WorkPanel';
+import CropModal from './CropModal';
 
 // dataRev taeller op hver gang kataloget melder en aendring. Uden den
 // blev noegleordene kun hentet naar man skiftede billede, saa ord Claude
 // lige havde skrevet foerst dukkede op hvis man gik væk og tilbage igen.
 export default function Inspector({
-  row, selectedCount, activeKeyword, editors, series, act, dataRev, hasKey, shop, onShop, onError,
+  row, selectedCount, activeKeyword, editors, statusNavne = [], series, act, dataRev, hasKey, shop, onShop, onError,
 }) {
   const [versions, setVersions] = useState([]);
   const [keywords, setKeywords] = useState([]);
   const [editorValg, setEditorValg] = useState('');
   const [nytOrd, setNytOrd] = useState('');
+  const [beskaer, setBeskaer] = useState(false);
 
   const loadKeywords = () => {
     if (row) invoke('kw:forFile', { fileId: row.file_id }).then(setKeywords).catch(() => {});
@@ -159,7 +161,7 @@ export default function Inspector({
           </p>
           <div className="knapraekke">
             {[...new Set([
-              ...editors.filter((e) => e.appPath).map((e) => e.label),
+              ...statusNavne,
               ...(row.editor ? [row.editor] : []),
             ])].map((navn) => (
               <button
@@ -187,18 +189,31 @@ export default function Inspector({
       {row.rel_path.startsWith('Approved/') && (
         <>
           <h4>Work folder</h4>
-          <p className="tom">Save edits in Edits and the finished master in Masters. The stage follows the folders.</p>
           <div className="knapraekke">
-            {['Originals', 'Edits', 'Masters', 'Print files'].map((del) => (
-              <button
-                key={del}
-                className="lille"
-                onClick={() => invoke('img:openWorkFolder', { versionId: row.version_id, del }).catch(onError)}
-              >
-                Open {del} folder
+            <button
+              className="lille"
+              onClick={() => invoke('img:openWorkFolder', { versionId: row.version_id }).catch(onError)}
+              title="Open the work's folder with Originals, Edits, Masters and Print files"
+            >
+              Show in Finder
+            </button>
+            {/\/Masters\//.test(row.rel_path) && (
+              <button className="lille" onClick={() => setBeskaer(true)} title="Crop this master. The crop is saved as a new file in Masters.">
+                Crop …
               </button>
-            ))}
+            )}
           </div>
+          {!/\/Masters\//.test(row.rel_path) && (
+            <p className="tom">Only finished works can be cropped: select a file in the Masters folder.</p>
+          )}
+          {beskaer && (
+            <CropModal
+              row={row}
+              onClose={() => setBeskaer(false)}
+              onDone={(besked) => { setBeskaer(false); onError(besked); }}
+              onError={onError}
+            />
+          )}
         </>
       )}
 
@@ -218,37 +233,10 @@ export default function Inspector({
       </div>
       <div className="knapraekke">
         <button className="lille" onClick={act.editInOther}>Other app …</button>
-        <button className="lille" onClick={act.reveal}>Reveal in Finder</button>
+        {!row.rel_path.startsWith('Approved/') && (
+          <button className="lille" onClick={act.reveal}>Show in Finder</button>
+        )}
       </div>
-
-      {row.rating === 'godkendt' && (
-        <>
-      <h4>Versions</h4>
-      <div className="versionsliste">
-        {versions.map((v) => (
-          <div key={v.id} className={`version ${v.id === row.version_id ? 'aktiv' : ''}`}>
-            <span className="versionsnavn">{v.is_master ? 'Original' : v.name}</span>
-            <span className="versionsinfo">
-              {v.rating === 'godkendt' ? '✓' : v.rating === 'kandidat' ? 'K' : v.rating === 'kasseret' ? '✕' : ''}
-              {v.editor ? ` ${v.editor}` : ''}
-              {v.finished ? ' F' : ''}
-            </span>
-            {!v.is_master && (
-              <span className="versionsknapper">
-                <button className="lille" onClick={() => act.renameVersion(v.id, v.name)} title="Rename">✎</button>
-                <button className="lille" onClick={() => act.deleteVersion(v.id)} title="Delete">🗑</button>
-              </span>
-            )}
-          </div>
-        ))}
-      </div>
-      <div className="knapraekke">
-        <button onClick={act.virtualCopy} title="Create a virtual copy, e.g. for a different crop">
-          New virtual copy
-        </button>
-      </div>
-        </>
-      )}
 
       <h4>Series</h4>
       <div className="knapraekke">

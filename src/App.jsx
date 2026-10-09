@@ -24,6 +24,7 @@ export default function App() {
   const [tree, setTree] = useState(null);
   const [series, setSeries] = useState([]);
   const [editors, setEditors] = useState([]);
+  const [statusNavne, setStatusNavne] = useState([]);
   const [topKeywords, setTopKeywords] = useState([]);
   const [aiStatus, setAiStatus] = useState(null);
   const [indexProgress, setIndexProgress] = useState(null);
@@ -153,6 +154,7 @@ export default function App() {
   // bibliotek aabnes, ikke ved hver aendring.
   const refreshFast = useCallback(async () => {
     invoke('ed:list').then(setEditors).catch(() => {});
+    invoke('ed:statusNames').then(setStatusNavne).catch(() => {});
     invoke('shop:status').then(setShop).catch(() => {});
     invoke('thumbs:status').then(setThumbStatus).catch(() => {});
   }, []);
@@ -701,6 +703,7 @@ export default function App() {
           selectedCount={selected.length}
           activeKeyword={filter.keyword}
           editors={editors}
+          statusNavne={statusNavne}
           series={series}
           act={act}
           dataRev={dataRev}
