@@ -100,7 +100,28 @@ export function libraryAvailable(root) {
 }
 
 // Gaar hele mappetraeet igennem og returnerer alle understoettede billedfiler.
-export function walkImages(root) {
+// Med en liste af topmapper laeses kun de mapper (og ikke loese filer i
+// roden). Uden en liste laeses det hele.
+function medIndhold(rel, navn, inkluder) {
+  return !inkluder || rel !== '' || inkluder.has(navn);
+}
+
+// Staar der en mappe der hedder Import (ogsaa " Import" med mellemrum
+// foran, som faar den til at ligge oeverst) i biblioteksroden, er det den der
+// sorteres. Returnerer mappens rigtige navn, eller null.
+export function findImportMappe(root) {
+  try {
+    const fund = readdirSync(root, { withFileTypes: true })
+      .filter((e) => e.isDirectory() && /^\s*import\s*$/i.test(e.name))
+      .map((e) => e.name)
+      .sort();
+    return fund[0] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export function walkImages(root, inkluder = null) {
   const out = [];
   const stack = [''];
   while (stack.length) {
@@ -116,8 +137,8 @@ export function walkImages(root) {
       if (ent.name.startsWith('.')) continue;
       const childRel = rel ? `${rel}/${ent.name}` : ent.name;
       if (ent.isDirectory()) {
-        if (!IGNORED_DIRS.has(ent.name)) stack.push(childRel);
-      } else if (ent.isFile() && isSupported(ent.name)) {
+        if (!IGNORED_DIRS.has(ent.name) && medIndhold(rel, ent.name, inkluder)) stack.push(childRel);
+      } else if (ent.isFile() && isSupported(ent.name) && !(inkluder && !rel)) {
         try {
           const st = statSync(join(abs, childRel.slice(rel ? rel.length + 1 : 0)));
           out.push({ rel: childRel, size: st.size, mtime: Math.floor(st.mtimeMs) });
@@ -133,7 +154,7 @@ export function walkImages(root) {
 // Det samme som walkImages, men giver tid tilbage til brugerfladen mens
 // der laeses. Paa et eksternt drev tager 15.000 stat-kald sekunder, og den
 // synkrone version holdt hele appen i den tid ved hver genskanning.
-export async function walkImagesAsync(root) {
+export async function walkImagesAsync(root, inkluder = null) {
   const out = [];
   const stack = [''];
   while (stack.length) {
@@ -150,8 +171,8 @@ export async function walkImagesAsync(root) {
       if (ent.name.startsWith('.')) continue;
       const childRel = rel ? `${rel}/${ent.name}` : ent.name;
       if (ent.isDirectory()) {
-        if (!IGNORED_DIRS.has(ent.name)) stack.push(childRel);
-      } else if (ent.isFile() && isSupported(ent.name)) {
+        if (!IGNORED_DIRS.has(ent.name) && medIndhold(rel, ent.name, inkluder)) stack.push(childRel);
+      } else if (ent.isFile() && isSupported(ent.name) && !(inkluder && !rel)) {
         filer.push(childRel);
       }
     }
@@ -168,7 +189,7 @@ export async function walkImagesAsync(root) {
 }
 
 // Returnerer alle mapper (til mappetraeet), også tomme.
-export function walkDirs(root) {
+export function walkDirs(root, inkluder = null) {
   const out = [];
   const stack = [''];
   while (stack.length) {
@@ -183,6 +204,7 @@ export function walkDirs(root) {
     for (const ent of entries) {
       if (!ent.isDirectory()) continue;
       if (ent.name.startsWith('.') || IGNORED_DIRS.has(ent.name)) continue;
+      if (!medIndhold(rel, ent.name, inkluder)) continue;
       const childRel = rel ? `${rel}/${ent.name}` : ent.name;
       out.push(childRel);
       stack.push(childRel);

@@ -7,7 +7,7 @@ import {
 } from 'node:fs';
 import { join, dirname, basename, extname, posix } from 'node:path';
 import {
-  walkImages, walkImagesAsync, walkDirs, quickHash, quickHashAsync, mapGraense, stemOf, slug, uniquePath, extOf, daCollator,
+  walkImages, walkImagesAsync, walkDirs, findImportMappe, quickHash, quickHashAsync, mapGraense, stemOf, slug, uniquePath, extOf, daCollator,
   libraryAvailable,
 } from './util.mjs';
 
@@ -31,7 +31,6 @@ export const BEDOEMMELSESMAPPE = {
   ubedomt: 'Import', godkendt: 'Approved', kandidat: 'Candidate', kasseret: 'Discarded',
 };
 export const ARBEJDSMAPPER = ['Originals', 'Edits', 'Masters', 'Print files'];
-const STYREDE_TOPMAPPER = ['Import', 'Candidate', 'Discarded', 'Approved'];
 
 // "Approved/Desert/Edits/x.tif" -> { work: 'Desert', del: 'Edits' }, ellers null.
 export function arbejdsmappeFor(rel) {
@@ -164,6 +163,11 @@ export class Catalog extends EventEmitter {
     this.root = root;
     // Slaas til af sessionen: bedoemmelsen flytter saa ogsaa filen til sin mappe.
     this.mappestyring = false;
+    // Mappen med det der ikke er sorteret endnu. Staar der en Import i roden
+    // (ogsaa " Import" med mellemrum), laeses kun den og de tre bedoemte
+    // mapper; alt andet i roden, fx SoMe, ignoreres.
+    this.importMappe = 'Import';
+    this.inkluder = null;
     db.exec(SCHEMA);
     this._migrate();
   }
@@ -257,6 +261,24 @@ export class Catalog extends EventEmitter {
     return antal;
   }
 
+  // Slaar den mappedrevne arbejdsgang til for et bibliotek, og finder Import.
+  brugMappestruktur() {
+    this.mappestyring = true;
+    const fundet = findImportMappe(this.root);
+    if (fundet) {
+      this.importMappe = fundet;
+      this.inkluder = new Set([fundet, 'Approved', 'Candidate', 'Discarded']);
+    }
+  }
+
+  _styredeTopmapper() {
+    return [this.importMappe, 'Candidate', 'Discarded', 'Approved'];
+  }
+
+  _topFor(rating) {
+    return rating === 'ubedomt' ? this.importMappe : BEDOEMMELSESMAPPE[rating];
+  }
+
   abs(rel) {
     return join(this.root, rel);
   }
@@ -278,7 +300,7 @@ export class Catalog extends EventEmitter {
     if (!libraryAvailable(this.root)) {
       return { changed: 0, edited: 0, unavailable: true };
     }
-    return this._afstem(new Map(walkImages(this.root).map((f) => [f.rel, f])), null);
+    return this._afstem(new Map(walkImages(this.root, this.inkluder).map((f) => [f.rel, f])), null);
   }
 
   // Det samme, men filsystemet laeses uden at blokere: mapperne, filernes
@@ -288,7 +310,7 @@ export class Catalog extends EventEmitter {
     if (!libraryAvailable(this.root)) {
       return { changed: 0, edited: 0, unavailable: true };
     }
-    const liste = await walkImagesAsync(this.root);
+    const liste = await walkImagesAsync(this.root, this.inkluder);
     const kendte = new Map(this.db.all('SELECT rel_path, size, mtime FROM files').map((r) => [r.rel_path, r]));
     const skalHashes = liste.filter((f) => {
       const k = kendte.get(f.rel);
@@ -727,7 +749,7 @@ export class Catalog extends EventEmitter {
   _maalmappe(rel, rating) {
     const dir = posix.dirname(rel) === '.' ? '' : posix.dirname(rel);
     const topmappe = rel.split('/')[0];
-    const styret = rel.includes('/') && STYREDE_TOPMAPPER.includes(topmappe);
+    const styret = rel.includes('/') && this._styredeTopmapper().includes(topmappe);
     if (rating === 'godkendt') {
       if (arbejdsmappeFor(rel)?.del === 'Originals') return null;
       const stem = stemOf(posix.basename(rel)).replace(/[/:\\]/g, '-');
@@ -746,7 +768,7 @@ export class Catalog extends EventEmitter {
     // Under Approved er der arbejdsmapper; tilbage gaar filen til roden af
     // den nye mappe, ellers bevares undermappen den kom fra.
     const under = topmappe === 'Approved' ? '' : (styret ? dir.split('/').slice(1).join('/') : dir);
-    const top = BEDOEMMELSESMAPPE[rating];
+    const top = this._topFor(rating);
     const mal = under ? `${top}/${under}` : top;
     return mal === dir ? null : mal;
   }
@@ -758,7 +780,7 @@ export class Catalog extends EventEmitter {
     const am = arbejdsmappeFor(rel);
     if (am) return am.work;
     const dele = posix.dirname(rel) === '.' ? [] : posix.dirname(rel).split('/');
-    if (dele.length && STYREDE_TOPMAPPER.includes(dele[0])) dele.shift();
+    if (dele.length && this._styredeTopmapper().includes(dele[0])) dele.shift();
     return dele.length ? dele[dele.length - 1] : '';
   }
 
@@ -1021,7 +1043,7 @@ export class Catalog extends EventEmitter {
   // ---------- Mapper og flytning ----------
 
   folderTree() {
-    const dirs = walkDirs(this.root);
+    const dirs = walkDirs(this.root, this.inkluder);
     // Tallene ved hver mappe skal vise det samme som et klik paa mappen.
     // Derfor taelles versioner og ikke filer, og undermapper regnes med,
     // praecis som filteret goer. Foer blev der taldt filer i mappen selv,

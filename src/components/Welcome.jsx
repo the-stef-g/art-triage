@@ -2,8 +2,8 @@ export default function Welcome({ recent, onChoose, onOpen }) {
   return (
     <div className="velkomst">
       <h1>Stef G Art</h1>
-      <p>Sort and organise your images. Pick the folder your images live in, and Stef G Art keeps track of the rest.</p>
-      <button className="stor" onClick={onChoose}>Choose image folder …</button>
+      <p>Sort and organise your images. Pick your Stef G Art folder. If it has an Import folder, only Import, Approved, Candidate and Discarded are read; anything else in it is left alone.</p>
+      <button className="stor" onClick={onChoose}>Choose the Stef G Art folder …</button>
       {recent.length > 0 && (
         <div className="seneste">
           <h3>Recent</h3>

@@ -648,3 +648,40 @@ describe('Edits-status', () => {
     expect(catalog.getVersion(kopi).rating).toBe('godkendt');
   });
 });
+
+describe('Import-mappen', () => {
+  const fil = () => catalog.listVersions({ visKasserede: true }).map((r) => r.rel_path).sort();
+
+  it('laeser kun Import (ogsaa med mellemrum foran) og de bedoemte mapper, ikke resten af roden', () => {
+    skriv(' Import/Ahl Strand/a.cr2', 'a');
+    skriv('Approved/w/Originals/w.cr2', 'w');
+    skriv('Candidate/c.cr2', 'c');
+    skriv('SoMe/s.jpg', 's');
+    skriv('los.jpg', 'l');
+    catalog.brugMappestruktur();
+    catalog.sync();
+    expect(fil()).toEqual([' Import/Ahl Strand/a.cr2', 'Approved/w/Originals/w.cr2', 'Candidate/c.cr2']);
+    expect(catalog.folderTree().children.map((m) => m.name ?? m.rel)).toBeTruthy();
+  });
+
+  it('ubedoemte filer hoerer hjemme i Import, med mellemrummet', () => {
+    skriv(' Import/Ahl Strand/a.cr2', 'a');
+    catalog.brugMappestruktur();
+    catalog.sync();
+    const id = () => catalog.listVersions({ visKasserede: true })[0].version_id;
+    catalog.setRating([id()], 'kasseret');
+    expect(existsSync(join(root, 'Discarded/Ahl Strand/a.cr2'))).toBe(true);
+    catalog.setRating([id()], 'ubedomt');
+    expect(existsSync(join(root, ' Import/Ahl Strand/a.cr2'))).toBe(true);
+    catalog.setRating([id()], 'godkendt');
+    expect(existsSync(join(root, 'Approved/a/Originals/a.cr2'))).toBe(true);
+  });
+
+  it('uden en Import-mappe laeses hele roden, som foer', () => {
+    skriv('Ahl/a.cr2', 'a');
+    skriv('SoMe/s.jpg', 's');
+    catalog.brugMappestruktur();
+    catalog.sync();
+    expect(fil()).toEqual(['Ahl/a.cr2', 'SoMe/s.jpg']);
+  });
+});

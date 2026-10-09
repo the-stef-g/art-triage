@@ -2,6 +2,7 @@
 // watcher, indeksering) og registrerer alle IPC-handlers som UI'et kalder.
 import { ipcMain, dialog, shell } from 'electron';
 import { join } from 'node:path';
+import { existsSync } from 'node:fs';
 import { openDatabase } from './db.mjs';
 import { Catalog } from './catalog.mjs';
 import { Thumbnailer } from './thumbs.mjs';
@@ -138,7 +139,7 @@ export class AppSession {
     const dataDir = dataDirFor(root);
     this.db = await openDatabase(join(dataDir, 'katalog.sqlite'));
     this.catalog = new Catalog(this.db, root);
-    this.catalog.mappestyring = true;
+    this.catalog.brugMappestruktur();
     this.thumbs = new Thumbnailer({
       cacheDir: join(dataDir, 'cache'),
       rasterizeSvg: this.rasterizeSvg,
@@ -423,14 +424,15 @@ export class AppSession {
 
     handle('lib:choose', async () => {
       const res = await dialog.showOpenDialog(this.win, {
-        title: 'Choose image folder',
+        title: 'Choose the Stef G Art folder',
         properties: ['openDirectory', 'createDirectory'],
       });
       if (res.canceled || !res.filePaths.length) return null;
       return this.openLibrary(res.filePaths[0]);
     });
     handle('lib:open', async ({ root }) => this.openLibrary(root));
-    handle('lib:recent', () => this.settings.data.recentLibraries);
+    // Mapper der er omdoebt eller slettet vises ikke som seneste bibliotek.
+    handle('lib:recent', () => (this.settings.data.recentLibraries || []).filter((r) => existsSync(r.root ?? r)));
     handle('lib:current', () => (this.catalog ? { root: this.catalog.root } : null));
     // "Skan igen": naar drevet lige er tilsluttet igen, eller naar der er
     // lagt filer i mappen og man ikke gider vente paa uret.
