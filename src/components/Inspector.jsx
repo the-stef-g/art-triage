@@ -64,6 +64,20 @@ export default function Inspector({
     );
   }
 
+  // Det der kan beskaeres er værkets master: den valgte fil hvis den ligger i
+  // Masters, ellers den foerste fil i Masters. Uden en er vaerket ikke faerdigt.
+  const iMasters = (rel) => /^Approved\/[^/]+\/Masters\//.test(rel);
+  const masterVersion = iMasters(row.rel_path)
+    ? row
+    : versions.find((v) => iMasters(v.rel_path));
+  const master = masterVersion ? {
+    version_id: masterVersion.version_id ?? masterVersion.id,
+    file_id: masterVersion.file_id ?? masterVersion.effective_file_id,
+    mtime: masterVersion.mtime,
+    rotation: masterVersion.rotation || 0,
+    rel_path: masterVersion.rel_path,
+  } : null;
+
   const editorList = editors.length
     ? editors
     : [{ appPath: '', label: 'Default app' }];
@@ -197,18 +211,23 @@ export default function Inspector({
             >
               Show in Finder
             </button>
-            {/\/Masters\//.test(row.rel_path) && (
-              <button className="lille" onClick={() => setBeskaer(true)} title="Crop this master. The crop is saved as a new file in Masters.">
-                Crop …
-              </button>
-            )}
+            <button
+              className="lille"
+              disabled={!master}
+              onClick={() => setBeskaer(true)}
+              title={master
+                ? `Crop ${master.rel_path.split('/').pop()}. The crop is saved as a new file in Masters.`
+                : 'Only finished works can be cropped: put the master in the Masters folder first.'}
+            >
+              Crop master …
+            </button>
           </div>
-          {!/\/Masters\//.test(row.rel_path) && (
-            <p className="tom">Only finished works can be cropped: select a file in the Masters folder.</p>
+          {!master && (
+            <p className="tom">Only finished works can be cropped. Put the master in the Masters folder.</p>
           )}
           {beskaer && (
             <CropModal
-              row={row}
+              row={master}
               onClose={() => setBeskaer(false)}
               onDone={(besked) => { setBeskaer(false); onError(besked); }}
               onError={onError}
