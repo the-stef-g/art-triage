@@ -2,7 +2,7 @@
 // Tekster rettes kun her; Woo er en kopi (docs/plan-shop.md). Alt gemmes
 // i kataloget, saa det overlever genstart og genscanning.
 import { basename } from 'node:path';
-import { stemOf } from './util.mjs';
+import { stemOf, beskaeringFraSti } from './util.mjs';
 import { exifYear } from './exif.mjs';
 
 export const CATEGORIES = ['Graphic Design', 'Photography', 'Paintings', 'Sculptures'];
@@ -137,11 +137,26 @@ export class Works {
     ) || null;
   }
 
+  // Beskaeringerne til shoppen er filerne i Masters hvis navn har et format
+  // ("... 2-3.tif"). Den foerste fil pr. format vinder. Aeldre markeringer
+  // lavet i haanden (work_crops) gaelder stadig for de formater, ingen fil har.
   cropsFor(imageId) {
-    return this.db.all(
-      'SELECT format, version_id FROM work_crops WHERE image_id=?',
+    const fraFiler = this.db.all(
+      `SELECT v.id AS vid, f.rel_path FROM versions v
+       JOIN images i ON i.id = v.image_id
+       JOIN files f ON f.id = COALESCE(v.file_id, i.master_file_id)
+       WHERE v.image_id=? AND f.present=1 ORDER BY v.id`,
       imageId
-    ).map((r) => ({ format: r.format, versionId: r.version_id }))
+    );
+    const out = new Map();
+    for (const r of fraFiler) {
+      const format = beskaeringFraSti(r.rel_path);
+      if (format && CROP_FORMATS.includes(format) && !out.has(format)) out.set(format, r.vid);
+    }
+    for (const r of this.db.all('SELECT format, version_id FROM work_crops WHERE image_id=?', imageId)) {
+      if (!out.has(r.format)) out.set(r.format, r.version_id);
+    }
+    return [...out].map(([format, versionId]) => ({ format, versionId }))
       .sort((a, b) => CROP_FORMATS.indexOf(a.format) - CROP_FORMATS.indexOf(b.format));
   }
 

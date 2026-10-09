@@ -318,6 +318,7 @@ input:focus, select:focus { outline: 1px solid var(--accent); }
 .badge.redigeret { background: var(--redigeret); color: #05233f; }
 .badge.faerdig { background: var(--faerdig); color: #2b1f00; }
 .badge.kopi { background: #6e40c9; color: #f2e8ff; }
+.badge.beskaering { background: #1f9d8a; color: #04231e; }
 .badge.serie { background: transparent; border: 1px solid var(--kant); }
 
 .tom-tilstand {
@@ -368,6 +369,7 @@ input:focus, select:focus { outline: 1px solid var(--accent); }
 .aktiv-kasseret { background: var(--kasseret); border-color: var(--kasseret); color: #2d0503; font-weight: 700; }
 /* Arbejdstrin. Samme to farver som maerkerne i grid'et, saa knappen og
    billedet siger det samme. */
+.aktiv-beskaering { background: #1f9d8a; border-color: #1f9d8a; color: #04231e; font-weight: 700; }
 .aktiv-redigeres { background: var(--redigeret); border-color: var(--redigeret); color: #04203f; font-weight: 700; }
 .aktiv-faerdig { background: var(--faerdig); border-color: var(--faerdig); color: #2e1f00; font-weight: 700; }
 .versionsliste { display: flex; flex-direction: column; gap: 2px; }

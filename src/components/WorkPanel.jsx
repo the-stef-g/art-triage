@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { invoke } from '../api';
 
 const CATEGORIES = ['Graphic Design', 'Photography', 'Paintings', 'Sculptures'];
-const CROP_FORMATS = ['1:1', '2:3', '3:2', '1:2', '2:1'];
 
 const TEXT_LABELS = {
   description: 'Description',
@@ -100,17 +99,6 @@ export default function WorkPanel({ row, versions, hasKey, shop, onShop, onError
     }
   };
 
-  const setCrop = async (versionId, format) => {
-    try {
-      await invoke('work:setCrop', { imageId, versionId, format: format || null });
-      adopt(await invoke('work:get', { imageId }));
-    } catch (err) {
-      onError(err);
-    }
-  };
-
-  const cropVersion = (format) => work.crops.find((c) => c.format === format)?.versionId ?? '';
-  const versionName = (v) => (v.is_master ? 'Original' : v.name);
 
   // Shop-knapperne gaar gennem hovedprocessen, som ejer noeglerne.
   const shopKald = async (kanal, besked) => {
@@ -327,20 +315,6 @@ export default function WorkPanel({ row, versions, hasKey, shop, onShop, onError
           </div>
         </>
       )}
-
-      <h4>Crops</h4>
-      {CROP_FORMATS.map((f) => (
-        <div key={f} className="vaerk-crop">
-          <span className="vaerk-format">{f}</span>
-          <select value={cropVersion(f)} onChange={(e) => setCrop(Number(e.target.value), f)}>
-            <option value="">None</option>
-            {versions.map((v) => <option key={v.id} value={v.id}>{versionName(v)}</option>)}
-          </select>
-          {cropVersion(f) && (
-            <button className="lille" onClick={() => setCrop(cropVersion(f), null)} title="Clear">×</button>
-          )}
-        </div>
-      ))}
 
       <h4>Texts</h4>
       <label>Your notes (sent to Claude)

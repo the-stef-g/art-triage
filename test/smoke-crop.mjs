@@ -1,7 +1,7 @@
 // Smoke test af beskaering i den byggede app: godkend et billede, laeg en
 // masterfil i Masters, beskaer den, og se at der kommer en ny fil i Masters.
 import { _electron as electron } from 'playwright-core';
-import { mkdtempSync, rmSync, existsSync, readdirSync } from 'node:fs';
+import { mkdtempSync, rmSync, existsSync, readdirSync, renameSync } from 'node:fs';
 import { mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -84,6 +84,29 @@ try {
   const m = await sharp(join(lib, 'Approved', 'blaa', 'Masters', 'blaa master 1-1.png')).metadata();
   if (m.width !== m.height) throw new Error(`Beskaeringen er ikke kvadratisk: ${m.width} x ${m.height}`);
   if (await page.locator('.badge.kasseret').count() !== 0) throw new Error('X ramte et billede bag beskaeringsvinduet');
+
+  // Beskaeringen er en etiket paa filen, ligesom Master.
+  const flise = (suffiks) => page.locator('.tile', { has: page.locator(`.tile-navn[title$="${suffiks}"]`) });
+  await page.waitForFunction(
+    () => [...document.querySelectorAll('.tile')].some((t) => t.querySelector('.tile-navn')?.title.endsWith('blaa master 1-1.png') && t.querySelector('.badge.beskaering')?.textContent === '1:1'),
+    null,
+    { timeout: 10000 }
+  );
+
+  // Et klik paa et andet format omdoeber filen, og etiketten foelger med.
+  await flise('blaa master 1-1.png').click();
+  await page.locator('button', { hasText: /^2:3$/ }).click();
+  await page.waitForSelector('.tile-navn[title$="blaa master 2-3.png"]', { timeout: 15000 });
+  if (!existsSync(join(lib, 'Approved', 'blaa', 'Masters', 'blaa master 2-3.png'))) throw new Error('Filen blev ikke omdoebt');
+
+  // Omdoeber man den selv i Finder, foelger appen med efter en genscanning.
+  renameSync(join(lib, 'Approved', 'blaa', 'Masters', 'blaa master 2-3.png'), join(lib, 'Approved', 'blaa', 'Masters', 'blaa master 3-2.png'));
+  await page.locator('button', { hasText: 'Scan again' }).click();
+  await page.waitForFunction(
+    () => [...document.querySelectorAll('.tile')].some((t) => t.querySelector('.tile-navn')?.title.endsWith('blaa master 3-2.png') && t.querySelector('.badge.beskaering')?.textContent === '3:2'),
+    null,
+    { timeout: 20000 }
+  );
 
   console.log('SMOKE OK: beskaering gemmer en ny fil i Masters');
   succes = true;

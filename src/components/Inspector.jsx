@@ -201,17 +201,32 @@ export default function Inspector({
         </>
       )}
 
-      {row.rel_path.startsWith('Approved/') && (
+      {row.rating === 'godkendt' && (
         <>
-          <h4>Work folder</h4>
+          <h4>Crops</h4>
           <div className="knapraekke">
+            {['1:1', '2:3', '3:2', '1:2', '2:1'].map((f) => (
+              <button
+                key={f}
+                className={row.crop === f ? 'aktiv-beskaering' : ''}
+                disabled={!iMasters(row.rel_path)}
+                onClick={() => invoke('img:setCrop', { versionId: row.version_id, crop: row.crop === f ? null : f }).catch(onError)}
+                title={iMasters(row.rel_path)
+                  ? 'Gives the file this crop, in its name and as a label. Click again to remove it.'
+                  : 'Crops apply to files in the Masters folder.'}
+              >
+                {f}
+              </button>
+            ))}
             <button
-              className="lille"
-              onClick={() => invoke('img:openWorkFolder', { versionId: row.version_id }).catch(onError)}
-              title="Open the work's folder with Originals, Edits, Masters and Print files"
+              disabled={!iMasters(row.rel_path) || !row.crop}
+              onClick={() => invoke('img:setCrop', { versionId: row.version_id, crop: null }).catch(onError)}
+              title="Remove the crop from the file name"
             >
-              Show in Finder
+              Clear
             </button>
+          </div>
+          <div className="knapraekke">
             <button
               className="lille"
               disabled={!master}
@@ -226,7 +241,7 @@ export default function Inspector({
           {!master && (
             <p className="tom">Only finished works can be cropped. Put the master in the Masters folder.</p>
           )}
-          {beskaer && (
+          {beskaer && master && (
             <CropModal
               row={master}
               onClose={() => setBeskaer(false)}
@@ -234,6 +249,21 @@ export default function Inspector({
               onError={onError}
             />
           )}
+        </>
+      )}
+
+      {row.rel_path.startsWith('Approved/') && (
+        <>
+          <h4>Work folder</h4>
+          <div className="knapraekke">
+            <button
+              className="lille"
+              onClick={() => invoke('img:openWorkFolder', { versionId: row.version_id }).catch(onError)}
+              title="Open the work's folder with Originals, Edits, Masters and Print files"
+            >
+              Show in Finder
+            </button>
+          </div>
         </>
       )}
 

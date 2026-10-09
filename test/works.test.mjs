@@ -233,6 +233,29 @@ describe('beskaeringer', () => {
   });
 });
 
+describe('beskaeringer fra filnavnene', () => {
+  it('er filerne i Masters med et format i navnet, og de gamle markeringer fylder hullerne', () => {
+    catalog.mappestyring = true;
+    skriv('Blue Door 02.cr2');
+    catalog.sync();
+    const id = imageIdFor('Blue Door 02.cr2');
+    catalog.setRating([catalog.listVersions({}).find((r) => r.image_id === id).version_id], 'godkendt');
+    skriv('Approved/Blue Door 02/Masters/Blue Door 02 3-2.tif');
+    skriv('Approved/Blue Door 02/Masters/Blue Door 02 1-1.tif');
+    skriv('Approved/Blue Door 02/Masters/Blue Door 02 uden.tif');
+    catalog.sync();
+    const rows = catalog.listVersions({}).filter((r) => r.image_id === id);
+    const vid = (navn) => rows.find((r) => r.rel_path.endsWith(navn)).version_id;
+    expect(works.get(id).crops).toEqual([
+      { format: '1:1', versionId: vid('1-1.tif') },
+      { format: '3:2', versionId: vid('3-2.tif') },
+    ]);
+    // En markering lavet i haanden for et format ingen fil har, gaelder stadig.
+    works.setCrop(id, vid('uden.tif'), '2:3');
+    expect(works.get(id).crops.map((c) => c.format)).toEqual(['1:1', '2:3', '3:2']);
+  });
+});
+
 describe('tekster fra Claude', () => {
   let id;
   beforeEach(() => {

@@ -516,6 +516,13 @@ export class AppSession {
       this.log(`rotate: ${ids.length} file(s) by ${delta} degrees`);
       return { antal: ids.length };
     });
+    // Beskaeringen paa en fil i Masters. Den staar i filnavnet, saa filen
+    // omdoebes, og etiketten foelger med.
+    handle('img:setCrop', ({ versionId, crop }) => {
+      const rel = this.requireCatalog().setBeskaering(versionId, crop ?? null);
+      this.log(`crop label: ${rel}`);
+      return { rel };
+    });
     // Beskaering. Kun et faerdigt vaerk kan beskaeres, altsaa en fil i Masters,
     // og resultatet er en ny fil i Masters.
     handle('crop:save', async ({ versionId, rect, ratio }) => {

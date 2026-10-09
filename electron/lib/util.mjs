@@ -213,6 +213,31 @@ export function walkDirs(root, inkluder = null) {
   return out.sort(daCollator.compare);
 }
 
+// Beskaeringens plads i filnavnet: et mellemrum (eller _) og formatet, som
+// "Desert Canyon 01 2-3.tif". Kun filer i et vaerks Masters-mappe har en
+// beskaering. Navnet er sandheden: aendrer man det, foelger etiketten med.
+export const BESKAERING_I_NAVN = { '1-1': '1:1', '2-3': '2:3', '3-2': '3:2', '1-2': '1:2', '2-1': '2:1' };
+
+export function beskaeringFraSti(rel) {
+  if (!/^Approved\/[^/]+\/Masters\//.test(rel)) return null;
+  const stem = stemOf(basename(rel));
+  const m = /[ _](1-1|2-3|3-2|1-2|2-1)$/.exec(stem);
+  if (m) return BESKAERING_I_NAVN[m[1]];
+  return /[ _]free \d+x\d+$/.test(stem) ? 'free' : null;
+}
+
+// Filnavnet med en beskaering i (eller uden den, naar crop er null). En
+// beskaering der staar der i forvejen, skiftes ud.
+export function navnMedBeskaering(fileName, crop) {
+  const ext = extname(fileName);
+  let stem = ext ? fileName.slice(0, -ext.length) : fileName;
+  stem = stem.replace(/[ _](1-1|2-3|3-2|1-2|2-1)$/, '').replace(/[ _]free \d+x\d+$/, '');
+  if (crop === null || crop === undefined) return `${stem}${ext}`;
+  const token = Object.entries(BESKAERING_I_NAVN).find(([, f]) => f === crop)?.[0];
+  if (!token) throw new Error(`Unknown crop format: ${crop}`);
+  return `${stem} ${token}${ext}`;
+}
+
 export function stemOf(fileName) {
   const e = extname(fileName);
   return e ? fileName.slice(0, -e.length) : fileName;

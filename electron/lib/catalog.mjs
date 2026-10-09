@@ -7,7 +7,7 @@ import {
 } from 'node:fs';
 import { join, dirname, basename, extname, posix } from 'node:path';
 import {
-  walkImages, walkImagesAsync, walkDirs, findImportMappe, quickHash, quickHashAsync, mapGraense, stemOf, slug, uniquePath, extOf, daCollator,
+  walkImages, walkImagesAsync, walkDirs, findImportMappe, beskaeringFraSti, navnMedBeskaering, quickHash, quickHashAsync, mapGraense, stemOf, slug, uniquePath, extOf, daCollator,
   libraryAvailable,
 } from './util.mjs';
 
@@ -676,6 +676,8 @@ export class Catalog extends EventEmitter {
         || (b.is_master - a.is_master)
         || (a.version_id - b.version_id));
     }
+    // Beskaeringen staar i filnavnet, saa den foelger med naar filen omdoebes.
+    for (const r of rows) r.crop = beskaeringFraSti(r.rel_path);
     return rows;
   }
 
@@ -882,6 +884,26 @@ export class Catalog extends EventEmitter {
     return this.db.get('SELECT editor FROM editor_log WHERE image_id=?', imageId)?.editor ?? null;
   }
 
+  // Beskaeringen paa en fil i Masters: den staar i filnavnet, saa at saette den
+  // omdoeber filen ("... 2-3.tif"), og null fjerner den. Returnerer den nye sti.
+  setBeskaering(versionId, crop) {
+    const v = this.getVersion(versionId);
+    const f = v ? this.getFile(v.effective_file_id) : null;
+    if (!f || !f.present) throw new Error('The file is not available right now');
+    if (!/^Approved\/[^/]+\/Masters\//.test(f.rel_path)) {
+      throw new Error('Only files in the Masters folder have a crop');
+    }
+    const nyt = navnMedBeskaering(basename(f.rel_path), crop ?? null);
+    if (nyt === basename(f.rel_path)) return f.rel_path;
+    const dir = join(this.root, posix.dirname(f.rel_path));
+    const dest = uniquePath(join(dir, nyt));
+    renameSync(this.abs(f.rel_path), dest);
+    const rel = toRel(this.root, dest);
+    this.db.run('UPDATE files SET rel_path=? WHERE id=?', rel, f.id);
+    this.emit('changed');
+    return rel;
+  }
+
   // Dreje et billede et kvarter ad gangen. delta er 90 (med uret) eller -90;
   // 0 nulstiller. Returnerer den nye drejning.
   rotateFile(fileId, delta) {
@@ -982,7 +1004,7 @@ export class Catalog extends EventEmitter {
        JOIN files f ON f.id = COALESCE(v.file_id, i.master_file_id)
        WHERE v.image_id=? ORDER BY v.is_master DESC, v.id ASC`,
       imageId
-    );
+    ).map((r) => ({ ...r, crop: beskaeringFraSti(r.rel_path) }));
   }
 
   // ---------- Serier ----------
