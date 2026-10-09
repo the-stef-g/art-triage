@@ -172,6 +172,7 @@ export default function Inspector({
           <p className="tom">
             {row.editor ? `Edited in ${row.editor}.` : row.edited ? 'Has edits. Choose the program below to note which one.' : 'Not edited yet.'}
             {' '}Save results in the Edits folder; the program you opened the image in becomes the status.
+            {selectedCount > 1 && ` A program you click applies to all ${selectedCount} selected Approved images.`}
           </p>
           <div className="knapraekke">
             {[...new Set([

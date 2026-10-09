@@ -347,8 +347,14 @@ export default function App() {
     // Kun for godkendte billeder, og kun navne appen kender.
     setEditor: (editor) => {
       const f = getFocused();
-      if (!f || f.rating !== 'godkendt') return;
-      invoke('img:setEditor', { versionIds: [f.version_id], editor }).catch(visFejl);
+      if (!f) return;
+      // Gaelder alle markerede godkendte billeder, ellers det aktive.
+      const valgte = new Set(selectedRef.current);
+      const rows = valgte.size > 1
+        ? rowsRef.current.filter((r) => valgte.has(r.version_id) && r.rating === 'godkendt')
+        : (f.rating === 'godkendt' ? [f] : []);
+      if (!rows.length) return;
+      invoke('img:setEditor', { versionIds: rows.map((r) => r.version_id), editor }).catch(visFejl);
     },
     // "Finished" kan saettes i haanden; en fil i Masters goer det af sig selv.
     setStage: (stage) => {
