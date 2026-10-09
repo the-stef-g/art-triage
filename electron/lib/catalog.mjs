@@ -588,8 +588,12 @@ export class Catalog extends EventEmitter {
       const pos = new Map(filter.fileIds.map((id, idx) => [id, idx]));
       rows.sort((a, b) => (pos.get(a.file_id) ?? 1e9) - (pos.get(b.file_id) ?? 1e9));
     } else if (filter.sort !== 'dato') {
+      // Efter filnavn, ikke hele stien: en bedoemmelse flytter filen til en
+      // anden mappe, og billedet maa ikke hoppe til en ny plads i gitteret,
+      // for saa mister man pladsen midt i en gennemgang.
       rows.sort((a, b) =>
-        daCollator.compare(a.rel_path, b.rel_path)
+        daCollator.compare(posix.basename(a.rel_path), posix.basename(b.rel_path))
+        || daCollator.compare(a.rel_path, b.rel_path)
         || (b.is_master - a.is_master)
         || (a.version_id - b.version_id));
     }

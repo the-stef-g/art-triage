@@ -582,3 +582,18 @@ describe('mappedrevet arbejdsgang', () => {
     expect(catalog.stageOf(catalog.getVersion(nyId))).toBe(null);
   });
 });
+
+describe('gitterets raekkefoelge', () => {
+  it('et billede bliver paa sin plads, selv om en bedoemmelse flytter filen til en anden mappe', () => {
+    catalog.mappestyring = true;
+    for (const n of ['a', 'b', 'c']) skriv(`${n}.cr2`, n);
+    catalog.sync();
+    const navne = () => catalog.listVersions({ visKasserede: true }).map((r) => r.rel_path.split('/').pop());
+    expect(navne()).toEqual(['a.cr2', 'b.cr2', 'c.cr2']);
+    const b = catalog.listVersions({}).find((r) => r.rel_path === 'b.cr2');
+    catalog.setRating([b.version_id], 'kandidat');
+    catalog.setRating([b.version_id], 'godkendt');
+    catalog.setRating([b.version_id], 'ubedomt');
+    expect(navne()).toEqual(['a.cr2', 'b.cr2', 'c.cr2']);
+  });
+});

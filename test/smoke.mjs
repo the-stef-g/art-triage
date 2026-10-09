@@ -30,7 +30,7 @@ async function lavTestbilleder(dir) {
   }
   await sharp({ create: { width: 64, height: 96, channels: 3, background: { r: 80, g: 160, b: 80 } } })
     .png()
-    .toFile(join(dir, 'undermappe', 'groen.png'));
+    .toFile(join(dir, 'undermappe', 'zgroen.png'));
 }
 
 const lib = mkdtempSync(join(tmpdir(), 'art-triage-smoke-'));
@@ -403,6 +403,7 @@ try {
   succes = true;
 } catch (err) {
   console.error(`SMOKE FEJL: ${err?.message || err}`);
+  if (err?.stack) console.error(String(err.stack).split('\n').filter((l) => l.includes('smoke.mjs')).join('\n'));
   const win = app.windows()[0];
   if (win) {
     await win.screenshot({ path: join(projectRoot, 'smoke-fejl.png') }).catch(() => {});
