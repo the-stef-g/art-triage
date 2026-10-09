@@ -154,7 +154,7 @@ export default function Inspector({
       ) : (
         <>
           <p className="tom">
-            {row.editor ? `Edited in ${row.editor}.` : 'Not edited yet.'}
+            {row.editor ? `Edited in ${row.editor}.` : row.edited ? 'Has edits. Choose the program below to note which one.' : 'Not edited yet.'}
             {' '}Save results in the Edits folder; the program you opened the image in becomes the status.
           </p>
           <div className="knapraekke">
@@ -195,7 +195,7 @@ export default function Inspector({
                 className="lille"
                 onClick={() => invoke('img:openWorkFolder', { versionId: row.version_id, del }).catch(onError)}
               >
-                {del}
+                Open {del} folder
               </button>
             ))}
           </div>

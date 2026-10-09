@@ -25,7 +25,7 @@ function Badges({ row }) {
         <span className="badge kandidat" title="Candidate: good subject, needs editing before it can be decided">?</span>
       )}
       {row.rating === 'kasseret' && <span className="badge kasseret" title="Discarded">✕</span>}
-      {Boolean(row.edited) && row.editor && <span className="badge redigeret" title={`Edited in ${row.editor}`}>{row.editor}</span>}
+      {Boolean(row.edited) && <span className="badge redigeret" title={row.editor ? `Edited in ${row.editor}` : 'Has edits'}>{row.editor || 'Edits'}</span>}
       {Boolean(row.finished) && <span className="badge faerdig" title="Finished">F</span>}
       {row.rating === 'godkendt' && !row.is_master && <span className="badge kopi" title={`Version: ${row.version_name}. A separate version of the original image, either a file with the same name in another format or an edit.`}>{row.version_name}</span>}
       {row.rating === 'godkendt' && Boolean(row.is_master) && row.version_count > 1 && (

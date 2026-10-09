@@ -129,7 +129,7 @@ export default function Toolbar({
         >
           {skanner ? 'Scanning …' : 'Scan again'}
         </button>
-        <button onClick={onCleanup} title="Move files where every version is discarded to the Discarded folder">Clean up</button>
+        <button onClick={onCleanup} title="Move files where every version is discarded to the Discarded folder, and delete empty folders in Import">Clean up</button>
         <button onClick={onChooseLibrary} title="Switch to a different image folder">Switch library</button>
       </div>
     </header>

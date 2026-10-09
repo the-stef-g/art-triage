@@ -83,8 +83,9 @@ describe('scanning', () => {
     const ra = rows.find((r) => r.rel_path === 'a.png');
     const rb = rows.find((r) => r.rel_path === 'b.png');
     expect([ra.edited, ra.editor]).toEqual([1, 'Luminar Neo']);
-    // b blev aldrig aabnet i et program: appen finder ikke selv paa en status.
-    expect([rb.edited, rb.editor]).toEqual([0, null]);
+    // b blev aldrig aabnet i et program: den har Edits, men appen finder ikke
+    // selv paa et programnavn.
+    expect([rb.edited, rb.editor]).toEqual([1, null]);
   });
 
   it('stacker afledte filer som versioner af samme billede', () => {
@@ -104,7 +105,7 @@ describe('scanning', () => {
     expect(stak.length).toBe(3);
     const kopi = rows.find((r) => r.version_name === 'gigapixel');
     expect(kopi).toBeTruthy();
-    expect(kopi.edited).toBe(0); // ingen kendt program, ingen status
+    expect(kopi.edited).toBe(1); // en redigering, men intet kendt program
     expect(kopi.editor).toBe(null);
   });
 
@@ -683,5 +684,65 @@ describe('Import-mappen', () => {
     catalog.brugMappestruktur();
     catalog.sync();
     expect(fil()).toEqual(['Ahl/a.cr2', 'SoMe/s.jpg']);
+  });
+});
+
+describe('Edits uden kendt program, og tomme mapper', () => {
+  const raekke = (rel) => catalog.listVersions({ visKasserede: true }).find((r) => r.rel_path === rel);
+
+  it('en fil i Edits giver Edits paa baade redigeringen og originalen, ogsaa uden programnavn', () => {
+    catalog.mappestyring = true;
+    skriv('a.cr2', 'a');
+    catalog.sync();
+    catalog.setRating([raekke('a.cr2').version_id], 'godkendt');
+    skriv('Approved/a/Edits/a v2.tif', 'redigeret i et program appen ikke saa');
+    catalog.sync();
+    const rows = catalog.listVersions({});
+    const edit = rows.find((r) => r.rel_path.endsWith('Edits/a v2.tif'));
+    const original = rows.find((r) => r.is_master);
+    expect([edit.edited, edit.editor]).toEqual([1, null]);
+    expect([original.edited, original.editor]).toEqual([1, null]);
+    expect(catalog.listVersions({ kunRedigerede: true })).toHaveLength(2);
+  });
+
+  it('opgraderer et katalog hvor Edits-filer ikke var markeret', async () => {
+    catalog.mappestyring = true;
+    skriv('b.cr2', 'b');
+    catalog.sync();
+    catalog.setRating([raekke('b.cr2').version_id], 'godkendt');
+    skriv('Approved/b/Edits/b v2.tif', 'e');
+    catalog.sync();
+    db.run('UPDATE versions SET edited=0');
+    db.exec('PRAGMA user_version = 2');
+    db.close();
+    await nyCatalog();
+    expect(catalog.listVersions({ kunRedigerede: true })).toHaveLength(2);
+  });
+
+  it('en tom mappe i Import slettes, naar den sidste fil flytter ud, men aldrig Import selv', () => {
+    catalog.mappestyring = true;
+    skriv('Import/Ahl/Dyb/a.cr2', 'a');
+    skriv('Import/Ahl/b.cr2', 'b');
+    skriv('Import/Ahl/Dyb/.DS_Store', 'macos');
+    catalog.brugMappestruktur();
+    catalog.sync();
+    catalog.setRating([raekke('Import/Ahl/Dyb/a.cr2').version_id], 'kasseret');
+    expect(existsSync(join(root, 'Import/Ahl/Dyb'))).toBe(false); // tom (kun .DS_Store)
+    expect(existsSync(join(root, 'Import/Ahl'))).toBe(true); // b ligger der stadig
+    catalog.setRating([raekke('Import/Ahl/b.cr2').version_id], 'kasseret');
+    expect(existsSync(join(root, 'Import/Ahl'))).toBe(false);
+    expect(existsSync(join(root, 'Import'))).toBe(true);
+  });
+
+  it('Clean up rydder ogsaa tomme mapper der allerede var i Import, men ikke andre steder', () => {
+    skriv('Import/x/y/z.cr2', 'z');
+    catalog.brugMappestruktur();
+    catalog.sync();
+    mkdirSync(join(root, 'Import/tom/endnu-tommere'), { recursive: true });
+    mkdirSync(join(root, 'Approved/w/Edits'), { recursive: true });
+    expect(catalog.ryddTommeMapper()).toBe(2);
+    expect(existsSync(join(root, 'Import/tom'))).toBe(false);
+    expect(existsSync(join(root, 'Import/x/y'))).toBe(true);
+    expect(existsSync(join(root, 'Approved/w/Edits'))).toBe(true);
   });
 });

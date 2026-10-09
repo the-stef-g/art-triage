@@ -3,7 +3,7 @@
 // filflytning. GUI-lag og AI-lag taler kun med denne klasse.
 import { EventEmitter } from 'node:events';
 import {
-  copyFileSync, mkdirSync, renameSync, existsSync, statSync,
+  copyFileSync, mkdirSync, renameSync, existsSync, statSync, readdirSync, rmdirSync, rmSync,
 } from 'node:fs';
 import { join, dirname, basename, extname, posix } from 'node:path';
 import {
@@ -204,6 +204,18 @@ export class Catalog extends EventEmitter {
     if (version < 2) {
       this.db.exec("UPDATE versions SET edited=0, finished=0 WHERE rating != 'godkendt'");
       this.db.exec('PRAGMA user_version = 2');
+    }
+    // Billeder med en fil i Edits har Edits, ogsaa naar programmet ikke kendes,
+    // og det har originalen ogsaa (medmindre vaerket er faerdigt).
+    if (version < 3) {
+      this.db.exec(`UPDATE versions SET edited=1
+        WHERE rating='godkendt' AND finished=0 AND file_id IN
+          (SELECT id FROM files WHERE rel_path LIKE 'Approved/%/Edits/%')`);
+      this.db.exec(`UPDATE versions SET edited=1
+        WHERE rating='godkendt' AND finished=0 AND is_master=1 AND image_id IN
+          (SELECT v.image_id FROM versions v JOIN files f ON f.id = v.file_id
+           WHERE f.rel_path LIKE 'Approved/%/Edits/%')`);
+      this.db.exec('PRAGMA user_version = 3');
     }
     // Hvilket program en version er redigeret i (Luminar Neo, Topaz Photo AI
     // ...). Navnene kommer fra editor-listen i appen, aldrig fra appen selv.
@@ -441,8 +453,16 @@ export class Catalog extends EventEmitter {
           this.db.run(
             'INSERT INTO versions(image_id, file_id, name, is_master, rating, edited, finished, editor, created_at) VALUES(?,?,?,0,?,?,?,?,?)',
             stackImage.imageId, fileId, stackImage.versionName, arvet,
-            editor ? 1 : 0, faerdig ? 1 : 0, editor, this.now()
+            godkendt && stackImage.kind === 'edit' ? 1 : 0, faerdig ? 1 : 0, editor, this.now()
           );
+          // Har billedet en redigering, har originalen den ogsaa, medmindre
+          // vaerket er faerdigt.
+          if (godkendt && stackImage.kind === 'edit') {
+            this.db.run(
+              'UPDATE versions SET edited=1, editor=COALESCE(editor, ?) WHERE image_id=? AND is_master=1 AND finished=0',
+              editor, stackImage.imageId
+            );
+          }
           if (faerdig) {
             this.db.run(
               'UPDATE versions SET edited=0, finished=1 WHERE image_id=? AND is_master=1',
@@ -475,8 +495,8 @@ export class Catalog extends EventEmitter {
   _markEdited(fileId) {
     // Kun godkendte billeder har Edits. En aendret fil goer ikke et billede
     // "faerdigt" laengere, og har vi set hvilket program billedet blev aabnet
-    // i, er det programmets navn statussen. Kendes det ikke, rettes der intet:
-    // appen finder ikke selv paa et navn.
+    // i, er det programmets navn statussen. Kendes det ikke, har billedet
+    // Edits uden et programnavn: appen finder ikke selv paa et navn.
     const rows = this.db.all(
       `SELECT v.id, v.image_id, v.editor FROM versions v
        JOIN images i ON i.id = v.image_id
@@ -486,8 +506,8 @@ export class Catalog extends EventEmitter {
     for (const r of rows) {
       const editor = r.editor || this._sidsteEditor(r.image_id);
       this.db.run(
-        'UPDATE versions SET finished=0, edited=?, editor=? WHERE id=?',
-        editor ? 1 : 0, editor ?? null, r.id
+        'UPDATE versions SET finished=0, edited=1, editor=? WHERE id=?',
+        editor ?? null, r.id
       );
     }
   }
@@ -1118,8 +1138,44 @@ export class Catalog extends EventEmitter {
         moved.push({ fileId: id, fromDir, toDir: targetRel || '' });
       }
     });
+    // En mappe i Import der er blevet tom, slettes.
+    for (const fra of new Set(moved.map((m) => m.fromDir))) this._fjernTomMappe(fra);
     if (moved.length) this.emit('changed');
     return moved;
+  }
+
+  // Sletter en mappe i Import hvis den er tom, og de mapper over den der saa
+  // ogsaa bliver tomme, men aldrig Import selv. Skjulte filer som .DS_Store
+  // tael ikke med. Mapper uden for Import roeres aldrig.
+  _fjernTomMappe(dirRel) {
+    let dir = dirRel;
+    const top = this.importMappe;
+    while (dir && dir !== top && dir.startsWith(`${top}/`)) {
+      const abs = join(this.root, dir);
+      try {
+        const indhold = readdirSync(abs).filter((n) => n !== '.DS_Store');
+        if (indhold.length) return;
+        rmSync(join(abs, '.DS_Store'), { force: true });
+        rmdirSync(abs);
+      } catch {
+        return;
+      }
+      dir = posix.dirname(dir);
+    }
+  }
+
+  // Gennemgaar hele Import og sletter de tomme mapper. Returnerer antallet.
+  ryddTommeMapper() {
+    const top = this.importMappe;
+    const mapper = walkDirs(this.root, null)
+      .filter((d) => d.startsWith(`${top}/`))
+      .sort((a, b) => b.length - a.length);
+    for (const d of mapper) {
+      if (existsSync(join(this.root, d))) this._fjernTomMappe(d);
+    }
+    const slettet = mapper.filter((d) => !existsSync(join(this.root, d))).length;
+    if (slettet) this.emit('changed');
+    return slettet;
   }
 
   // Flytter filer hvor ALLE tilknyttede versioner er kasserede til Discarded/.

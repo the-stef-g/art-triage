@@ -546,8 +546,12 @@ export class AppSession {
       return moves.length;
     });
     handle('fold:cleanup', () => {
-      const moves = this.requireCatalog().moveDiscarded();
+      const catalog = this.requireCatalog();
+      const moves = catalog.moveDiscarded();
       this.undoMgr.afterMoves(moves);
+      // Tomme mapper i Import slettes ogsaa.
+      const tomme = catalog.ryddTommeMapper();
+      if (tomme) this.log(`clean up: removed ${tomme} empty folder(s) in ${catalog.importMappe}`);
       return moves.length;
     });
 
