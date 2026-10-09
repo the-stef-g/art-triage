@@ -88,7 +88,7 @@ try {
   // Beskaeringen er en etiket paa filen, ligesom Master.
   const flise = (suffiks) => page.locator('.tile', { has: page.locator(`.tile-navn[title$="${suffiks}"]`) });
   await page.waitForFunction(
-    () => [...document.querySelectorAll('.tile')].some((t) => t.querySelector('.tile-navn')?.title.endsWith('blaa master 1-1.png') && t.querySelector('.badge.beskaering')?.textContent === '1:1'),
+    () => [...document.querySelectorAll('.tile')].some((t) => t.querySelector('.tile-navn')?.title.endsWith('blaa master 1-1.png') && t.querySelector('.badge.beskaering')?.textContent === '1:1' && t.querySelector('.badge.kopi')?.textContent === 'Master'),
     null,
     { timeout: 10000 }
   );
