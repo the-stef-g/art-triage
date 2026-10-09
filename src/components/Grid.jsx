@@ -27,8 +27,8 @@ function Badges({ row }) {
       {row.rating === 'kasseret' && <span className="badge kasseret" title="Discarded">✕</span>}
       {Boolean(row.edited) && <span className="badge redigeret" title="Being edited">R</span>}
       {Boolean(row.finished) && <span className="badge faerdig" title="Finished">F</span>}
-      {!row.is_master && <span className="badge kopi" title={`Virtual copy: ${row.version_name}`}>{row.version_name}</span>}
-      {row.is_master && row.version_count > 1 && (
+      {!row.is_master && <span className="badge kopi" title={`Version: ${row.version_name}. A separate version of the original image, either a file with the same name in another format or an edit.`}>{row.version_name}</span>}
+      {Boolean(row.is_master) && row.version_count > 1 && (
         <span className="badge stak" title={`${row.version_count} versions`}>⧉ {row.version_count}</span>
       )}
       {row.series_name && <span className="badge serie" title={`Series: ${row.series_name}`}>{row.series_name}</span>}
