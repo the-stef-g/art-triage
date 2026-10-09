@@ -1,10 +1,12 @@
-# art-triage
+# Stef G Art
 
-art-triage is a macOS app for sorting and organising image files. It does not edit your images itself. Instead it sends files to your own editor apps (Luminar Neo, Topaz Photo AI, Gigapixel and others) and notices when you save. The app keeps track of an ordinary folder in Finder: your files stay where they are, and all catalogue data lives in a hidden `.art-triage` subfolder in the same place.
+Stef G Art is a macOS app for sorting and organising image files. It does not edit your images itself. Instead it sends files to your own editor apps (Luminar Neo, Topaz Photo AI, Gigapixel and others) and notices when you save. The app keeps track of an ordinary folder in Finder: your files stay where they are, and all catalogue data lives in a hidden `.art-triage` subfolder in the same place.
 
 Built for Intel Mac (iMac 2019) on macOS Sequoia. Runs on newer versions too.
 
-The app was called Billedflow until version 0.2.8. Libraries created back then keep their `.billedflow` folder and are picked up automatically, so no ratings are lost in the rename.
+The app was called Art Triage until version 0.10.0, and Billedflow until 0.2.8. On the first start of Stef G Art your settings, keys and the downloaded model are copied over from the old Art Triage folder in `~/Library/Application Support`, which is left untouched. The repository and the hidden `.art-triage` data folder keep their names.
+
+Libraries created as Billedflow Libraries created back then keep their `.billedflow` folder and are picked up automatically, so no ratings are lost in the rename.
 
 ## Get the app
 
