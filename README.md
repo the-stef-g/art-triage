@@ -56,7 +56,24 @@ Tab does not move focus around the interface. The work is done with the mouse an
 
 **Edit in.** Pick an app in the Inspector and click Open. art-triage finds Luminar Neo, Topaz Photo AI, Gigapixel, Photoshop, Affinity Photo and Pixelmator Pro in Applications on its own, and you can always choose a different app. When you save in the editor, art-triage notices the change, marks the version as being edited and refreshes the preview. If the editor saves a new file next to the original (for example `IMG_1234-gigapixel.tif`), it is stacked automatically as a version of the same image.
 
-**Folders.** The folder tree on the left shows the whole library. "New folder" creates a folder, and you can drag images from the grid onto a folder to move the files on disk. "Clean up" moves every file whose versions are all discarded into the `_kasseret` folder.
+**Folders follow the rating.** The rating decides where a file lives, inside the library folder:
+
+```
+Import/                 not rated yet
+Candidate/              Candidate
+Discarded/              Discarded
+Approved/<file name>/   one work folder per approved image
+    Originals/          the original file, moved here when you approve it
+    Edits/              every edited version (there can be several)
+    Masters/            the finished master file
+    Print files/        production files with colour profiles for each print medium
+```
+
+Rating a file Candidate or Discarded moves it into that folder, and the sub-folder it came from is kept. Clear moves it back to Import, but only if it was in one of these folders; an unrated file that lives somewhere else stays where it is. Approving creates the work folder with all four folders and moves the original into `Originals`. Only the original is moved. Undo moves it back.
+
+**The workflow stage follows the work folder.** The stage only exists for Approved images: no rating means no stage, and only Approved can have one. Save an edit in `Edits` and the image becomes *Being edited*; put the master in `Masters` and it becomes *Finished*. Any file saved in `Edits` or `Masters` is added as a version of the original, whatever it is called. The buttons are still there to set the stage by hand, and they are disabled for images that are not Approved. The work folder buttons in the right-hand column open `Originals`, `Edits`, `Masters` and `Print files` in Finder. The `Print files` folder is not scanned.
+
+Nothing is moved until you change a rating, so existing files stay where they are. "Clean up" moves every file whose versions are all discarded into `Discarded`.
 
 **Series.** Select one or more images and pick "New series" or an existing series in the Inspector. Click a series in the sidebar to see only its images. Hover a series in the sidebar and two buttons appear: the pencil renames it, the bin deletes it. Deleting a series does not touch the images, they only lose their link to it.
 
@@ -110,13 +127,13 @@ The Work panel in the Inspector holds everything that belongs to one artwork: ti
 - Help > WooCommerce key: a REST key with Read/Write permission, entered as `ck_… cs_…`.
 - Help > WordPress application password: entered as `username:application password` (Users > Profile > Application Passwords).
 
-**The field format.** The ACPT fields are written exactly as product 20 (Desert Canyon 04) has them: the value, `*_attachment_id` for images and video, the field's definition UUID in `*_id` and the field type in `*_type`. The reference is `docs/reference-product-20.json`, and a test checks that what Art Triage writes is identical to it. Colour and catalogue number are only sent when you have filled them in: empty means the series colour and the number at the end of the title, which the site works out. Print on/off is sent as `1` or empty.
+**The field format.** The ACPT fields are written exactly as product 20 (Desert Canyon 04) has them: the value, `*_attachment_id` for images and video, the field's definition UUID in `*_id` and the field type in `*_type`. The reference is `docs/reference-product-20.json`, and a test checks that what Stef G Art writes is identical to it. Colour and catalogue number are only sent when you have filled them in: empty means the series colour and the number at the end of the title, which the site works out. Print on/off is sent as `1` or empty.
 
-**Check shop format** fetches product 20 live and compares its fields with what Art Triage writes. If they match, nothing changes. If someone has changed the fields in WooCommerce, the differences are listed and Send to shop stays locked until a new check passes. Never having run the check does not lock anything.
+**Check shop format** fetches product 20 live and compares its fields with what Stef G Art writes. If they match, nothing changes. If someone has changed the fields in WooCommerce, the differences are listed and Send to shop stays locked until a new check passes. Never having run the check does not lock anything.
 
-**Product type and attributes.** A unique work (Paintings, Sculptures) is a simple product with stock 1. Every other work is a variable product, like product 20, and gets its print variants from the CSV later. Art Triage only writes the attributes Year, Technique and Dimensions. When a product is updated, the print attributes (Format, Material, Frame, Size) are sent back unchanged, so the variants are not lost. Tax class is Reduced rate for sculptures and standard for everything else.
+**Product type and attributes.** A unique work (Paintings, Sculptures) is a simple product with stock 1. Every other work is a variable product, like product 20, and gets its print variants from the CSV later. Stef G Art only writes the attributes Year, Technique and Dimensions. When a product is updated, the print attributes (Format, Material, Frame, Size) are sent back unchanged, so the variants are not lost. Tax class is Reduced rate for sculptures and standard for everything else.
 
-**Series.** The series is set on the product through `/wp-json/wp/v2/product/{id}` with `series`. If the shop has no term with that name, Art Triage creates it with its three fields: intro, template (walkthrough or wall) and colour. They are edited in the Work panel under Shop. A new term always gets a template (walkthrough if you have not chosen one). A term that already exists only gets the fields you have filled in, and only if they differ. A work without a series leaves the product's series alone.
+**Series.** The series is set on the product through `/wp-json/wp/v2/product/{id}` with `series`. If the shop has no term with that name, Stef G Art creates it with its three fields: intro, template (walkthrough or wall) and colour. They are edited in the Work panel under Shop. A new term always gets a template (walkthrough if you have not chosen one). A term that already exists only gets the fields you have filled in, and only if they differ. A work without a series leaves the product's series alone.
 
 ## The local AI model
 

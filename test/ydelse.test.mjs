@@ -59,6 +59,7 @@ describe('asynkron genskanning giver det samme som den synkrone', () => {
     await catalog.syncAsync();
     const b = catalog.listVersions({}).find((r) => r.rel_path === 'b.jpg');
     catalog.setRating([b.version_id], 'godkendt');
+    catalog.setRating([catalog.listVersions({}).find((r) => r.rel_path === 'a.jpg').version_id], 'godkendt');
     // a.jpg faar nyt indhold, b.jpg flyttes til en undermappe.
     writeFileSync(join(root, 'a.jpg'), 'helt nyt og laengere indhold');
     const nyTid = new Date(Date.now() + 60_000);
@@ -147,7 +148,7 @@ describe('forespoergsler der voksede med kvadratet', () => {
     expect(kopi).toBeTruthy();
     const flyttet = catalog.moveDiscarded();
     expect(flyttet.map((m) => m.fileId)).toHaveLength(1);
-    expect(catalog.listVersions({ visKasserede: true }).find((r) => r.is_master && r.rel_path.startsWith('_kasseret/'))).toBeTruthy();
+    expect(catalog.listVersions({ visKasserede: true }).find((r) => r.is_master && r.rel_path.startsWith('Discarded/'))).toBeTruthy();
     expect(catalog.listVersions({ visKasserede: true }).find((r) => r.rel_path === 'b.jpg')).toBeTruthy();
   });
 

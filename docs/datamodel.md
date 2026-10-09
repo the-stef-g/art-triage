@@ -10,7 +10,7 @@ Erstatter v2.0, hvor værkerne var en egen posttype (`vaerk`) på cms.stefs.clou
 | --- | --- | --- |
 | Titel | Produktets navn | Som den skal stå. Titler oversættes aldrig |
 | Historien | Produktets beskrivelse | Almindelig tekst i editoren |
-| Billede | Produktbillede | Kildefilen fra Art Triage. Alt-teksten står i mediebiblioteket |
+| Billede | Produktbillede | Kildefilen fra Stef G Art. Alt-teksten står i mediebiblioteket |
 | Pris | Woo, Regular price | Skulpturer og malerier. Printpriser: se "Printpriser" |
 | Solgt | Woo, lager | Unika har lagerstyring med 1 stk. Udsolgt = solgt. Solgte værker bliver stående, mærket solgt |
 | Fremhævet | Woos stjerne (Featured) | Værket kan vises på forsiden |
@@ -61,7 +61,7 @@ Printværker er variable produkter i Woo med en variant pr. kombination af besk�
 
 ## Arbejdsgangen ved et nyt værk
 
-1. Eksportér kildefilen og beskæringerne fra Art Triage.
+1. Eksportér kildefilen og beskæringerne fra Stef G Art.
 2. Opret produktet i WooCommerce: navn, beskrivelse, billede, kategori, attributter, pris eller lager, felterne under "Work" og evt. serie.
 3. Claude skriver alt-tekst og hjælper med historien.
 4. Udgiv. Sitet bygges igen, og værket er ude.
@@ -69,7 +69,7 @@ Printværker er variable produkter i Woo med en variant pr. kombination af besk�
 ## Åbne punkter
 
 - Selve printpriserne, som kræver Prodigis indkøbspriser.
-- Året skal komme fra optagelsesdatoen i originalfilen, fx ved at Art Triage læser den. Filens dato duer ikke.
+- Året skal komme fra optagelsesdatoen i originalfilen, fx ved at Stef G Art læser den. Filens dato duer ikke.
 - Om Fremhævet er nok til forsiden, eller forsiden skal have sin egen styring.
 
 ## Varianter og nøgler i praksis (4. oktober 2026)

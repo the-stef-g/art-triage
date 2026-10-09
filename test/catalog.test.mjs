@@ -71,6 +71,7 @@ describe('scanning', () => {
   it('markerer versioner som redigeret naar filens indhold aendres', () => {
     skriv('a.png', 'foerste-indhold');
     catalog.sync();
+    catalog.setRating([catalog.listVersions({})[0].version_id], 'godkendt');
     expect(catalog.listVersions({})[0].edited).toBe(0);
 
     skriv('a.png', 'nyt-indhold-som-er-laengere');
@@ -81,6 +82,7 @@ describe('scanning', () => {
   it('stacker afledte filer som versioner af samme billede', () => {
     skriv('IMG_0001.png', 'raa-fil');
     catalog.sync();
+    catalog.setRating([catalog.listVersions({})[0].version_id], 'godkendt');
 
     skriv('IMG_0001-gigapixel.jpg', 'opskaleret');
     skriv('IMG_0001.tif', 'samme-navn-anden-type');
@@ -169,16 +171,17 @@ describe('status og filtre', () => {
     // De to arbejdstrin ligger paa hver sit billede: et billede kan ikke
     // baade vaere under redigering og faerdigt.
     const rows = catalog.listVersions({});
-    catalog.setRating([rows[0].version_id], 'godkendt');
+    catalog.setRating([rows[0].version_id, rows[1].version_id, rows[2].version_id], 'godkendt');
     catalog.setStage([rows[1].version_id], 'edited');
     catalog.setStage([rows[2].version_id], 'finished');
-    expect(catalog.listVersions({ kunGodkendte: true })).toHaveLength(1);
+    expect(catalog.listVersions({ kunGodkendte: true })).toHaveLength(3);
     expect(catalog.listVersions({ kunRedigerede: true })).toHaveLength(1);
     expect(catalog.listVersions({ kunFaerdige: true })).toHaveLength(1);
   });
 
   it('lader kun ét arbejdstrin gaelde ad gangen', () => {
     const [a] = catalog.listVersions({});
+    catalog.setRating([a.version_id], 'godkendt');
     catalog.setStage([a.version_id], 'edited');
     expect(catalog.getVersion(a.version_id).edited).toBe(1);
     catalog.setStage([a.version_id], 'finished');
@@ -192,6 +195,7 @@ describe('status og filtre', () => {
   it('rydder faerdig naar filen aendres paa disken igen', () => {
     // Er der lige gemt en ny udgave, er arbejdet ikke overstaaet.
     const [a] = catalog.listVersions({});
+    catalog.setRating([a.version_id], 'godkendt');
     catalog.setStage([a.version_id], 'finished');
     skriv('a.png', 'helt nyt indhold der giver en anden hash');
     catalog.sync();
@@ -379,7 +383,7 @@ describe('mapper og flytning', () => {
 
     const n = catalog.moveDiscarded();
     expect(n).toHaveLength(1);
-    expect(existsSync(join(root, '_kasseret', 'kasseret.png'))).toBe(true);
+    expect(existsSync(join(root, 'Discarded', 'kasseret.png'))).toBe(true);
     expect(existsSync(join(root, 'blandet.png'))).toBe(true);
   });
 
@@ -494,5 +498,87 @@ describe('serier', () => {
     // Billederne bliver liggende; de mister kun tilknytningen.
     expect(catalog.listVersions({})).toHaveLength(2);
     expect(catalog.listVersions({ serieId: id })).toEqual([]);
+  });
+});
+
+describe('mappedrevet arbejdsgang', () => {
+  beforeEach(() => {
+    catalog.mappestyring = true;
+  });
+
+  const raekke = (rel) => catalog.listVersions({ visKasserede: true }).find((r) => r.rel_path === rel);
+
+  it('et godkendt billede faar sin arbejdsmappe, og originalen flyttes ind', () => {
+    skriv('Import/Desert Canyon.cr2', 'original');
+    catalog.sync();
+    const r = raekke('Import/Desert Canyon.cr2');
+    catalog.setRating([r.version_id], 'godkendt');
+    const rel = 'Approved/Desert Canyon/Originals/Desert Canyon.cr2';
+    expect(existsSync(join(root, rel))).toBe(true);
+    expect(existsSync(join(root, 'Import/Desert Canyon.cr2'))).toBe(false);
+    for (const d of ['Originals', 'Edits', 'Masters', 'Print files']) {
+      expect(existsSync(join(root, 'Approved/Desert Canyon', d))).toBe(true);
+    }
+    expect(raekke(rel).rating).toBe('godkendt');
+  });
+
+  it('en fil i Edits bliver en version under redigering, en i Masters goer vaerket faerdigt', () => {
+    skriv('a.cr2', 'original');
+    catalog.sync();
+    catalog.setRating([raekke('a.cr2').version_id], 'godkendt');
+    skriv('Approved/a/Edits/helt-andet-navn.tif', 'redigeret');
+    catalog.sync();
+    let rows = catalog.listVersions({});
+    expect(new Set(rows.map((r) => r.image_id)).size).toBe(1);
+    const edit = rows.find((r) => r.rel_path.endsWith('Edits/helt-andet-navn.tif'));
+    expect(edit.is_master).toBe(0);
+    expect(edit.rating).toBe('godkendt');
+    expect(edit.edited).toBe(1);
+
+    skriv('Approved/a/Masters/a master.tif', 'master');
+    skriv('Approved/a/Print files/a 1-1.tif', 'til tryk');
+    catalog.sync();
+    rows = catalog.listVersions({});
+    expect(rows).toHaveLength(3); // Print files er ikke billeder at sortere
+    const master = rows.find((r) => r.rel_path.endsWith('Masters/a master.tif'));
+    expect(master.version_name).toBe('Master');
+    expect(master.finished).toBe(1);
+    const original = rows.find((r) => r.is_master);
+    expect(original.finished).toBe(1);
+    expect(original.edited).toBe(0);
+  });
+
+  it('Candidate og Discarded flytter filen og bevarer undermappen, Clear henter den tilbage', () => {
+    skriv('Ahl Strand/x.cr2', 'x');
+    catalog.sync();
+    const v = raekke('Ahl Strand/x.cr2').version_id;
+    catalog.setRating([v], 'kandidat');
+    expect(existsSync(join(root, 'Candidate/Ahl Strand/x.cr2'))).toBe(true);
+    catalog.setRating([v], 'kasseret');
+    expect(existsSync(join(root, 'Discarded/Ahl Strand/x.cr2'))).toBe(true);
+    expect(existsSync(join(root, 'Candidate/Ahl Strand/x.cr2'))).toBe(false);
+    catalog.setRating([v], 'ubedomt');
+    expect(existsSync(join(root, 'Import/Ahl Strand/x.cr2'))).toBe(true);
+  });
+
+  it('en ubedoemt fil uden for de styrede mapper bliver liggende', () => {
+    skriv('Ahl Strand/y.cr2', 'y');
+    catalog.sync();
+    catalog.setRating([raekke('Ahl Strand/y.cr2').version_id], 'ubedomt');
+    expect(existsSync(join(root, 'Ahl Strand/y.cr2'))).toBe(true);
+  });
+
+  it('arbejdstrin findes kun paa godkendte billeder', () => {
+    skriv('z.cr2', 'z');
+    catalog.sync();
+    const id = raekke('z.cr2').version_id;
+    catalog.setStage([id], 'edited'); // ubedoemt: ingen virkning
+    expect(catalog.stageOf(catalog.getVersion(id))).toBe(null);
+    catalog.setRating([id], 'godkendt');
+    const nyId = raekke('Approved/z/Originals/z.cr2').version_id;
+    catalog.setStage([nyId], 'finished');
+    expect(catalog.stageOf(catalog.getVersion(nyId))).toBe('finished');
+    catalog.setRating([nyId], 'kandidat'); // forlader Approved: trinnet ryddes
+    expect(catalog.stageOf(catalog.getVersion(nyId))).toBe(null);
   });
 });

@@ -64,7 +64,9 @@ export async function mapGraense(liste, graense, fn) {
   await Promise.all(arbejdere);
 }
 
-export const IGNORED_DIRS = new Set(['.art-triage', '.billedflow', 'node_modules']);
+// "Print files" er produktionsfilerne i et vaerks arbejdsmappe, ikke billeder
+// der skal sorteres.
+export const IGNORED_DIRS = new Set(['.art-triage', '.billedflow', 'node_modules', 'Print files']);
 
 // Hvor katalogdata ligger ved siden af billederne.
 //

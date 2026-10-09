@@ -1,7 +1,7 @@
 {
   "name": "art-triage",
-  "productName": "Art Triage",
-  "version": "0.9.12",
+  "productName": "Stef G Art",
+  "version": "0.10.0",
   "description": "Sort and organise image files on macOS",
   "author": "Steffen Graumann",
   "license": "UNLICENSED",
@@ -38,7 +38,7 @@
   },
   "build": {
     "appId": "dk.stefs.art-triage",
-    "productName": "Art Triage",
+    "productName": "Stef G Art",
     "asar": true,
     "asarUnpack": [
       "node_modules/sharp/**/*",
@@ -65,7 +65,7 @@
         }
       ],
       "minimumSystemVersion": "11.0.0",
-      "artifactName": "art-triage-mac-x64.zip"
+      "artifactName": "stef-g-art-mac-x64.zip"
     }
   }
 }

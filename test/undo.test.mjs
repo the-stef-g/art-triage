@@ -48,6 +48,7 @@ describe('fortryd og gentag', () => {
 
   it('fortryder arbejdstrin', () => {
     const [a] = catalog.listVersions({});
+    catalog.setRating([a.version_id], 'godkendt');
     undoMgr.beforeStage([a.version_id]);
     catalog.setStage([a.version_id], 'finished');
     expect(catalog.getVersion(a.version_id).finished).toBe(1);
@@ -60,6 +61,7 @@ describe('fortryd og gentag', () => {
     // Hele trinnet gemmes under ét. Blev kun det ene flag husket, kunne
     // en fortrydelse ende med baade redigeres og faerdig taendt.
     const [a] = catalog.listVersions({});
+    catalog.setRating([a.version_id], 'godkendt');
     catalog.setStage([a.version_id], 'edited');
     undoMgr.beforeStage([a.version_id]);
     catalog.setStage([a.version_id], 'finished');

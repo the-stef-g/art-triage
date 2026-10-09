@@ -138,6 +138,7 @@ export class AppSession {
     const dataDir = dataDirFor(root);
     this.db = await openDatabase(join(dataDir, 'katalog.sqlite'));
     this.catalog = new Catalog(this.db, root);
+    this.catalog.mappestyring = true;
     this.thumbs = new Thumbnailer({
       cacheDir: join(dataDir, 'cache'),
       rasterizeSvg: this.rasterizeSvg,
@@ -500,6 +501,12 @@ export class AppSession {
       }
       this.log(`rotate: ${ids.length} file(s) by ${delta} degrees`);
       return { antal: ids.length };
+    });
+    // Aabner en af arbejdsmappens undermapper i Finder.
+    handle('img:openWorkFolder', async ({ versionId, del }) => {
+      const abs = this.requireCatalog().workFolder(versionId, del);
+      if (!abs) throw new Error('This image has no work folder. Only Approved images do.');
+      await shell.openPath(abs);
     });
     handle('img:reveal', ({ versionId }) => {
       const p = this.requireCatalog().filePathForVersion(versionId);

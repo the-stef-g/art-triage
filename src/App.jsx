@@ -347,6 +347,8 @@ export default function App() {
     setStage: (stage) => {
       const f = getFocused();
       if (!f) return;
+      // Arbejdstrin findes kun paa godkendte billeder.
+      if (stage !== null && f.rating !== 'godkendt') return;
       const key = stage === 'edited' ? 'edited' : 'finished';
       const harDet = stage !== null && Boolean(f[key]);
       invoke('img:setStage', { versionIds: [f.version_id], stage: harDet ? null : stage })
@@ -425,7 +427,7 @@ export default function App() {
     cleanup: async () => {
       try {
         const n = await invoke('fold:cleanup');
-        setFejl(n ? `Flyttede ${n} kasserede filer til _kasseret` : 'Ingen filer at flytte');
+        setFejl(n ? `Moved ${n} discarded files to Discarded` : 'No files to move');
         setTimeout(() => setFejl(null), 4000);
       } catch (err) { visFejl(err); }
     },
@@ -642,7 +644,7 @@ export default function App() {
   }, []);
 
   if (!harBro) {
-    return <div className="velkomst"><h1>Art Triage</h1><p>This app must run inside Electron.</p></div>;
+    return <div className="velkomst"><h1>Stef G Art</h1><p>This app must run inside Electron.</p></div>;
   }
   if (!library) {
     return <Welcome recent={recent} onChoose={act.chooseLibrary} onOpen={act.openLibrary} />;

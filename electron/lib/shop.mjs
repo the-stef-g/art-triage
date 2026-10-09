@@ -1,5 +1,5 @@
 // Send til shop (docs/plan-shop.md): opretter og opdaterer produktet i
-// WooCommerce paa shop.stefg.art. Teksterne rettes kun i Art Triage; Woo er
+// WooCommerce paa shop.stefg.art. Teksterne rettes kun i Stef G Art; Woo er
 // en kopi, og det der staar der bliver overskrevet naar vaerket sendes.
 //
 // To noegler, begge gemt som Claude-noeglen: aldrig vist igen, aldrig i
@@ -325,7 +325,7 @@ export function compareFormat(product) {
   return problems;
 }
 
-// Det Art Triage ejer af attributterne. Alle andre (Format, Material,
+// Det Stef G Art ejer af attributterne. Alle andre (Format, Material,
 // Frame, Size og hvad der ellers kommer) er printvarianternes og roeres ikke.
 const EJEDE_ATTRIBUTTER = ['Year', 'Technique', 'Dimensions'];
 
@@ -360,7 +360,7 @@ export function mergeAttributes(existing, work) {
   return [...nye, ...ud].map((a, i) => ({ ...a, position: i }));
 }
 
-// Produktet som Art Triage ejer det. Lager, ordrer og printvarianter
+// Produktet som Stef G Art ejer det. Lager, ordrer og printvarianter
 // roeres ikke. Et unikt vaerk er et simpelt produkt med 1 paa lager; alle
 // andre er variable, som produkt 20, og faar deres varianter fra CSV'en.
 export function buildProduct(work, media, { categoryId = null, create = true, existingAttributes = [] } = {}) {

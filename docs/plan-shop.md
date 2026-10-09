@@ -1,22 +1,22 @@
-# Plan: værkets tekster og shop-produkt i Art Triage
+# Plan: værkets tekster og shop-produkt i Stef G Art
 
 Version 1.0 (5. oktober 2026). Skrevet til Claude Code i repoet the-stef-g/art-triage. Byg den i en ny session.
 
 ## Hvorfor
 
-Stef vil samle alt, der hører til et værk, ét sted. Art Triage bliver stedet, hvor et værk gøres færdigt: billede, beskæringer, data, tekster og alt-tekst. Derfra sendes det til WooCommerce på shop.stefg.art, som sitet stefg.art læser fra ved hvert build.
+Stef vil samle alt, der hører til et værk, ét sted. Stef G Art bliver stedet, hvor et værk gøres færdigt: billede, beskæringer, data, tekster og alt-tekst. Derfra sendes det til WooCommerce på shop.stefg.art, som sitet stefg.art læser fra ved hvert build.
 
-Teksterne rettes kun i Art Triage. Woo er en kopi. Retter Stef noget i Woo, bliver det overskrevet næste gang værket sendes. Det skal stå tydeligt i appen.
+Teksterne rettes kun i Stef G Art. Woo er en kopi. Retter Stef noget i Woo, bliver det overskrevet næste gang værket sendes. Det skal stå tydeligt i appen.
 
 ## Beslutninger (5. oktober 2026)
 
-- Art Triage opretter og opdaterer produktet i Woo selv.
-- Art Triage beder Claude om udkast til beskrivelse, kort tekst og alt-tekst. Stef retter dem i appen.
-- Datamodellen på shoppen er fast og beskrevet i datamodel.md v3.0 i stefg.art-mappen. Art Triage tilpasser sig den, ikke omvendt.
+- Stef G Art opretter og opdaterer produktet i Woo selv.
+- Stef G Art beder Claude om udkast til beskrivelse, kort tekst og alt-tekst. Stef retter dem i appen.
+- Datamodellen på shoppen er fast og beskrevet i datamodel.md v3.0 i stefg.art-mappen. Stef G Art tilpasser sig den, ikke omvendt.
 
-## Hvad et værk er i Art Triage
+## Hvad et værk er i Stef G Art
 
-Et værk er et billede (`images`) med status godkendt og færdig. Beskæringerne til print er versioner eller virtuelle kopier af samme billede, hver markeret med sit format (1:1, 2:3, 3:2, 1:2, 2:1). Serien er Art Triages egen serie, som svarer til termen i taksonomien `series` på shoppen.
+Et værk er et billede (`images`) med status godkendt og færdig. Beskæringerne til print er versioner eller virtuelle kopier af samme billede, hver markeret med sit format (1:1, 2:3, 3:2, 1:2, 2:1). Serien er Stef G Arts egen serie, som svarer til termen i taksonomien `series` på shoppen.
 
 ## Felter pr. værk (nyt panel i Inspector)
 
@@ -26,7 +26,7 @@ Et værk er et billede (`images`) med status godkendt og færdig. Beskæringerne
 | År | Optagelsesdatoen i originalfilen (EXIF), ikke filens dato. Kan rettes |
 | Kategori | Graphic Design, Photography, Paintings eller Sculptures |
 | Teknik | Fri tekst, fx "Digital art" |
-| Serie | Art Triages serie |
+| Serie | Stef G Arts serie |
 | Skabelon | `spread` eller `poster` |
 | Sektionsfarve | Valgfri farve. Tom = seriens farve |
 | Katalognummer | Valgfrit. Tom = tallet sidst i titlen |
@@ -63,7 +63,7 @@ En knap "Send to shop" opretter produktet første gang og opdaterer det bagefter
 2. **Produktet** via `/wp-json/wc/v3/products`: navn, beskrivelse, kort beskrivelse, hovedbillede, kategori, attributterne Year og Technique (og Dimensions ved unikke værker), seriens term og ACPT-felterne i `meta_data` med nøglerne `work_template`, `work_section_colour`, `work_catalogue_number`, `work_video`, `work_prints` og `work_crop_1x1` til `work_crop_2x1`. Hent først produkt 20 (Desert Canyon 04) og kopier præcis det format, ACPT bruger i dag, også de skjulte hjælpefelter som `_attachment_id`.
 3. **Status:** nye produkter oprettes som kladde. Stef udgiver selv, eller med en knap "Publish" i appen.
 4. **Unikke værker:** simpelt produkt med pris, lagerstyring og 1 stk. på lager, momsklasse Reduced rate for skulpturer.
-5. Art Triage rører kun de felter, den selv ejer. Lager, ordrer og printvarianter røres ikke i denne fase.
+5. Stef G Art rører kun de felter, den selv ejer. Lager, ordrer og printvarianter røres ikke i denne fase.
 
 **Nøgler.** Der skal bruges to nye nøgler, gemt som Claude-nøglen i dag: aldrig vist igen, aldrig i loggen, aldrig sendt til brugerfladen.
 
@@ -74,8 +74,8 @@ Stop og forklar Stef trin for trin, hvordan han laver dem, når det bliver aktue
 
 ## Senere faser (ikke nu)
 
-- **Printvarianter fra appen:** i dag laver Claude i Cowork en CSV pr. værk ud fra prisliste.md. Senere kan Art Triage oprette varianterne selv ud fra en prisliste i appens indstillinger og de beskæringer, værket har.
-- **Byg sitet efter udgivelse:** Art Triage kan starte GitHub-workflowet i the-stef-g/stefs.cloud, så værket kommer ud med det samme. Kræver et GitHub-token, der kun må starte Actions i det ene repo.
+- **Printvarianter fra appen:** i dag laver Claude i Cowork en CSV pr. værk ud fra prisliste.md. Senere kan Stef G Art oprette varianterne selv ud fra en prisliste i appens indstillinger og de beskæringer, værket har.
+- **Byg sitet efter udgivelse:** Stef G Art kan starte GitHub-workflowet i the-stef-g/stefs.cloud, så værket kommer ud med det samme. Kræver et GitHub-token, der kun må starte Actions i det ene repo.
 
 ## Rapport
 

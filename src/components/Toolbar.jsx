@@ -72,7 +72,7 @@ export default function Toolbar({
 
   return (
     <header className="toolbar">
-      <div className="titel">Art Triage</div>
+      <div className="titel">Stef G Art</div>
       <div className="soegefelt">
         <input
           type="search"
@@ -131,7 +131,7 @@ export default function Toolbar({
         >
           {skanner ? 'Scanning …' : 'Scan again'}
         </button>
-        <button onClick={onCleanup} title="Move files where every version is discarded to the _kasseret folder">Clean up</button>
+        <button onClick={onCleanup} title="Move files where every version is discarded to the Discarded folder">Clean up</button>
         <button onClick={onChooseLibrary} title="Switch to a different image folder">Switch library</button>
       </div>
     </header>

@@ -1,4 +1,4 @@
-name: Build art-triage
+name: Build Stef G Art
 
 on:
   push:
@@ -118,10 +118,10 @@ jobs:
       - name: Check that sharp is packaged, unpacked and built for Intel
         run: |
           rm -rf release/check && mkdir -p release/check
-          unzip -q release/art-triage-mac-x64.zip -d release/check
-          node scripts/check-packaged-sharp.mjs "release/check/Art Triage.app/Contents/Resources" darwin-x64
+          unzip -q release/stef-g-art-mac-x64.zip -d release/check
+          node scripts/check-packaged-sharp.mjs "release/check/Stef G Art.app/Contents/Resources" darwin-x64
       - name: Upload app artifact
         uses: actions/upload-artifact@v7
         with:
-          name: art-triage-mac-x64
-          path: release/art-triage-mac-x64.zip
+          name: stef-g-art-mac-x64
+          path: release/stef-g-art-mac-x64.zip

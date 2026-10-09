@@ -149,23 +149,46 @@ export default function Inspector({
         <button onClick={() => act.setRating('ubedomt')}>Clear</button>
       </div>
       <h4>Workflow stage</h4>
+      {row.rating !== 'godkendt' && (
+        <p className="tom">The workflow stage only applies to Approved images.</p>
+      )}
       <div className="knapraekke">
         <button
           className={row.edited ? 'aktiv-redigeres' : ''}
+          disabled={row.rating !== 'godkendt'}
           onClick={() => act.setStage('edited')}
-          title="The image is out with an editor right now"
+          title="The image is out with an editor right now. Files saved in the Edits folder set this automatically."
         >
           Being edited
         </button>
         <button
           className={row.finished ? 'aktiv-faerdig' : ''}
+          disabled={row.rating !== 'godkendt'}
           onClick={() => act.setStage('finished')}
-          title="The work on this image is over"
+          title="The work on this image is over. A file in the Masters folder sets this automatically."
         >
           Finished
         </button>
-        <button onClick={() => act.setStage(null)}>Clear</button>
+        <button disabled={row.rating !== 'godkendt'} onClick={() => act.setStage(null)}>Clear</button>
       </div>
+
+      {row.rel_path.startsWith('Approved/') && (
+        <>
+          <h4>Work folder</h4>
+          <p className="tom">Save edits in Edits and the finished master in Masters. The stage follows the folders.</p>
+          <div className="knapraekke">
+            {['Originals', 'Edits', 'Masters', 'Print files'].map((del) => (
+              <button
+                key={del}
+                className="lille"
+                onClick={() => invoke('img:openWorkFolder', { versionId: row.version_id, del }).catch(onError)}
+              >
+                {del}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
 
       <h4>Edit in</h4>
       <div className="knapraekke">
@@ -176,7 +199,7 @@ export default function Inspector({
         </select>
         <button
           onClick={() => act.editIn(editorValg || editorList[0]?.appPath || null)}
-          title="Open the file in the chosen app. When you save, Art Triage notices and marks the image as being edited."
+          title="Open the file in the chosen app. Save the result in the Edits folder of the work, and Stef G Art marks the image as being edited."
         >
           Open
         </button>

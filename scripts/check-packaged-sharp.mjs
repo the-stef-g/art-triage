@@ -5,7 +5,7 @@
 // koeres, saa tjekket sker i byggeriet.
 //
 // Brug: node scripts/check-packaged-sharp.mjs <Resources-mappen> <darwin-x64|linux-x64>
-// Resources-mappen er "Art Triage.app/Contents/Resources" paa macOS.
+// Resources-mappen er "Stef G Art.app/Contents/Resources" paa macOS.
 import { existsSync, readdirSync, openSync, readSync, closeSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';

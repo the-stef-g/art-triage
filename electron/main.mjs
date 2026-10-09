@@ -1,4 +1,4 @@
-// art-triage: hovedproces. Ejer vinduerne, de to custom-protokoller
+// Stef G Art: hovedproces. Ejer vinduerne, de to custom-protokoller
 // (app:// til bundtede filer, thumb:// til previews) og AI-vinduet.
 import {
   app, BrowserWindow, Menu, protocol, ipcMain, net, nativeTheme, screen, shell,
@@ -15,6 +15,10 @@ import { Settings } from './lib/settings.mjs';
 import { AiBridge } from './lib/aiBridge.mjs';
 import { AppSession } from './lib/ipc.mjs';
 import { parseWooKey, parseWpLogin } from './lib/shop.mjs';
+import { overtagGamleData } from './lib/migrate.mjs';
+
+// Appen hed foer Art Triage: tag indstillinger, noegler og model med over.
+overtagGamleData(join(app.getPath('appData'), 'Art Triage'), app.getPath('userData'));
 
 const here = dirname(fileURLToPath(import.meta.url));
 const distDir = join(here, '..', 'dist');
@@ -312,12 +316,12 @@ function buildMenu() {
   const template = [
     ...(process.platform === 'darwin'
       ? [{
-          label: 'Art Triage',
+          label: 'Stef G Art',
           submenu: [
-            { role: 'about', label: 'About Art Triage' },
+            { role: 'about', label: 'About Stef G Art' },
             { type: 'separator' },
-            { role: 'hide', label: 'Hide Art Triage' },
-            { role: 'quit', label: 'Quit Art Triage' },
+            { role: 'hide', label: 'Hide Stef G Art' },
+            { role: 'quit', label: 'Quit Stef G Art' },
           ],
         }]
       : []),
@@ -409,7 +413,7 @@ app.whenReady().then(() => {
     sidsteStatus = linje;
     aiLog(linje);
   });
-  aiLog(`--- Art Triage ${app.getVersion()} startet (${process.platform}, Electron ${process.versions.electron}) ---`);
+  aiLog(`--- Stef G Art ${app.getVersion()} startet (${process.platform}, Electron ${process.versions.electron}) ---`);
   session = new AppSession({ settings, ai, rasterizeSvg, log: aiLog });
   // Er sharp med i den pakkede app? Det er den foerste ting at se efter
   // naar en forhaandsvisning ikke kan laves.

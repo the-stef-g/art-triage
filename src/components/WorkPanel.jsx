@@ -133,7 +133,7 @@ export default function WorkPanel({ row, versions, hasKey, shop, onShop, onError
     try {
       const res = await invoke('shop:checkFormat');
       onShop(res.problems.length
-        ? `The shop's field format differs from what Art Triage writes: ${res.problems.slice(0, 3).join('; ')}`
+        ? `The shop's field format differs from what Stef G Art writes: ${res.problems.slice(0, 3).join('; ')}`
         : `The shop format matches (${res.name})`);
     } catch (err) {
       onError(err);
@@ -287,7 +287,7 @@ export default function WorkPanel({ row, versions, hasKey, shop, onShop, onError
           className="lille"
           disabled={busy || !shop?.harWoo}
           onClick={checkFormat}
-          title="Fetches product 20 from the shop and checks that its fields look like what Art Triage writes"
+          title="Fetches product 20 from the shop and checks that its fields look like what Stef G Art writes"
         >
           Check shop format
         </button>

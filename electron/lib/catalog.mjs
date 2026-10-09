@@ -24,6 +24,21 @@ export function erRedigeretUdgave(suffiks, ext, masterExt) {
   return /[a-zA-Z\u00c0-\u024f]{2,}/.test(tekst) || /^v\d+$/i.test(tekst);
 }
 
+// Den mappedrevne struktur. Bedoemmelsen bestemmer hvilken mappe en fil
+// ligger i, og et godkendt billede faar sin egen arbejdsmappe:
+//   Approved/<filnavn>/Originals | Edits | Masters | Print files
+export const BEDOEMMELSESMAPPE = {
+  ubedomt: 'Import', godkendt: 'Approved', kandidat: 'Candidate', kasseret: 'Discarded',
+};
+export const ARBEJDSMAPPER = ['Originals', 'Edits', 'Masters', 'Print files'];
+const STYREDE_TOPMAPPER = ['Import', 'Candidate', 'Discarded', 'Approved'];
+
+// "Approved/Desert/Edits/x.tif" -> { work: 'Desert', del: 'Edits' }, ellers null.
+export function arbejdsmappeFor(rel) {
+  const m = /^Approved\/([^/]+)\/(Originals|Edits|Masters|Print files)\//.exec(rel);
+  return m ? { work: m[1], del: m[2] } : null;
+}
+
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS files(
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -147,6 +162,8 @@ export class Catalog extends EventEmitter {
     super();
     this.db = db;
     this.root = root;
+    // Slaas til af sessionen: bedoemmelsen flytter saa ogsaa filen til sin mappe.
+    this.mappestyring = false;
     db.exec(SCHEMA);
     this._migrate();
   }
@@ -177,6 +194,12 @@ export class Catalog extends EventEmitter {
     if (version < 1) {
       this._afstakFejl();
       this.db.exec('PRAGMA user_version = 1');
+    }
+    // Arbejdstrin gælder kun godkendte billeder. Tidligere kunne alt faa
+    // "Being edited", ogsaa ubedoemte filer, og det ryddes én gang.
+    if (version < 2) {
+      this.db.exec("UPDATE versions SET edited=0, finished=0 WHERE rating != 'godkendt'");
+      this.db.exec('PRAGMA user_version = 2');
     }
     // De to trin var foer uafhaengige flag, saa et billede kunne staa som
     // baade under redigering og faerdigt. Faerdig vinder: det er det trin
@@ -369,10 +392,25 @@ export class Catalog extends EventEmitter {
 
         const stackImage = this._findStackTarget(n.rel, mappeIndeks);
         if (stackImage) {
+          // En ny version arver originalens bedoemmelse. Er den godkendt, er
+          // en fil i Edits "under redigering", og en fil i Masters gør
+          // billedet "faerdigt" (originalen faar det trin med).
+          const arvet = this.db.get(
+            'SELECT rating FROM versions WHERE image_id=? AND is_master=1', stackImage.imageId
+          )?.rating ?? 'ubedomt';
+          const godkendt = arvet === 'godkendt';
+          const faerdig = godkendt && stackImage.kind === 'master';
           this.db.run(
-            'INSERT INTO versions(image_id, file_id, name, is_master, rating, edited, created_at) VALUES(?,?,?,0,?,1,?)',
-            stackImage.imageId, fileId, stackImage.versionName, 'ubedomt', this.now()
+            'INSERT INTO versions(image_id, file_id, name, is_master, rating, edited, finished, created_at) VALUES(?,?,?,0,?,?,?,?)',
+            stackImage.imageId, fileId, stackImage.versionName, arvet,
+            godkendt && !faerdig ? 1 : 0, faerdig ? 1 : 0, this.now()
           );
+          if (faerdig) {
+            this.db.run(
+              'UPDATE versions SET edited=0, finished=1 WHERE image_id=? AND is_master=1',
+              stackImage.imageId
+            );
+          }
         } else {
           const imageId = this.db.run(
             'INSERT INTO images(master_file_id, created_at) VALUES(?,?)',
@@ -397,10 +435,13 @@ export class Catalog extends EventEmitter {
   // Faerdig-maerket ryddes med: er der lige gemt en ny udgave, er arbejdet
   // ikke overstaaet, og de to trin kan ikke gaelde samtidig.
   _markEdited(fileId) {
-    this.db.run('UPDATE versions SET edited=1, finished=0 WHERE file_id=?', fileId);
+    // Kun godkendte billeder har et arbejdstrin.
     this.db.run(
-      `UPDATE versions SET edited=1, finished=0 WHERE file_id IS NULL AND image_id IN
-        (SELECT id FROM images WHERE master_file_id=?)`,
+      "UPDATE versions SET edited=1, finished=0 WHERE file_id=? AND rating='godkendt'", fileId
+    );
+    this.db.run(
+      `UPDATE versions SET edited=1, finished=0 WHERE file_id IS NULL AND rating='godkendt'
+        AND image_id IN (SELECT id FROM images WHERE master_file_id=?)`,
       fileId
     );
   }
@@ -423,7 +464,33 @@ export class Catalog extends EventEmitter {
     else indeks.set(dir, [{ id, rel_path: relPath }]);
   }
 
+  // En fil i Edits eller Masters i en arbejdsmappe hoerer til originalen i
+  // samme arbejdsmappes Originals, uanset hvad den hedder.
+  _arbejdsmappeMaal(rel, indeks) {
+    const am = arbejdsmappeFor(rel);
+    if (!am || (am.del !== 'Edits' && am.del !== 'Masters')) return null;
+    const originalDir = `Approved/${am.work}/Originals`;
+    const kandidater = indeks
+      ? (indeks.get(originalDir) || [])
+      : this.db.all(
+        'SELECT id, rel_path FROM files WHERE present=1 AND rel_path LIKE ?',
+        `${originalDir}/%`
+      );
+    for (const k of kandidater) {
+      const owner = this._imageForFile(k.id);
+      if (!owner) continue;
+      const stem = stemOf(posix.basename(rel));
+      const arbejdStem = am.work;
+      const rest = stem.startsWith(arbejdStem) ? stem.slice(arbejdStem.length).replace(/^[-_. ()]+|[)]+$/g, '') : '';
+      const versionName = am.del === 'Masters' ? 'Master' : (rest || stem);
+      return { imageId: owner.imageId, versionName, kind: am.del === 'Masters' ? 'master' : 'edit' };
+    }
+    return null;
+  }
+
   _findStackTarget(rel, indeks = null) {
+    const iArbejdsmappe = this._arbejdsmappeMaal(rel, indeks);
+    if (iArbejdsmappe) return iArbejdsmappe;
     const dir = posix.dirname(rel);
     const stem = stemOf(posix.basename(rel));
     const prefix = dir === '.' ? '' : `${dir}/`;
@@ -456,7 +523,7 @@ export class Catalog extends EventEmitter {
     if (!owner) return null;
     const suffix = best.suffix.replace(/^[-_. ()]+|[)]+$/g, '');
     const versionName = suffix || extOf(rel).toUpperCase();
-    return { imageId: owner.imageId, versionName };
+    return { imageId: owner.imageId, versionName, kind: 'edit' };
   }
 
   _imageForFile(fileId) {
@@ -542,6 +609,22 @@ export class Catalog extends EventEmitter {
     return this.db.get('SELECT * FROM files WHERE id=?', fileId);
   }
 
+  // Arbejdsmappens undermappe (Originals, Edits, Masters, Print files) for et
+  // godkendt billede, eller null hvis billedet ikke har en arbejdsmappe.
+  workFolder(versionId, del) {
+    if (!ARBEJDSMAPPER.includes(del)) return null;
+    const v = this.getVersion(versionId);
+    if (!v) return null;
+    const master = this.db.get(
+      'SELECT f.rel_path FROM images i JOIN files f ON f.id = i.master_file_id WHERE i.id=?', v.image_id
+    );
+    const am = master ? arbejdsmappeFor(master.rel_path) : null;
+    if (!am) return null;
+    const abs = join(this.root, 'Approved', am.work, del);
+    mkdirSync(abs, { recursive: true });
+    return abs;
+  }
+
   filePathForVersion(versionId) {
     const v = this.getVersion(versionId);
     if (!v) return null;
@@ -561,10 +644,63 @@ export class Catalog extends EventEmitter {
     }
     this.db.transaction(() => {
       for (const id of versionIds) {
-        this.db.run('UPDATE versions SET rating=? WHERE id=?', rating, id);
+        // Arbejdstrin findes kun paa godkendte billeder.
+        if (rating === 'godkendt') this.db.run('UPDATE versions SET rating=? WHERE id=?', rating, id);
+        else this.db.run('UPDATE versions SET rating=?, edited=0, finished=0 WHERE id=?', rating, id);
       }
     });
+    if (this.mappestyring) this._placerBilleder(versionIds);
     this.emit('changed');
+  }
+
+  // Flytter originalen til den mappe bedoemmelsen peger paa. Kun originalen
+  // (masterversionen) flyttes; redigeringer og masterfiler bliver i
+  // arbejdsmappen. Returnerer de udfoerte flytninger.
+  _placerBilleder(versionIds) {
+    const moves = [];
+    const set = new Set();
+    for (const id of versionIds) {
+      const v = this.db.get(
+        `SELECT v.is_master, v.rating, i.id AS image_id, i.master_file_id AS fid
+         FROM versions v JOIN images i ON i.id = v.image_id WHERE v.id=?`, id
+      );
+      if (!v || !v.is_master || set.has(v.image_id)) continue;
+      set.add(v.image_id);
+      const f = this.getFile(v.fid);
+      if (!f || !f.present) continue;
+      const mal = this._maalmappe(f.rel_path, v.rating);
+      if (mal === null) continue;
+      moves.push(...this.moveFiles([f.id], mal));
+      if (v.rating === 'godkendt') {
+        const arbejd = posix.dirname(mal);
+        for (const del of ['Edits', 'Masters', 'Print files']) {
+          mkdirSync(join(this.root, arbejd, del), { recursive: true });
+        }
+      }
+    }
+    return moves;
+  }
+
+  // Mappen en fil skal ligge i for en bedoemmelse, eller null hvis den allerede
+  // ligger rigtigt eller ikke skal flyttes.
+  _maalmappe(rel, rating) {
+    const dir = posix.dirname(rel) === '.' ? '' : posix.dirname(rel);
+    const topmappe = rel.split('/')[0];
+    const styret = rel.includes('/') && STYREDE_TOPMAPPER.includes(topmappe);
+    if (rating === 'godkendt') {
+      if (arbejdsmappeFor(rel)?.del === 'Originals') return null;
+      const stem = stemOf(posix.basename(rel)).replace(/[/:\\]/g, '-');
+      return `Approved/${stem}/Originals`;
+    }
+    // En fil der ligger uden for de styrede mapper og ikke er bedoemt, bliver
+    // hvor den er. Faar den en bedoemmelse, hentes mappens navn ind foran.
+    if (rating === 'ubedomt' && !styret) return null;
+    // Under Approved er der arbejdsmapper; tilbage gaar filen til roden af
+    // den nye mappe, ellers bevares undermappen den kom fra.
+    const under = topmappe === 'Approved' ? '' : (styret ? dir.split('/').slice(1).join('/') : dir);
+    const top = BEDOEMMELSESMAPPE[rating];
+    const mal = under ? `${top}/${under}` : top;
+    return mal === dir ? null : mal;
   }
 
   // Hvor langt et billede er i arbejdet. Det er ét trin ad gangen: enten
@@ -580,7 +716,15 @@ export class Catalog extends EventEmitter {
     const finished = stage === 'finished' ? 1 : 0;
     this.db.transaction(() => {
       for (const id of versionIds) {
-        this.db.run('UPDATE versions SET edited=?, finished=? WHERE id=?', edited, finished, id);
+        // Kun godkendte billeder har et arbejdstrin; andre kan kun ryddes.
+        if (stage === null) {
+          this.db.run('UPDATE versions SET edited=0, finished=0 WHERE id=?', id);
+        } else {
+          this.db.run(
+            "UPDATE versions SET edited=?, finished=? WHERE id=? AND rating='godkendt'",
+            edited, finished, id
+          );
+        }
       }
     });
     this.emit('changed');
@@ -843,7 +987,7 @@ export class Catalog extends EventEmitter {
     return moved;
   }
 
-  // Flytter filer hvor ALLE tilknyttede versioner er kasserede til _kasseret/.
+  // Flytter filer hvor ALLE tilknyttede versioner er kasserede til Discarded/.
   moveDiscarded() {
     const rows = this.db.all(
       `WITH alle AS MATERIALIZED (${effektiveFiler('1=1')}),
@@ -851,9 +995,10 @@ export class Catalog extends EventEmitter {
        SELECT f.id FROM files f
        JOIN alle a ON a.fid = f.id
        WHERE f.present=1 AND f.rel_path NOT LIKE '\\_kasseret/%' ESCAPE '\\'
+         AND f.rel_path NOT LIKE 'Discarded/%'
          AND f.id NOT IN (SELECT fid FROM levende)`
     );
-    return this.moveFiles(rows.map((r) => r.id), '_kasseret');
+    return this.moveFiles(rows.map((r) => r.id), 'Discarded');
   }
 
   // ---------- Embeddings og noegleord ----------
