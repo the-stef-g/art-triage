@@ -148,29 +148,41 @@ export default function Inspector({
         </button>
         <button onClick={() => act.setRating('ubedomt')}>Clear</button>
       </div>
-      <h4>Workflow stage</h4>
-      {row.rating !== 'godkendt' && (
-        <p className="tom">The workflow stage only applies to Approved images.</p>
+      <h4>Edits</h4>
+      {row.rating !== 'godkendt' ? (
+        <p className="tom">Edits and versions only apply to Approved images.</p>
+      ) : (
+        <>
+          <p className="tom">
+            {row.editor ? `Edited in ${row.editor}.` : 'Not edited yet.'}
+            {' '}Save results in the Edits folder; the program you opened the image in becomes the status.
+          </p>
+          <div className="knapraekke">
+            {[...new Set([
+              ...editors.filter((e) => e.appPath).map((e) => e.label),
+              ...(row.editor ? [row.editor] : []),
+            ])].map((navn) => (
+              <button
+                key={navn}
+                className={row.editor === navn ? 'aktiv-redigeres' : ''}
+                onClick={() => act.setEditor(row.editor === navn ? null : navn)}
+                title={row.editor === navn ? 'Click to clear the status' : `Mark as edited in ${navn}`}
+              >
+                {navn}
+              </button>
+            ))}
+          </div>
+          <div className="knapraekke">
+            <button
+              className={row.finished ? 'aktiv-faerdig' : ''}
+              onClick={() => act.setStage(row.finished ? null : 'finished')}
+              title="The work on this image is over. A file in the Masters folder sets this automatically."
+            >
+              Finished
+            </button>
+          </div>
+        </>
       )}
-      <div className="knapraekke">
-        <button
-          className={row.edited ? 'aktiv-redigeres' : ''}
-          disabled={row.rating !== 'godkendt'}
-          onClick={() => act.setStage('edited')}
-          title="The image is out with an editor right now. Files saved in the Edits folder set this automatically."
-        >
-          Being edited
-        </button>
-        <button
-          className={row.finished ? 'aktiv-faerdig' : ''}
-          disabled={row.rating !== 'godkendt'}
-          onClick={() => act.setStage('finished')}
-          title="The work on this image is over. A file in the Masters folder sets this automatically."
-        >
-          Finished
-        </button>
-        <button disabled={row.rating !== 'godkendt'} onClick={() => act.setStage(null)}>Clear</button>
-      </div>
 
       {row.rel_path.startsWith('Approved/') && (
         <>
@@ -199,7 +211,7 @@ export default function Inspector({
         </select>
         <button
           onClick={() => act.editIn(editorValg || editorList[0]?.appPath || null)}
-          title="Open the file in the chosen app. Save the result in the Edits folder of the work, and Stef G Art marks the image as being edited."
+          title="Open the file in the chosen app. Save the result in the Edits folder of the work. The program you open it in becomes the Edits status."
         >
           Open
         </button>
@@ -209,6 +221,8 @@ export default function Inspector({
         <button className="lille" onClick={act.reveal}>Reveal in Finder</button>
       </div>
 
+      {row.rating === 'godkendt' && (
+        <>
       <h4>Versions</h4>
       <div className="versionsliste">
         {versions.map((v) => (
@@ -216,7 +230,7 @@ export default function Inspector({
             <span className="versionsnavn">{v.is_master ? 'Original' : v.name}</span>
             <span className="versionsinfo">
               {v.rating === 'godkendt' ? '✓' : v.rating === 'kandidat' ? 'K' : v.rating === 'kasseret' ? '✕' : ''}
-              {v.edited ? ' R' : ''}
+              {v.editor ? ` ${v.editor}` : ''}
               {v.finished ? ' F' : ''}
             </span>
             {!v.is_master && (
@@ -233,6 +247,8 @@ export default function Inspector({
           New virtual copy
         </button>
       </div>
+        </>
+      )}
 
       <h4>Series</h4>
       <div className="knapraekke">

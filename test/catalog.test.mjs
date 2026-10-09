@@ -68,15 +68,23 @@ describe('scanning', () => {
     expect(rows[0].file_id).toBe(row.file_id);
   });
 
-  it('markerer versioner som redigeret naar filens indhold aendres', () => {
+  it('en aendret fil faar det program billedet blev aabnet i som status, og ellers ingen', () => {
     skriv('a.png', 'foerste-indhold');
+    skriv('b.png', 'andet-indhold');
     catalog.sync();
-    catalog.setRating([catalog.listVersions({})[0].version_id], 'godkendt');
-    expect(catalog.listVersions({})[0].edited).toBe(0);
+    const [a, b] = catalog.listVersions({});
+    catalog.setRating([a.version_id, b.version_id], 'godkendt');
+    expect(catalog.noteEditor(a.version_id, 'Luminar Neo')).toBe(true);
 
     skriv('a.png', 'nyt-indhold-som-er-laengere');
+    skriv('b.png', 'ogsaa-nyt-indhold-som-er-laengere');
     catalog.sync();
-    expect(catalog.listVersions({})[0].edited).toBe(1);
+    const rows = catalog.listVersions({});
+    const ra = rows.find((r) => r.rel_path === 'a.png');
+    const rb = rows.find((r) => r.rel_path === 'b.png');
+    expect([ra.edited, ra.editor]).toEqual([1, 'Luminar Neo']);
+    // b blev aldrig aabnet i et program: appen finder ikke selv paa en status.
+    expect([rb.edited, rb.editor]).toEqual([0, null]);
   });
 
   it('stacker afledte filer som versioner af samme billede', () => {
@@ -96,12 +104,29 @@ describe('scanning', () => {
     expect(stak.length).toBe(3);
     const kopi = rows.find((r) => r.version_name === 'gigapixel');
     expect(kopi).toBeTruthy();
-    expect(kopi.edited).toBe(1);
+    expect(kopi.edited).toBe(0); // ingen kendt program, ingen status
+    expect(kopi.editor).toBe(null);
   });
 
-  it('stakker ikke nummererede filer eller filer af samme type', () => {
+  it('et billede der ikke er godkendt har ingen versioner', () => {
     skriv('Ild.cr2', 'original');
     catalog.sync();
+    skriv('Ild 9 1.cr2', 'nummereret, samme type');
+    skriv('Ild 7a.jpg', 'nummer med bogstav');
+    skriv('Ild-lumi.tif', 'ser redigeret ud, men originalen er ikke godkendt');
+    skriv('Ild-lumi.cr2', 'samme navn i to formater');
+    skriv('Ild-lumi.jpg', 'samme navn i to formater');
+    catalog.sync();
+    const rows = catalog.listVersions({});
+    expect(rows).toHaveLength(6);
+    expect(new Set(rows.map((r) => r.image_id)).size).toBe(6);
+    expect(rows.every((r) => r.is_master === 1 && r.version_count === 1)).toBe(true);
+  });
+
+  it('stakker ikke nummererede filer eller filer af samme type, selv naar billedet er godkendt', () => {
+    skriv('Ild.cr2', 'original');
+    catalog.sync();
+    catalog.setRating([catalog.listVersions({})[0].version_id], 'godkendt');
     skriv('Ild 9 1.cr2', 'nummereret, samme type');
     skriv('Ild 7a.jpg', 'nummer med bogstav');
     skriv('Ild 10.dng', 'nummer');
@@ -109,37 +134,9 @@ describe('scanning', () => {
     skriv('Ild-lumi.tif', 'redigeret, anden type');
     catalog.sync();
     const rows = catalog.listVersions({});
-    // Ild-lumi.cr2 og .tif hoerer sammen (samme navn); de andre er hver sit.
     expect(new Set(rows.map((r) => r.image_id)).size).toBe(5);
-    expect(rows.filter((r) => r.version_count === 2)).toHaveLength(2);
-    expect(rows.find((r) => r.rel_path === 'Ild-lumi.tif').is_master).toBe(0);
+    expect(rows.find((r) => r.rel_path.startsWith('Approved/') === false && r.rel_path === 'Ild-lumi.tif').is_master).toBe(0);
     expect(rows.find((r) => r.rel_path === 'Ild 9 1.cr2').is_master).toBe(1);
-  });
-
-  it('goer fejlagtigt stakkede versioner til egne billeder, og lader de rigtige staa', () => {
-    skriv('Ild.cr2', 'original');
-    catalog.sync();
-    const master = catalog.listVersions({})[0];
-    const nyFil = (rel) => catalog.db.run(
-      'INSERT INTO files(rel_path, size, mtime, hash, present, created_at) VALUES(?,?,?,?,1,?)',
-      rel, 5, 1, `h-${rel}`, 1
-    ).lastInsertRowid;
-    const stak = (rel, navn) => catalog.db.run(
-      'INSERT INTO versions(image_id, file_id, name, is_master, rating, edited, created_at) VALUES(?,?,?,0,?,1,1)',
-      master.image_id, nyFil(rel), navn, 'godkendt'
-    );
-    stak('Ild 9 1.cr2', '1');
-    stak('Ild 7a.jpg', '7a');
-    stak('Ild-lumi.tif', 'lumi');
-    expect(catalog._afstakFejl()).toBe(2);
-    const rows = catalog.listVersions({});
-    expect(new Set(rows.map((r) => r.image_id)).size).toBe(3);
-    const lumi = rows.find((r) => r.version_name === 'lumi');
-    expect(lumi.version_count).toBe(2);
-    const egen = rows.find((r) => r.rel_path === 'Ild 7a.jpg');
-    expect(egen.is_master).toBe(1);
-    expect(egen.rating).toBe('godkendt');
-    expect(catalog._afstakFejl()).toBe(0); // en gang er nok
   });
 
   it('markerer forsvundne filer som fravaerende', () => {
@@ -200,7 +197,6 @@ describe('status og filtre', () => {
     skriv('a.png', 'helt nyt indhold der giver en anden hash');
     catalog.sync();
     const v = catalog.getVersion(a.version_id);
-    expect(v.edited).toBe(1);
     expect(v.finished).toBe(0);
   });
 
@@ -526,6 +522,7 @@ describe('mappedrevet arbejdsgang', () => {
     skriv('a.cr2', 'original');
     catalog.sync();
     catalog.setRating([raekke('a.cr2').version_id], 'godkendt');
+    catalog.noteEditor(raekke('Approved/a/Originals/a.cr2').version_id, 'Topaz Photo AI');
     skriv('Approved/a/Edits/helt-andet-navn.tif', 'redigeret');
     catalog.sync();
     let rows = catalog.listVersions({});
@@ -534,6 +531,7 @@ describe('mappedrevet arbejdsgang', () => {
     expect(edit.is_master).toBe(0);
     expect(edit.rating).toBe('godkendt');
     expect(edit.edited).toBe(1);
+    expect(edit.editor).toBe('Topaz Photo AI');
 
     skriv('Approved/a/Masters/a master.tif', 'master');
     skriv('Approved/a/Print files/a 1-1.tif', 'til tryk');
@@ -620,5 +618,33 @@ describe('gitterets raekkefoelge', () => {
     catalog.setRating([b.version_id], 'godkendt');
     catalog.setRating([b.version_id], 'ubedomt');
     expect(navne()).toEqual(['a.cr2', 'b.cr2', 'c.cr2']);
+  });
+});
+
+describe('Edits-status', () => {
+  it('kun godkendte billeder faar et program som status, og det kan ryddes', () => {
+    skriv('e.png', 'e');
+    catalog.sync();
+    const id = catalog.listVersions({})[0].version_id;
+    catalog.setEditor([id], 'Luminar Neo');
+    expect(catalog.getVersion(id).editor).toBe(null); // ikke godkendt
+    catalog.setRating([id], 'godkendt');
+    catalog.setEditor([id], 'Luminar Neo');
+    expect(catalog.getVersion(id)).toMatchObject({ editor: 'Luminar Neo', edited: 1 });
+    catalog.setEditor([id], null);
+    expect(catalog.getVersion(id)).toMatchObject({ editor: null, edited: 0 });
+    catalog.setEditor([id], 'Topaz Photo AI');
+    catalog.setRating([id], 'kandidat'); // forlader Approved: status ryddes
+    expect(catalog.getVersion(id).editor).toBe(null);
+    expect(() => catalog.setEditor([id], '  ')).toThrow(/needs a name/);
+  });
+
+  it('en virtuel kopi arver originalens bedoemmelse', () => {
+    skriv('k.png', 'k');
+    catalog.sync();
+    const id = catalog.listVersions({})[0].version_id;
+    catalog.setRating([id], 'godkendt');
+    const kopi = catalog.createVirtualCopy(id);
+    expect(catalog.getVersion(kopi).rating).toBe('godkendt');
   });
 });

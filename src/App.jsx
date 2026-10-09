@@ -341,32 +341,27 @@ export default function App() {
       const f = getFocused();
       if (f) invoke('img:setRating', { versionIds: [f.version_id], rating }).catch(visFejl);
     },
-    // Arbejdstrin: enten under redigering eller faerdig, aldrig begge.
-    // Saettes trinnet paa noget der allerede staar der, ryddes det, saa
-    // genvejene stadig virker som til og fra.
+    // Status under Edits: navnet paa det program billedet er redigeret i.
+    // Kun for godkendte billeder, og kun navne appen kender.
+    setEditor: (editor) => {
+      const f = getFocused();
+      if (!f || f.rating !== 'godkendt') return;
+      invoke('img:setEditor', { versionIds: [f.version_id], editor }).catch(visFejl);
+    },
+    // "Finished" kan saettes i haanden; en fil i Masters goer det af sig selv.
     setStage: (stage) => {
       const f = getFocused();
       if (!f) return;
-      // Arbejdstrin findes kun paa godkendte billeder.
+      // Kun godkendte billeder har Edits og Finished.
       if (stage !== null && f.rating !== 'godkendt') return;
-      const key = stage === 'edited' ? 'edited' : 'finished';
-      const harDet = stage !== null && Boolean(f[key]);
+      const harDet = stage !== null && Boolean(f.finished);
       invoke('img:setStage', { versionIds: [f.version_id], stage: harDet ? null : stage })
         .catch(visFejl);
     },
-    // Drej det aktive billede manuelt, naar automatikken tager fejl.
-    // Gælder alle markerede billeder, ellers det aktive.
-    rotate: (delta) => {
-      const f = getFocused();
-      const valgte = new Set(selectedRef.current);
-      const fileIds = valgte.size > 1
-        ? [...new Set(rowsRef.current.filter((r) => valgte.has(r.version_id)).map((r) => r.file_id))]
-        : (f ? [f.file_id] : []);
-      if (fileIds.length) invoke('img:rotate', { fileIds, delta }).catch(visFejl);
-    },
     virtualCopy: () => {
       const f = getFocused();
-      if (f) invoke('img:virtualCopy', { versionId: f.version_id }).catch(visFejl);
+      // Kun et godkendt billede har versioner.
+      if (f && f.rating === 'godkendt') invoke('img:virtualCopy', { versionId: f.version_id }).catch(visFejl);
     },
     editIn: async (appPath, versionId = getFocused()?.version_id) => {
       if (!versionId) return;
@@ -613,9 +608,8 @@ export default function App() {
         case 'c': act.setRating('kandidat'); break;
         case 'x': act.setRating('kasseret'); break;
         case 'u': act.setRating('ubedomt'); break;
-        case 'e': act.setStage('edited'); break;
         case 'f': act.setStage('finished'); break;
-        case 'v': act.virtualCopy(); break;
+        case 'v': if (getFocused()?.rating === 'godkendt') act.virtualCopy(); break;
         // [ og ] er svaere at ramme paa et dansk tastatur, saa L og R gør det samme.
         case '[': case 'l': if (!e.metaKey && !e.ctrlKey) act.rotate(-90); break;
         case ']': case 'r': if (!e.metaKey && !e.ctrlKey) act.rotate(90); break;

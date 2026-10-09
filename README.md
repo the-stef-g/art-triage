@@ -34,9 +34,9 @@ The app is not signed with an Apple developer certificate, so macOS refuses the 
 
 **Rating.** Every image is approved, a candidate, discarded or unrated. The three decided states are a traffic light: green ✓ approved, yellow ? candidate, red ✕ discarded. The badge in the corner of the image is the whole marking; there is no coloured frame around the picture, because a badge is enough to catch the eye and a frame under every image was noise. Discarded images are hidden by default; the Discarded chip in the toolbar shows them.
 
-**Workflow stage.** Separately from the rating, an image sits at one stage: being edited, finished, or neither. It is one at a time, not two switches. An image cannot be out with an editor and finished at the same time, so setting one clears the other. Saving from an editor puts the image back on "being edited", because a new version means the work is not over.
+**Edits.** Only Approved images have Edits and versions; an image that is not Approved has neither, and no rating means nothing here. The Edits status is the name of the program an image was edited in, such as *Luminar Neo* or *Topaz Photo AI*. The names come from the editors the app knows (the ones it finds in Applications and any you add with "Other app"). The app never makes up a status of its own. The status is set when you open an image in a program with "Open" and a file then shows up in `Edits`, and you can set or clear it by hand with the program buttons. *Finished* is separate: a file in `Masters` sets it, and it can be toggled by hand.
 
-**The action buttons are in the toolbar**, between the sort order and New folder, each with its key on it: **A** approve, **C** candidate, **X** discard, **U** unrated, **E** being edited, **F** finished, **V** virtual copy. Click them or press the key, it is the same thing. They used to be a list in the Inspector, which showed only when nothing was selected, so they were out of sight exactly when there was something to use them on. **Space** (large preview) and **Cmd+Z** (undo) have no button; they sit in the fingers already. Also: **Cmd+A** selects all, **Shift+Cmd+Z** redoes. Pressing **E** or **F** on an image already at that stage clears it.
+**The action buttons are in the toolbar**, between the sort order and New folder, each with its key on it: **A** approve, **C** candidate, **X** discard, **U** unrated, **F** finished, **V** virtual copy. Click them or press the key, it is the same thing. They used to be a list in the Inspector, which showed only when nothing was selected, so they were out of sight exactly when there was something to use them on. **Space** (large preview) and **Cmd+Z** (undo) have no button; they sit in the fingers already. Also: **Cmd+A** selects all, **Shift+Cmd+Z** redoes. Pressing **F** on a finished image clears it.
 
 **Selection and the active image are two different things**, as in Lightroom. Several images can be selected while one of them is the active image: the one you are standing on, the one the Inspector shows, and the one the arrows move. The active image has a full blue border and a lighter background; the rest of the selection has a dimmed border.
 
@@ -48,7 +48,7 @@ The app is not signed with an Apple developer certificate, so macOS refuses the 
 
 Tab does not move focus around the interface. The work is done with the mouse and these letters, and a wandering focus made it unclear what the next key would hit. Tab still works inside text fields.
 
-**The filter chips are views, one at a time.** Approved, Candidates, Being edited, Finished and Discarded are five ways of looking at the library, and clicking one turns off the others. Clicking the active one goes back to showing everything.
+**The filter chips are views, one at a time.** Approved, Candidates, Edits (images with an Edits status), Finished and Discarded are five ways of looking at the library, and clicking one turns off the others. Clicking the active one goes back to showing everything.
 
 **The large preview stays inside the middle column.** Space fills the grid area, not the window, so the sidebar and the Inspector stay where they are and you can see series, keywords and rating while looking at the picture full size. Space again or Escape closes it.
 
@@ -56,7 +56,7 @@ Tab does not move focus around the interface. The work is done with the mouse an
 
 **Virtual copies.** "New virtual copy" creates an extra version of the same subject, for instance for a different crop. The copy takes up no space on disk until you send it off for editing. At that moment art-triage makes a physical copy next to the original and opens it in your editor.
 
-**Edit in.** Pick an app in the Inspector and click Open. art-triage finds Luminar Neo, Topaz Photo AI, Gigapixel, Photoshop, Affinity Photo and Pixelmator Pro in Applications on its own, and you can always choose a different app. When you save in the editor, art-triage notices the change, marks the version as being edited and refreshes the preview. If the editor saves a new file next to the original (for example `IMG_1234-gigapixel.tif`), it is stacked automatically as a version of the same image.
+**Edit in.** Pick an app in the Inspector and click Open. art-triage finds Luminar Neo, Topaz Photo AI, Gigapixel, Photoshop, Affinity Photo and Pixelmator Pro in Applications on its own, and you can always choose a different app. When you save in the editor, art-triage notices the change, refreshes the preview and, for an Approved image, gives it the program's name as Edits status. If the editor saves a new file next to the original (for example `IMG_1234-gigapixel.tif`), it is stacked automatically as a version of the same image.
 
 **Folders follow the rating.** The rating decides where a file lives, inside the library folder:
 
@@ -73,7 +73,7 @@ Approved/<file name>/   one work folder per approved image
 
 Rating a file Candidate moves it into `Candidate`, and the sub-folder it came from is kept. Discarded works differently, to keep the archive easy to read: the file goes to `Discarded` in the library root, into a single folder named after the folder it came from (for an approved work, the name of the work). `Ahl Strand/Strand 2/x.cr2` ends up in `Discarded/Strand 2/`. Clear moves it back to Import, but only if it was in one of these folders; an unrated file that lives somewhere else stays where it is. Approving creates the work folder with all four folders and moves the original into `Originals`. Only the original is moved. Undo moves it back.
 
-**The workflow stage follows the work folder.** The stage only exists for Approved images: no rating means no stage, and only Approved can have one. Save an edit in `Edits` and the image becomes *Being edited*; put the master in `Masters` and it becomes *Finished*. Any file saved in `Edits` or `Masters` is added as a version of the original, whatever it is called. The buttons are still there to set the stage by hand, and they are disabled for images that are not Approved. The work folder buttons in the right-hand column open `Originals`, `Edits`, `Masters` and `Print files` in Finder. The `Print files` folder is not scanned.
+**Edits follow the work folder.** Any file saved in `Edits` or `Masters` is added as a version of the original, whatever it is called, but only for Approved images. A file in `Edits` gets the program the image was last opened in as its status; if that is not known, it gets none. A file in `Masters` is called *Master* and marks the work as *Finished*. Nothing here applies to images that are not Approved, and new files are no longer stacked as versions of an image that is not Approved. The work folder buttons in the right-hand column open `Originals`, `Edits`, `Masters` and `Print files` in Finder. The `Print files` folder is not scanned.
 
 Nothing is moved until you change a rating, so existing files stay where they are. "Clean up" moves every file whose versions are all discarded into `Discarded`, by the same rule.
 
@@ -178,7 +178,7 @@ Code comments, internal identifiers and the database values (`godkendt`, `kasser
 2. Check that previews appear for all of it, including RAW and PSD.
 3. Approve a couple of images with G and discard one with X. Quit the app, open it again and see that it is remembered.
 4. Make a virtual copy with V, select the copy and click Open in Gigapixel. Check that a new physical copy sits next to the original.
-5. Save from the editor and see that the version is marked as being edited, and that the preview updates.
+5. Open an Approved image in an editor, save the result in its `Edits` folder, and see that the version gets the program's name as status, and that the preview updates.
 6. Wait until the status bar says the analysis is done, then search for something you know is in the images, for example "yellow flowers".
 7. Drag an image to another folder in the sidebar and check in Finder that the file has moved.
 

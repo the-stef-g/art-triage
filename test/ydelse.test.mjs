@@ -59,7 +59,9 @@ describe('asynkron genskanning giver det samme som den synkrone', () => {
     await catalog.syncAsync();
     const b = catalog.listVersions({}).find((r) => r.rel_path === 'b.jpg');
     catalog.setRating([b.version_id], 'godkendt');
-    catalog.setRating([catalog.listVersions({}).find((r) => r.rel_path === 'a.jpg').version_id], 'godkendt');
+    const aId = catalog.listVersions({}).find((r) => r.rel_path === 'a.jpg').version_id;
+    catalog.setRating([aId], 'godkendt');
+    catalog.noteEditor(aId, 'Luminar Neo');
     // a.jpg faar nyt indhold, b.jpg flyttes til en undermappe.
     writeFileSync(join(root, 'a.jpg'), 'helt nyt og laengere indhold');
     const nyTid = new Date(Date.now() + 60_000);
@@ -145,6 +147,7 @@ describe('forespoergsler der voksede med kvadratet', () => {
     catalog.setRating([v('a.jpg').version_id], 'kasseret');
     catalog.setRating([v('b.jpg').version_id], 'kasseret');
     const kopi = catalog.createVirtualCopy(v('b.jpg').version_id); // en levende kopi af b
+    catalog.setRating([kopi], 'ubedomt'); // en kopi arver bedoemmelsen; her er den levende
     expect(kopi).toBeTruthy();
     const flyttet = catalog.moveDiscarded();
     expect(flyttet.map((m) => m.fileId)).toHaveLength(1);

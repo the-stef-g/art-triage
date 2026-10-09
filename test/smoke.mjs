@@ -176,25 +176,24 @@ try {
   });
   if (flyttet) throw new Error(`Tabulator flyttede fokus til ${flyttet}`);
 
-  // Arbejdstrin er ét ad gangen. E saetter "being edited", F skifter til
-  // "finished", og saa maa den foerste knap ikke stadig staa taendt: det
-  // var praecis fejlen, hvor der stod baade det ene og det andet.
-  await page.keyboard.press('e');
-  await page.waitForSelector('.aktiv-redigeres', { timeout: 10000 });
+  // Edits og Finished findes kun for godkendte billeder. Det foerste billede
+  // er godkendt: F saetter Finished, og samme genvej igen rydder den. Paa et
+  // billede der ikke er godkendt, sker der intet.
+  await page.locator('.tile').first().click();
   await page.keyboard.press('f');
-  await page.waitForFunction(
-    () => document.querySelectorAll('.aktiv-faerdig').length === 1
-      && document.querySelectorAll('.aktiv-redigeres').length === 0,
-    null,
-    { timeout: 10000 }
-  );
-  // Samme genvej igen rydder trinnet.
+  await page.waitForSelector('.aktiv-faerdig', { timeout: 10000 });
   await page.keyboard.press('f');
   await page.waitForFunction(
     () => document.querySelectorAll('.aktiv-faerdig').length === 0,
     null,
     { timeout: 10000 }
   );
+  await page.locator('.tile').nth(2).click();
+  await page.keyboard.press('f');
+  await page.waitForTimeout(400);
+  if (await page.locator('.aktiv-faerdig').count() !== 0) {
+    throw new Error('Finished kunne saettes paa et billede der ikke er godkendt');
+  }
 
   // Forstoerrelsen skal blive inden for midterfeltet, saa sidepanel og
   // inspektoer bliver staaende. Var den bundet til vinduet igen, ville
@@ -346,7 +345,11 @@ try {
     { timeout: 10000 }
   );
 
-  // Ny virtuel kopi med V: en ekstra flise dukker op.
+  // Ny virtuel kopi med V: en ekstra flise dukker op. Kun godkendte billeder
+  // har versioner, saa det er det godkendte foerste billede der bruges.
+  await page.locator('.tile').first().click();
+  await page.keyboard.press('a');
+  await page.waitForSelector('.tile.aktiv .badge.godkendt', { timeout: 10000 });
   await page.keyboard.press('v');
   await page.waitForFunction(
     () => document.querySelectorAll('.tile').length === 5,

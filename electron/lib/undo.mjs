@@ -73,15 +73,15 @@ export class UndoManager {
     const saved = versionIds
       .map((id) => {
         const v = this.catalog.getVersion(id);
-        return v ? { id, stage: this.catalog.stageOf(v) } : null;
+        return v ? { id, edited: v.edited, finished: v.finished, editor: v.editor } : null;
       })
       .filter(Boolean);
     if (!saved.length) return null;
     return {
-      label: 'arbejdstrin',
+      label: 'edits',
       apply: () => {
         const redo = this._stageEntry(saved.map((s) => s.id));
-        for (const { id, stage } of saved) this.catalog.setStage([id], stage);
+        for (const s of saved) this.catalog.restoreEdits(s.id, s);
         return redo;
       },
     };

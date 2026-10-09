@@ -201,6 +201,19 @@ export class Catalog extends EventEmitter {
       this.db.exec("UPDATE versions SET edited=0, finished=0 WHERE rating != 'godkendt'");
       this.db.exec('PRAGMA user_version = 2');
     }
+    // Hvilket program en version er redigeret i (Luminar Neo, Topaz Photo AI
+    // ...). Navnene kommer fra editor-listen i appen, aldrig fra appen selv.
+    const versionKolonner = this.db.all('PRAGMA table_info(versions)').map((k) => k.name);
+    if (!versionKolonner.includes('editor')) {
+      this.db.exec('ALTER TABLE versions ADD COLUMN editor TEXT');
+    }
+    // Det program et billede senest blev aabnet i, saa en fil der dukker op i
+    // Edits kan faa det som status.
+    this.db.exec(`CREATE TABLE IF NOT EXISTS editor_log(
+      image_id INTEGER PRIMARY KEY REFERENCES images(id) ON DELETE CASCADE,
+      editor TEXT NOT NULL,
+      opened_at INTEGER NOT NULL
+    )`);
     // De to trin var foer uafhaengige flag, saa et billede kunne staa som
     // baade under redigering og faerdigt. Faerdig vinder: det er det trin
     // man selv har sat sidst, og det er den tilstand der betyder noget.
@@ -400,10 +413,13 @@ export class Catalog extends EventEmitter {
           )?.rating ?? 'ubedomt';
           const godkendt = arvet === 'godkendt';
           const faerdig = godkendt && stackImage.kind === 'master';
+          // Status er det program billedet senest blev aabnet i. Kendes det
+          // ikke, faar filen ingen status; appen finder ikke selv paa et navn.
+          const editor = godkendt && stackImage.kind === 'edit' ? this._sidsteEditor(stackImage.imageId) : null;
           this.db.run(
-            'INSERT INTO versions(image_id, file_id, name, is_master, rating, edited, finished, created_at) VALUES(?,?,?,0,?,?,?,?)',
+            'INSERT INTO versions(image_id, file_id, name, is_master, rating, edited, finished, editor, created_at) VALUES(?,?,?,0,?,?,?,?,?)',
             stackImage.imageId, fileId, stackImage.versionName, arvet,
-            godkendt && !faerdig ? 1 : 0, faerdig ? 1 : 0, this.now()
+            editor ? 1 : 0, faerdig ? 1 : 0, editor, this.now()
           );
           if (faerdig) {
             this.db.run(
@@ -435,15 +451,23 @@ export class Catalog extends EventEmitter {
   // Faerdig-maerket ryddes med: er der lige gemt en ny udgave, er arbejdet
   // ikke overstaaet, og de to trin kan ikke gaelde samtidig.
   _markEdited(fileId) {
-    // Kun godkendte billeder har et arbejdstrin.
-    this.db.run(
-      "UPDATE versions SET edited=1, finished=0 WHERE file_id=? AND rating='godkendt'", fileId
+    // Kun godkendte billeder har Edits. En aendret fil goer ikke et billede
+    // "faerdigt" laengere, og har vi set hvilket program billedet blev aabnet
+    // i, er det programmets navn statussen. Kendes det ikke, rettes der intet:
+    // appen finder ikke selv paa et navn.
+    const rows = this.db.all(
+      `SELECT v.id, v.image_id, v.editor FROM versions v
+       JOIN images i ON i.id = v.image_id
+       WHERE v.rating='godkendt' AND (v.file_id=? OR (v.file_id IS NULL AND i.master_file_id=?))`,
+      fileId, fileId
     );
-    this.db.run(
-      `UPDATE versions SET edited=1, finished=0 WHERE file_id IS NULL AND rating='godkendt'
-        AND image_id IN (SELECT id FROM images WHERE master_file_id=?)`,
-      fileId
-    );
+    for (const r of rows) {
+      const editor = r.editor || this._sidsteEditor(r.image_id);
+      this.db.run(
+        'UPDATE versions SET finished=0, edited=?, editor=? WHERE id=?',
+        editor ? 1 : 0, editor ?? null, r.id
+      );
+    }
   }
 
   // Finder det billede en ny, afledt fil hoerer til: samme mappe og et
@@ -506,14 +530,17 @@ export class Catalog extends EventEmitter {
       if (s.rel_path === rel) continue; // ikke matche sig selv
       const sStem = stemOf(posix.basename(s.rel_path));
       if (sStem === stem) {
-        // Samme navn, anden filtype: hoerer sammen.
-        if (!best || sStem.length > best.stemLen) best = { fileId: s.id, stemLen: sStem.length, suffix: '' };
+        // Samme navn, anden filtype: hoerer sammen, men kun naar billedet er
+        // godkendt. Et billede der ikke er godkendt, har ingen versioner.
+        if ((!best || sStem.length > best.stemLen) && this._ejerGodkendt(s.id)) {
+          best = { fileId: s.id, stemLen: sStem.length, suffix: '' };
+        }
       } else if (
         stem.startsWith(sStem) &&
         /^[-_. ()]/.test(stem.slice(sStem.length)) &&
         erRedigeretUdgave(stem.slice(sStem.length), extOf(rel), extOf(s.rel_path))
       ) {
-        if (!best || sStem.length > best.stemLen) {
+        if ((!best || sStem.length > best.stemLen) && this._ejerGodkendt(s.id)) {
           best = { fileId: s.id, stemLen: sStem.length, suffix: stem.slice(sStem.length) };
         }
       }
@@ -524,6 +551,16 @@ export class Catalog extends EventEmitter {
     const suffix = best.suffix.replace(/^[-_. ()]+|[)]+$/g, '');
     const versionName = suffix || extOf(rel).toUpperCase();
     return { imageId: owner.imageId, versionName, kind: 'edit' };
+  }
+
+  // Er originalen til billedet som filen hoerer til godkendt? Kun et godkendt
+  // billede har versioner.
+  _ejerGodkendt(fileId) {
+    const owner = this._imageForFile(fileId);
+    if (!owner) return false;
+    return this.db.get(
+      'SELECT rating FROM versions WHERE image_id=? AND is_master=1', owner.imageId
+    )?.rating === 'godkendt';
   }
 
   _imageForFile(fileId) {
@@ -570,7 +607,7 @@ export class Catalog extends EventEmitter {
     const order = 'f.mtime DESC';
     const rows = this.db.all(
       `SELECT v.id AS version_id, v.image_id, v.name AS version_name, v.is_master,
-              v.rating, v.edited, v.finished,
+              v.rating, v.edited, v.finished, v.editor,
               f.id AS file_id, f.rel_path, f.mtime, f.size, f.rotation,
               i.series_id, s.name AS series_name,
               (SELECT COUNT(*) FROM versions v2 WHERE v2.image_id = v.image_id) AS version_count
@@ -650,7 +687,7 @@ export class Catalog extends EventEmitter {
       for (const id of versionIds) {
         // Arbejdstrin findes kun paa godkendte billeder.
         if (rating === 'godkendt') this.db.run('UPDATE versions SET rating=? WHERE id=?', rating, id);
-        else this.db.run('UPDATE versions SET rating=?, edited=0, finished=0 WHERE id=?', rating, id);
+        else this.db.run('UPDATE versions SET rating=?, edited=0, finished=0, editor=NULL WHERE id=?', rating, id);
       }
     });
     if (this.mappestyring) this._placerBilleder(versionIds);
@@ -740,7 +777,7 @@ export class Catalog extends EventEmitter {
       for (const id of versionIds) {
         // Kun godkendte billeder har et arbejdstrin; andre kan kun ryddes.
         if (stage === null) {
-          this.db.run('UPDATE versions SET edited=0, finished=0 WHERE id=?', id);
+          this.db.run('UPDATE versions SET edited=0, finished=0, editor=NULL WHERE id=?', id);
         } else {
           this.db.run(
             "UPDATE versions SET edited=?, finished=? WHERE id=? AND rating='godkendt'",
@@ -750,6 +787,56 @@ export class Catalog extends EventEmitter {
       }
     });
     this.emit('changed');
+  }
+
+  // Status under Edits: det program billedet er redigeret i. Kun godkendte
+  // billeder har en, og navnet maa vaere et af de programmer appen kender.
+  // null rydder den.
+  setEditor(versionIds, editor) {
+    const navn = editor == null ? null : String(editor).trim();
+    if (editor != null && !navn) throw new Error('The editor needs a name');
+    this.db.transaction(() => {
+      for (const id of versionIds) {
+        if (navn === null) {
+          this.db.run('UPDATE versions SET editor=NULL, edited=0 WHERE id=?', id);
+        } else {
+          this.db.run(
+            "UPDATE versions SET editor=?, edited=1, finished=0 WHERE id=? AND rating='godkendt'",
+            navn, id
+          );
+        }
+      }
+    });
+    this.emit('changed');
+  }
+
+  // Genskaber et helt trin, bruges af fortryd. Ingen regler, det er et
+  // snapshot af en tilstand der har vaeret gyldig.
+  restoreEdits(versionId, { edited, finished, editor }) {
+    this.db.run(
+      'UPDATE versions SET edited=?, finished=?, editor=? WHERE id=?',
+      edited ? 1 : 0, finished ? 1 : 0, editor ?? null, versionId
+    );
+    this.emit('changed');
+  }
+
+  // Huskes naar et billede aabnes i et program, saa en fil der senere dukker
+  // op i Edits faar det programmets navn som status.
+  noteEditor(versionId, editor) {
+    const v = this.getVersion(versionId);
+    if (!v || !editor) return false;
+    const master = this.db.get('SELECT rating FROM versions WHERE image_id=? AND is_master=1', v.image_id);
+    if (master?.rating !== 'godkendt') return false;
+    this.db.run(
+      `INSERT INTO editor_log(image_id, editor, opened_at) VALUES(?,?,?)
+       ON CONFLICT(image_id) DO UPDATE SET editor=excluded.editor, opened_at=excluded.opened_at`,
+      v.image_id, String(editor), this.now()
+    );
+    return true;
+  }
+
+  _sidsteEditor(imageId) {
+    return this.db.get('SELECT editor FROM editor_log WHERE image_id=?', imageId)?.editor ?? null;
   }
 
   // Dreje et billede et kvarter ad gangen. delta er 90 (med uret) eller -90;
@@ -781,9 +868,13 @@ export class Catalog extends EventEmitter {
       v.image_id
     ).c;
     const name = `Kopi ${count + 1}`;
+    // En kopi arver originalens bedoemmelse; kun godkendte billeder har versioner.
+    const arvet = this.db.get(
+      'SELECT rating FROM versions WHERE image_id=? AND is_master=1', v.image_id
+    )?.rating ?? 'ubedomt';
     const r = this.db.run(
-      'INSERT INTO versions(image_id, file_id, name, is_master, created_at) VALUES(?,NULL,?,0,?)',
-      v.image_id, name, this.now()
+      'INSERT INTO versions(image_id, file_id, name, is_master, rating, created_at) VALUES(?,NULL,?,0,?,?)',
+      v.image_id, name, arvet, this.now()
     );
     this.emit('changed');
     return r.lastInsertRowid;

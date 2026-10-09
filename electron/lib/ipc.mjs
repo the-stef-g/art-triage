@@ -471,6 +471,17 @@ export class AppSession {
       this.undoMgr.beforeRatings(versionIds);
       catalog.setRating(versionIds, rating);
     });
+    // Status under Edits er navnet paa et af de programmer appen kender
+    // (Luminar Neo, Topaz Photo AI ...). Appen opfinder aldrig et nyt.
+    handle('img:setEditor', ({ versionIds, editor }) => {
+      const catalog = this.requireCatalog();
+      if (editor != null) {
+        const kendte = detectEditors(this.settings.data.customEditors).map((e) => e.label);
+        if (!kendte.includes(editor)) throw new Error(`Unknown editor: ${editor}`);
+      }
+      this.undoMgr.beforeStage(versionIds);
+      catalog.setEditor(versionIds, editor ?? null);
+    });
     handle('img:setStage', ({ versionIds, stage }) => {
       const catalog = this.requireCatalog();
       this.undoMgr.beforeStage(versionIds);
@@ -551,6 +562,12 @@ export class AppSession {
         : catalog.filePathForVersion(versionId);
       if (!filePath) throw new Error('The file does not exist on disk');
       await openInApp(appPath || null, filePath);
+      // Husk hvilket program billedet blev aabnet i, saa en fil der dukker op
+      // i Edits faar det som status. Aabnet i standardprogrammet: intet navn.
+      if (appPath) {
+        const editor = detectEditors(this.settings.data.customEditors).find((e) => e.appPath === appPath);
+        if (editor) catalog.noteEditor(versionId, editor.label);
+      }
       return { filePath };
     });
     handle('ed:pick', async () => {

@@ -9,7 +9,6 @@ const HANDLINGER = [
   { tast: 'C', navn: 'candidate', kraeverValg: true },
   { tast: 'X', navn: 'discard', kraeverValg: true },
   { tast: 'U', navn: 'unrated', kraeverValg: true },
-  { tast: 'E', navn: 'being edited', kraeverValg: true },
   { tast: 'F', navn: 'finished', kraeverValg: true },
   { tast: 'V', navn: 'virtual copy', kraeverValg: true },
 ];
@@ -63,7 +62,6 @@ export default function Toolbar({
       case 'C': act.setRating('kandidat'); break;
       case 'X': act.setRating('kasseret'); break;
       case 'U': act.setRating('ubedomt'); break;
-      case 'E': act.setStage('edited'); break;
       case 'F': act.setStage('finished'); break;
       case 'V': act.virtualCopy(); break;
       default: break;
@@ -96,7 +94,7 @@ export default function Toolbar({
       <div className="filtre">
         <button className={filter.kunGodkendte ? 'chip aktiv' : 'chip'} onClick={() => visKun('kunGodkendte')} title="Show approved only">Approved</button>
         <button className={filter.kunKandidater ? 'chip aktiv' : 'chip'} onClick={() => visKun('kunKandidater')} title="Show candidates only, the ones waiting for a round in the editor">Candidates</button>
-        <button className={filter.kunRedigerede ? 'chip aktiv' : 'chip'} onClick={() => visKun('kunRedigerede')} title="Show only images being edited">Being edited</button>
+        <button className={filter.kunRedigerede ? 'chip aktiv' : 'chip'} onClick={() => visKun('kunRedigerede')} title="Show only images with an Edits status, meaning edited in a program">Edits</button>
         <button className={filter.kunFaerdige ? 'chip aktiv' : 'chip'} onClick={() => visKun('kunFaerdige')} title="Show finished only">Finished</button>
         <button className={filter.kunKasserede ? 'chip aktiv' : 'chip'} onClick={() => visKun('kunKasserede')} title="Show discarded only">Discarded</button>
         <select
