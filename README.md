@@ -6,7 +6,7 @@ Built for Intel Mac (iMac 2019) on macOS Sequoia. Runs on newer versions too.
 
 The app was called Art Triage until version 0.10.0, and Billedflow until 0.2.8. On the first start of Stef G Art your settings, keys and the downloaded model are copied over from the old Art Triage folder in `~/Library/Application Support`, which is left untouched. The repository and the hidden `.art-triage` data folder keep their names.
 
-Libraries created as Billedflow Libraries created back then keep their `.billedflow` folder and are picked up automatically, so no ratings are lost in the rename.
+Libraries created in the Billedflow days keep their `.billedflow` folder and are picked up automatically, so no ratings are lost in the rename.
 
 ## Get the app
 
