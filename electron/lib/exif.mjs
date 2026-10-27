@@ -7,6 +7,7 @@
 // RAW-formater (DNG, CR2, NEF, ARW m.fl.) ER en TIFF-struktur. Resten
 // (HEIC, CR3, RAF) giver null, og aaret skrives saa ind i haanden.
 import { openSync, readSync, closeSync } from 'node:fs';
+import { open as aabnAsync } from 'node:fs/promises';
 
 const LAES_BYTES = 1024 * 1024;
 
@@ -15,6 +16,7 @@ const TAG_DATETIME = 0x0132;
 const TAG_EXIF_IFD = 0x8769;
 const TAG_DATETIME_ORIGINAL = 0x9003;
 const TAG_DATETIME_DIGITIZED = 0x9004;
+const TAG_SUBSEC_ORIGINAL = 0x9291;
 
 // "2023:06:14 18:02:11" -> 2023. Nuller og vrøvl giver null.
 export function yearFromExifDate(text) {
@@ -205,5 +207,48 @@ export function exifYear(absPath) {
     return null;
   } finally {
     if (fd !== undefined) closeSync(fd);
+  }
+}
+
+// Optagetidspunktet som et tal der kan sorteres paa (millisekunder, uden
+// tidszone: det bruges kun til raekkefoelgen af skud), eller null.
+// Sekunderne alene er ikke nok i en serie, saa SubSecTimeOriginal tages med.
+export function exifTidFromBuffer(buf) {
+  try {
+    const tiff = findTiff(buf);
+    if (!tiff) return null;
+    const start = tiff.start;
+    const le = buf[start] === 0x49;
+    const ifd0 = readIfd(buf, start, le ? buf.readUInt32LE(start + 4) : buf.readUInt32BE(start + 4), le);
+    const exifPtr = ifd0.get(TAG_EXIF_IFD);
+    const exif = exifPtr ? readIfd(buf, start, exifPtr.rawLong, le) : new Map();
+    const tekst = ascii(buf, exif.get(TAG_DATETIME_ORIGINAL))
+      || ascii(buf, exif.get(TAG_DATETIME_DIGITIZED))
+      || ascii(buf, ifd0.get(TAG_DATETIME));
+    const m = /^(\d{4}):(\d{2}):(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/.exec(String(tekst || '').trim());
+    if (!m || m[1] === '0000') return null;
+    const sub = ascii(buf, exif.get(TAG_SUBSEC_ORIGINAL));
+    const ms = sub && /^\d+/.test(sub.trim()) ? Math.round(Number(`0.${sub.trim().match(/^\d+/)[0]}`) * 1000) : 0;
+    return Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]) + ms;
+  } catch {
+    return null;
+  }
+}
+
+// Kun starten af filen laeses: EXIF ligger dér i JPEG og i de TIFF-baserede
+// RAW-formater. Asynkront, saa en mappe med hundredvis af filer ikke
+// fryser appen.
+const TID_BYTES = 256 * 1024;
+export async function exifTid(absPath) {
+  let fh;
+  try {
+    fh = await aabnAsync(absPath, 'r');
+    const buf = Buffer.alloc(TID_BYTES);
+    const { bytesRead } = await fh.read(buf, 0, TID_BYTES, 0);
+    return exifTidFromBuffer(buf.subarray(0, bytesRead));
+  } catch {
+    return null;
+  } finally {
+    await fh?.close().catch(() => {});
   }
 }

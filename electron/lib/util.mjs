@@ -238,6 +238,25 @@ export function navnMedBeskaering(fileName, crop) {
   return `${stem} ${token}${ext}`;
 }
 
+// Programmerne en kopi kan sendes til, og det de tilfoejer filnavnet:
+// "Desert-neo.tif" er redigeret i Luminar Neo. Navnet er sandheden, som for
+// beskaeringerne: den sidste endelse er det seneste program.
+export const EDITOR_SUFFIKS = { 'Luminar Neo': 'neo', 'Topaz Photo AI': 'tp', Photoshop: 'ps' };
+
+export function editorFraSti(rel) {
+  if (!/^Approved\/[^/]+\/Edits\//.test(rel)) return null;
+  const stem = stemOf(basename(rel));
+  const fund = [...stem.matchAll(/-(neo|tp|ps)(?=$|[-_ .])/gi)];
+  if (!fund.length) return null;
+  const s = fund[fund.length - 1][1].toLowerCase();
+  return Object.keys(EDITOR_SUFFIKS).find((k) => EDITOR_SUFFIKS[k] === s) ?? null;
+}
+
+// Navnet uden programendelserne: "Desert-neo-tp" -> "Desert".
+export function udenEditorSuffiks(stem) {
+  return stem.replace(/(-(neo|tp|ps))+(?=$|[-_ .])/gi, '').replace(/[-_ .]+$/, '') || stem;
+}
+
 export function stemOf(fileName) {
   const e = extname(fileName);
   return e ? fileName.slice(0, -e.length) : fileName;

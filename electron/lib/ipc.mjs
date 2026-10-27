@@ -4,11 +4,13 @@ import { ipcMain, dialog, shell } from 'electron';
 import { join } from 'node:path';
 import { existsSync } from 'node:fs';
 import { cropMaster } from './crop.mjs';
+import { lavMaster } from './master.mjs';
 import { openDatabase } from './db.mjs';
 import { Catalog } from './catalog.mjs';
 import { Thumbnailer } from './thumbs.mjs';
 import { watchLibrary } from './watcher.mjs';
 import { detectEditors, openInApp, statusNavne } from './editors.mjs';
+import { EDITOR_SUFFIKS } from './util.mjs';
 import { SearchIndex, normalize } from './searchIndex.mjs';
 import { Indexer, MODEL_ID } from './indexer.mjs';
 import {
@@ -464,7 +466,7 @@ export class AppSession {
         }
       }
       const rows = catalog.listVersions(effective);
-      return { rows, counts: catalog.counts(), searchInfo };
+      return { rows, counts: catalog.counts(), faseTal: catalog.faseTal(), searchInfo };
     });
 
     handle('img:imageVersions', ({ imageId }) =>
@@ -516,6 +518,47 @@ export class AppSession {
       this.log(`rotate: ${ids.length} file(s) by ${delta} degrees`);
       return { antal: ids.length };
     });
+    // Filmstrip: de andre skud i samme mappe, i den raekkefoelge de er taget.
+    handle('img:filmstrip', ({ fileId, visKasserede }) =>
+      this.requireCatalog().filmstrip(fileId, { visKasserede: Boolean(visKasserede) }));
+
+    // Fase 2: en kopi til et program. Kopien faar programmets endelse
+    // (-neo, -tp, -ps) og ligger i vaerkets Edits, saa resultatet ogsaa
+    // gemmes dér, og statussen kan ses af navnet.
+    handle('edit:send', async ({ versionId, program }) => {
+      const catalog = this.requireCatalog();
+      const suffiks = EDITOR_SUFFIKS[program];
+      if (!suffiks) throw new Error(`Unknown program: ${program}`);
+      const app = detectEditors(this.settings.data.customEditors).find((e) => e.label === program);
+      if (!app) throw new Error(`${program} was not found in Applications`);
+      const dest = catalog.kopiTilEdits(versionId, suffiks);
+      this.log(`edit: copy for ${program} -> ${dest.slice(catalog.root.length + 1)}`);
+      await this.runSync('kopi til editor');
+      await openInApp(app.appPath, dest);
+      return { rel: dest.slice(catalog.root.length + 1) };
+    });
+
+    // Fase 2, sidste skridt: den faerdige redigering bliver master.
+    handle('edit:makeMaster', async ({ versionId }) => {
+      const catalog = this.requireCatalog();
+      const res = await lavMaster(catalog.masterMaal(versionId));
+      this.log(`master: ${res.path.slice(catalog.root.length + 1)}${res.konverteret ? ' (converted to TIFF)' : ''}`);
+      await this.runSync('master');
+      return { rel: res.path.slice(catalog.root.length + 1), konverteret: res.konverteret };
+    });
+
+    // Fase 2: kassér et vaerk. Originalen gaar til Discarded, og redigeringerne
+    // og den tomme arbejdsmappe gaar i papirkurven.
+    handle('work:discard', async ({ versionId }) => {
+      const catalog = this.requireCatalog();
+      const { filer, arbejdsmappe } = catalog.kasserVaerk(versionId);
+      if (existsSync(arbejdsmappe)) await shell.trashItem(arbejdsmappe);
+      else for (const f of filer) await shell.trashItem(f).catch(() => {});
+      this.log(`discard work: ${filer.length} edit file(s) to the Trash`);
+      await this.runSync('kassering');
+      return { edits: filer.length };
+    });
+
     // Beskaeringen paa en fil i Masters. Den staar i filnavnet, saa filen
     // omdoebes, og etiketten foelger med.
     handle('img:setCrop', ({ versionId, crop }) => {

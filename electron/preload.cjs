@@ -5,7 +5,7 @@ const CHANNELS = new Set([
   'lib:choose', 'lib:open', 'lib:recent', 'lib:current',
   'lib:rescan', 'lib:driveStatus',
   'img:list', 'img:imageVersions', 'img:setRating', 'img:setStage', 'img:setEditor',
-  'img:virtualCopy', 'img:renameVersion', 'img:deleteVersion', 'img:reveal', 'img:rotate', 'img:openWorkFolder', 'crop:save', 'img:setCrop',
+  'img:virtualCopy', 'img:renameVersion', 'img:deleteVersion', 'img:reveal', 'img:rotate', 'img:openWorkFolder', 'crop:save', 'img:setCrop', 'img:filmstrip', 'edit:send', 'edit:makeMaster', 'work:discard',
   'ser:list', 'ser:create', 'ser:assign', 'ser:rename', 'ser:delete', 'ser:setShop',
   'fold:tree', 'fold:create', 'fold:move', 'fold:cleanup',
   'ed:list', 'ed:statusNames', 'ed:open', 'ed:pick',

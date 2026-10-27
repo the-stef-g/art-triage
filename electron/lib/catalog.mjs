@@ -6,8 +6,10 @@ import {
   copyFileSync, mkdirSync, renameSync, existsSync, statSync, readdirSync, rmdirSync, rmSync,
 } from 'node:fs';
 import { join, dirname, basename, extname, posix } from 'node:path';
+import { exifTid } from './exif.mjs';
 import {
-  walkImages, walkImagesAsync, walkDirs, findImportMappe, beskaeringFraSti, navnMedBeskaering, quickHash, quickHashAsync, mapGraense, stemOf, slug, uniquePath, extOf, daCollator,
+  walkImages, walkImagesAsync, walkDirs, findImportMappe, beskaeringFraSti, navnMedBeskaering,
+  editorFraSti, udenEditorSuffiks, quickHash, quickHashAsync, mapGraense, stemOf, slug, uniquePath, extOf, daCollator,
   libraryAvailable,
 } from './util.mjs';
 
@@ -216,6 +218,12 @@ export class Catalog extends EventEmitter {
           (SELECT v.image_id FROM versions v JOIN files f ON f.id = v.file_id
            WHERE f.rel_path LIKE 'Approved/%/Edits/%')`);
       this.db.exec('PRAGMA user_version = 3');
+    }
+    // Optagetidspunktet fra EXIF, til filmstrippen. Hentes foerst naar det
+    // skal bruges: NULL er ikke laest endnu, -1 er ingen dato i filen.
+    const filKolonner2 = this.db.all('PRAGMA table_info(files)').map((k) => k.name);
+    if (!filKolonner2.includes('taken_at')) {
+      this.db.exec('ALTER TABLE files ADD COLUMN taken_at INTEGER');
     }
     // Hvilket program en version er redigeret i (Luminar Neo, Topaz Photo AI
     // ...). Navnene kommer fra editor-listen i appen, aldrig fra appen selv.
@@ -676,10 +684,191 @@ export class Catalog extends EventEmitter {
         || (b.is_master - a.is_master)
         || (a.version_id - b.version_id));
     }
-    // Beskaeringen staar i filnavnet, saa den foelger med naar filen omdoebes.
-    for (const r of rows) r.crop = beskaeringFraSti(r.rel_path);
-    return rows;
+    // Beskaeringen og programmet staar i filnavnet, saa de foelger med naar
+    // filen omdoebes.
+    for (const r of rows) {
+      r.crop = beskaeringFraSti(r.rel_path);
+      const editor = editorFraSti(r.rel_path);
+      if (editor) {
+        r.editor = editor;
+        r.edited = 1;
+      }
+    }
+    return filter.fase ? this._filtrerFase(rows, Number(filter.fase)) : rows;
   }
+
+  // ---------- Faser ----------
+  //
+  // 1 Sort: det der ikke er godkendt endnu (Import og Candidate).
+  // 2 Edit: godkendte vaerker uden en master; originalen og redigeringerne.
+  // 3 Product: vaerker med en master; én flise pr. vaerk.
+  // 4 Crops: vaerker med en master; masteren og beskaeringerne.
+  // 5 Print: beskaeringerne.
+  // Fasen er ikke en status man saetter. Den foelger af mapperne.
+
+  _mastersInfo() {
+    const rows = this.db.all(
+      `SELECT v.image_id, f.rel_path FROM versions v JOIN files f ON f.id = v.file_id
+       WHERE f.present=1 AND f.rel_path LIKE 'Approved/%/Masters/%'`
+    );
+    const medMaster = new Set();
+    const medBeskaering = new Set();
+    for (const r of rows) {
+      if (!/^Approved\/[^/]+\/Masters\//.test(r.rel_path)) continue;
+      medMaster.add(r.image_id);
+      if (beskaeringFraSti(r.rel_path)) medBeskaering.add(r.image_id);
+    }
+    return { medMaster, medBeskaering };
+  }
+
+  _filtrerFase(rows, fase) {
+    const { medMaster } = this._mastersInfo();
+    const iMasters = (r) => /^Approved\/[^/]+\/Masters\//.test(r.rel_path);
+    const godk = (r) => r.rating === 'godkendt';
+    switch (fase) {
+      case 1: return rows.filter((r) => !godk(r));
+      case 2: return rows.filter((r) => godk(r) && !medMaster.has(r.image_id));
+      case 3: {
+        // Én flise pr. vaerk: masteren uden et format i navnet, ellers den foerste.
+        const valgt = new Map();
+        for (const r of rows) {
+          if (!godk(r) || !iMasters(r)) continue;
+          const nu = valgt.get(r.image_id);
+          if (!nu || (nu.crop && !r.crop)) valgt.set(r.image_id, r);
+        }
+        const behold = new Set([...valgt.values()].map((r) => r.version_id));
+        return rows.filter((r) => behold.has(r.version_id));
+      }
+      case 4: return rows.filter((r) => godk(r) && iMasters(r));
+      case 5: return rows.filter((r) => godk(r) && iMasters(r) && r.crop);
+      default: return rows;
+    }
+  }
+
+  // Antal i hver fase: billeder i fase 1, vaerker i de andre.
+  faseTal() {
+    const { medMaster, medBeskaering } = this._mastersInfo();
+    const sort = this.db.get(
+      `SELECT COUNT(*) AS c FROM versions v JOIN images i ON i.id = v.image_id
+       JOIN files f ON f.id = i.master_file_id
+       WHERE v.is_master=1 AND f.present=1 AND v.rating IN ('ubedomt', 'kandidat')`
+    ).c;
+    let edit = 0;
+    let vaerker = 0;
+    for (const r of this.db.all(
+      `SELECT v.image_id FROM versions v JOIN images i ON i.id = v.image_id
+       JOIN files f ON f.id = i.master_file_id
+       WHERE v.is_master=1 AND f.present=1 AND v.rating='godkendt'`
+    )) {
+      if (medMaster.has(r.image_id)) vaerker += 1;
+      else edit += 1;
+    }
+    return { 1: sort, 2: edit, 3: vaerker, 4: vaerker, 5: medBeskaering.size };
+  }
+
+  // ---------- Filmstrip ----------
+
+  // De andre filer i samme mappe som filen, i den raekkefoelge de er skudt
+  // (EXIF), og ellers efter filens dato og navn. Optagetidspunktet laeses
+  // foerste gang en mappe vises og gemmes.
+  async filmstrip(fileId, { visKasserede = false } = {}) {
+    const f = this.getFile(fileId);
+    if (!f) return [];
+    const dir = posix.dirname(f.rel_path);
+    const prefix = dir === '.' ? '' : `${escapeLike(dir)}/`;
+    const rows = this.db.all(
+      `SELECT v.id AS version_id, v.rating, f.id AS file_id, f.rel_path, f.mtime, f.rotation, f.taken_at
+       FROM versions v JOIN images i ON i.id = v.image_id
+       JOIN files f ON f.id = COALESCE(v.file_id, i.master_file_id)
+       WHERE f.present=1 AND v.is_master=1
+         AND f.rel_path LIKE ? ESCAPE '\\' AND f.rel_path NOT LIKE ? ESCAPE '\\'
+         ${visKasserede ? '' : "AND v.rating != 'kasseret'"}`,
+      `${prefix}%`, `${prefix}%/%`
+    );
+    const mangler = rows.filter((r) => r.taken_at === null || r.taken_at === undefined);
+    await mapGraense(mangler, 8, async (r) => {
+      const t = await exifTid(this.abs(r.rel_path));
+      r.taken_at = t ?? -1;
+      this.db.run('UPDATE files SET taken_at=? WHERE id=?', r.taken_at, r.file_id);
+    });
+    const tid = (r) => (r.taken_at > 0 ? r.taken_at : r.mtime);
+    return rows.sort((a, b) => tid(a) - tid(b) || daCollator.compare(a.rel_path, b.rel_path));
+  }
+
+  // ---------- Fase 2 ----------
+
+  // Vaerkets arbejdsmappe ("Desert") ud fra en hvilken som helst version.
+  _vaerkFor(versionId) {
+    const v = this.getVersion(versionId);
+    if (!v) return null;
+    const master = this.db.get(
+      'SELECT f.rel_path FROM images i JOIN files f ON f.id = i.master_file_id WHERE i.id=?', v.image_id
+    );
+    const am = master ? arbejdsmappeFor(master.rel_path) : null;
+    return am ? { imageId: v.image_id, work: am.work, v } : null;
+  }
+
+  // En kopi af filen i vaerkets Edits, med programmets endelse:
+  // "Desert.cr2" -> "Edits/Desert-neo.cr2". Returnerer den nye sti.
+  kopiTilEdits(versionId, suffiks) {
+    if (!/^[a-z]+$/.test(String(suffiks))) throw new Error('Unknown program');
+    const vaerk = this._vaerkFor(versionId);
+    if (!vaerk) throw new Error('Only Approved works can be sent to an editor');
+    const f = this.getFile(vaerk.v.effective_file_id);
+    if (!f || !f.present) throw new Error('The file is not available right now');
+    const ext = extname(f.rel_path);
+    const stem = stemOf(basename(f.rel_path));
+    const mappe = join(this.root, 'Approved', vaerk.work, 'Edits');
+    mkdirSync(mappe, { recursive: true });
+    const dest = uniquePath(join(mappe, `${stem}-${suffiks}${ext}`));
+    copyFileSync(this.abs(f.rel_path), dest);
+    return dest;
+  }
+
+  // Hvor en master af filen skal ligge, og hvad den skal hedde: vaerkets
+  // Masters, med navnet uden programendelser ("Desert-neo-tp.tif" -> "Desert.tif").
+  masterMaal(versionId) {
+    const vaerk = this._vaerkFor(versionId);
+    if (!vaerk) throw new Error('Only Approved works can get a master');
+    const f = this.getFile(vaerk.v.effective_file_id);
+    if (!f || !f.present) throw new Error('The file is not available right now');
+    return {
+      kilde: this.abs(f.rel_path),
+      mappe: join(this.root, 'Approved', vaerk.work, 'Masters'),
+      stem: udenEditorSuffiks(stemOf(basename(f.rel_path))),
+    };
+  }
+
+  // Kassér et vaerk i fase 2: originalen gaar til Discarded som alle andre
+  // kasserede, og redigeringerne fjernes fra kataloget. Returnerer de filer
+  // og den arbejdsmappe der skal i papirkurven (det goer kalderen).
+  kasserVaerk(versionId) {
+    const vaerk = this._vaerkFor(versionId);
+    if (!vaerk) throw new Error('Only Approved works can be discarded here');
+    const harMaster = this.db.get(
+      `SELECT 1 AS ok FROM versions v JOIN files f ON f.id = v.file_id
+       WHERE v.image_id=? AND f.present=1 AND f.rel_path LIKE 'Approved/%/Masters/%' LIMIT 1`,
+      vaerk.imageId
+    );
+    if (harMaster) throw new Error('This work already has a master and is no longer in Edit');
+    const ekstra = this.db.all(
+      `SELECT v.id AS vid, f.id AS fid, f.rel_path FROM versions v JOIN files f ON f.id = v.file_id
+       WHERE v.image_id=? AND v.is_master=0`,
+      vaerk.imageId
+    );
+    const alle = this.db.all('SELECT id FROM versions WHERE image_id=?', vaerk.imageId).map((r) => r.id);
+    const tilPapirkurv = ekstra.filter((e) => existsSync(this.abs(e.rel_path))).map((e) => this.abs(e.rel_path));
+    this.db.transaction(() => {
+      for (const e of ekstra) {
+        this.db.run('DELETE FROM versions WHERE id=?', e.vid);
+        this.db.run('UPDATE files SET present=0 WHERE id=?', e.fid);
+      }
+    });
+    // Originalen flyttes af den almindelige regel for kasserede.
+    this.setRating(alle.filter((id) => !ekstra.some((e) => e.vid === id)), 'kasseret');
+    return { filer: tilPapirkurv, arbejdsmappe: join(this.root, 'Approved', vaerk.work) };
+  }
+
 
   getVersion(versionId) {
     return this.db.get(
