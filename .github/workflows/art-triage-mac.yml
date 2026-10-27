@@ -91,13 +91,18 @@ jobs:
               .catch((e) => { console.error('packed sharp FAILED:', e.message); process.exit(1); });
           "
         timeout-minutes: 6
+      # Skaermbillederne er kun til at finde fejl med, saa de gemmes kun naar
+      # en test fejler, og kun kort. En fuld lagerkvote maa ikke faelde en
+      # koersel hvor alle test er gaaet igennem.
       - name: Upload smoke screenshots
-        if: always()
+        if: failure()
+        continue-on-error: true
         uses: actions/upload-artifact@v7
         with:
           name: smoke-screenshots
           path: smoke-*.png
           if-no-files-found: ignore
+          retention-days: 3
 
   build-mac:
     name: Build macOS app (Intel x64)
@@ -130,3 +135,5 @@ jobs:
         with:
           name: stef-g-art-mac-x64
           path: release/stef-g-art-mac-x64.zip
+          # Appen hentes kort efter bygningen. Gamle builds fyldte kvoten op.
+          retention-days: 14
