@@ -398,6 +398,21 @@ export default function App() {
         setTimeout(() => setFejl(null), 7000);
       } catch (err) { visFejl(err); }
     },
+    // Fase 5: en printfil til Prodigi for hver markeret fil, ellers den aktive.
+    makePrintFiles: async () => {
+      const f = getFocused();
+      if (!f) return;
+      const valgte = selectedRef.current.length > 1 ? selectedRef.current : [f.version_id];
+      setFejl(`Making ${valgte.length} print file${valgte.length === 1 ? '' : 's'} …`);
+      try {
+        const res = await invoke('print:make', { versionIds: valgte });
+        const mb = res.reduce((sum, r) => sum + r.bytes, 0) / 1e6;
+        setFejl(res.length === 1
+          ? `Print file saved as ${res[0].rel} (${mb.toFixed(1)} MB)`
+          : `${res.length} print files saved in Print files (${mb.toFixed(1)} MB in all)`);
+        setTimeout(() => setFejl(null), 7000);
+      } catch (err) { visFejl(err); }
+    },
     // Fase 2: kassér hele vaerket. Originalen gaar til Discarded, og
     // redigeringerne i papirkurven.
     discardWork: async () => {

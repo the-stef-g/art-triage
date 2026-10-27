@@ -7,6 +7,7 @@ import {
 } from 'node:fs';
 import { join, dirname, basename, extname, posix } from 'node:path';
 import { exifTid } from './exif.mjs';
+import { printfilNavn } from './printfil.mjs';
 import {
   walkImages, walkImagesAsync, walkDirs, findImportMappe, beskaeringFraSti, navnMedBeskaering,
   editorFraSti, udenEditorSuffiks, quickHash, quickHashAsync, mapGraense, stemOf, slug, uniquePath, extOf, daCollator,
@@ -694,7 +695,40 @@ export class Catalog extends EventEmitter {
         r.edited = 1;
       }
     }
-    return filter.fase ? this._filtrerFase(rows, Number(filter.fase)) : rows;
+    if (!filter.fase) return rows;
+    const fase = Number(filter.fase);
+    const ud = this._filtrerFase(rows, fase);
+    // Fase 5: om der er en printfil, og hvor stor den er. Print files
+    // skannes ikke, saa det slaas op paa disken.
+    if (fase === 5) for (const r of ud) r.printfil = this._printfilInfo(r.rel_path);
+    return ud;
+  }
+
+  // Printfilen til en fil i Masters: { rel, bytes } eller null.
+  _printfilInfo(rel) {
+    const m = /^Approved\/([^/]+)\/Masters\/([^/]+)$/.exec(rel);
+    if (!m) return null;
+    const printRel = `Approved/${m[1]}/Print files/${printfilNavn(stemOf(m[2]))}`;
+    try {
+      return { rel: printRel, bytes: statSync(this.abs(printRel)).size };
+    } catch {
+      return null;
+    }
+  }
+
+  // Hvad der skal til for at lave printfilen til en fil i Masters.
+  printMaal(versionId) {
+    const v = this.getVersion(versionId);
+    const f = v ? this.getFile(v.effective_file_id) : null;
+    if (!f || !f.present) throw new Error('The file is not available right now');
+    const m = /^Approved\/([^/]+)\/Masters\/([^/]+)$/.exec(f.rel_path);
+    if (!m) throw new Error('Print files are made from files in Masters');
+    return {
+      kilde: this.abs(f.rel_path),
+      mappe: join(this.root, 'Approved', m[1], 'Print files'),
+      stem: stemOf(m[2]),
+      rotation: f.rotation || 0,
+    };
   }
 
   // ---------- Faser ----------

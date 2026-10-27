@@ -335,8 +335,29 @@ export default function Inspector({
 
       {fase === 5 && (
         <>
-          <h4>Print files</h4>
-          <p className="tom">Making print files for Prodigi is the next step to build.</p>
+          <h4>Print file</h4>
+          <p className="tom">
+            {row.printfil
+              ? `${row.printfil.rel.split('/').pop()} · ${formatBytes(row.printfil.bytes)}`
+              : 'No print file yet.'}
+          </p>
+          <p className="tom">A PNG in sRGB at full size, marked 300 DPI, in the work&apos;s Print files folder. Prodigi&apos;s ICC profiles are for proofing and are not put in the file.</p>
+          <div className="knapraekke">
+            <button
+              onClick={act.makePrintFiles}
+              title="Make the print file from this crop. An old print file with the same name is replaced."
+            >
+              {selectedCount > 1 ? `Make print files (${selectedCount})` : row.printfil ? 'Make print file again' : 'Make print file'}
+            </button>
+            {row.printfil && (
+              <button
+                className="lille"
+                onClick={() => invoke('img:openWorkFolder', { versionId: row.version_id, del: 'Print files' }).catch(onError)}
+              >
+                Open Print files
+              </button>
+            )}
+          </div>
         </>
       )}
 

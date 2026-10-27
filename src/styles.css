@@ -361,6 +361,7 @@ input:focus, select:focus { outline: 1px solid var(--accent); }
 .badge.faerdig { background: var(--faerdig); color: #2b1f00; }
 .badge.kopi { background: #6e40c9; color: #f2e8ff; }
 .badge.beskaering { background: #1f9d8a; color: #04231e; }
+.badge.print { background: #c9d1d9; color: #161b22; }
 .badge.serie { background: transparent; border: 1px solid var(--kant); }
 
 .tom-tilstand {

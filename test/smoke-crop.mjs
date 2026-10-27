@@ -113,6 +113,15 @@ try {
     { timeout: 10000 }
   );
 
+  // Printfilen: en PNG i vaerkets Print files, og flisen faar en Print-etiket.
+  await page.locator('.tile').first().click();
+  await page.locator('button', { hasText: 'Make print file' }).click();
+  await page.waitForSelector('.tile .badge.print', { timeout: 20000 });
+  const printfil = join(lib, 'Approved', 'blaa', 'Print files', 'blaa master 3-2.png');
+  if (!existsSync(printfil)) throw new Error('Printfilen blev ikke lavet');
+  const pm = await sharp(printfil).metadata();
+  if (pm.format !== 'png' || pm.density !== 300) throw new Error(`Printfilen er ${pm.format} paa ${pm.density} DPI`);
+
   console.log('SMOKE OK: beskaering gemmer en ny fil i Masters');
   succes = true;
 } catch (err) {

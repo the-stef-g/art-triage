@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { existsSync } from 'node:fs';
 import { cropMaster } from './crop.mjs';
 import { lavMaster } from './master.mjs';
+import { lavPrintfil } from './printfil.mjs';
 import { openDatabase } from './db.mjs';
 import { Catalog } from './catalog.mjs';
 import { Thumbnailer } from './thumbs.mjs';
@@ -545,6 +546,20 @@ export class AppSession {
       this.log(`master: ${res.path.slice(catalog.root.length + 1)}${res.konverteret ? ' (converted to TIFF)' : ''}`);
       await this.runSync('master');
       return { rel: res.path.slice(catalog.root.length + 1), konverteret: res.konverteret };
+    });
+
+    // Fase 5: printfiler til Prodigi, én pr. markeret fil i Masters.
+    handle('print:make', async ({ versionIds }) => {
+      const catalog = this.requireCatalog();
+      const ids = Array.isArray(versionIds) ? versionIds : [];
+      const lavet = [];
+      for (const id of ids) {
+        const res = await lavPrintfil(catalog.printMaal(id));
+        lavet.push({ rel: res.path.slice(catalog.root.length + 1), bytes: res.bytes });
+      }
+      this.log(`print: ${lavet.length} print file(s)`);
+      this.broadcast('changed');
+      return lavet;
     });
 
     // Fase 2: kassér et vaerk. Originalen gaar til Discarded, og redigeringerne
