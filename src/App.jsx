@@ -6,20 +6,27 @@ import Sidebar from './components/Sidebar';
 import Grid from './components/Grid';
 import Inspector from './components/Inspector';
 import StatusBar, { MIN_KOLONNER, MAX_KOLONNER } from './components/StatusBar';
+import Filmstrip from './components/Filmstrip';
 import { PreviewOverlay, NameModal } from './components/Overlay';
 
+// Fasen huskes, saa appen aabner hvor man slap.
+const gemtFase = () => {
+  const n = Number(localStorage.getItem('fase'));
+  return n >= 1 && n <= 5 ? n : 1;
+};
 const defaultFilter = {
   folder: null, search: '', visKasserede: false, kunKasserede: false,
-  kunGodkendte: false, kunKandidater: false, kunRedigerede: false, kunFaerdige: false,
-  serieId: null, keyword: null, sort: 'navn',
+  kunKandidater: false, serieId: null, keyword: null, sort: 'navn', fase: 1,
 };
+const startFilter = () => ({ ...defaultFilter, fase: gemtFase() });
 
 export default function App() {
   const [library, setLibrary] = useState(null);
   const [recent, setRecent] = useState([]);
-  const [filter, setFilter] = useState(defaultFilter);
+  const [filter, setFilter] = useState(startFilter);
   const [rows, setRows] = useState([]);
   const [counts, setCounts] = useState(null);
+  const [faseTal, setFaseTal] = useState(null);
   const [searchInfo, setSearchInfo] = useState(null);
   const [tree, setTree] = useState(null);
   const [series, setSeries] = useState([]);
@@ -88,6 +95,7 @@ export default function App() {
       const gammeltIdx = gamleRows.findIndex((r) => r.version_id === activeRef.current);
       setRows(res.rows);
       setCounts(res.counts);
+      setFaseTal(res.faseTal || null);
       setSearchInfo(res.searchInfo);
       const valid = new Set(res.rows.map((r) => r.version_id));
       const beholdt = selectedRef.current.filter((id) => valid.has(id));
@@ -320,7 +328,7 @@ export default function App() {
         const res = await invoke('lib:choose');
         if (res) {
           setLibrary(res);
-          setFilter(defaultFilter);
+          setFilter(startFilter());
           setSelected([]);
         }
       } catch (err) { visFejl(err); }
@@ -328,7 +336,7 @@ export default function App() {
     openLibrary: async (root) => {
       try {
         setLibrary(await invoke('lib:open', { root }));
-        setFilter(defaultFilter);
+        setFilter(startFilter());
         setSelected([]);
       } catch (err) { visFejl(err); }
     },
@@ -356,20 +364,56 @@ export default function App() {
       if (!rows.length) return;
       invoke('img:setEditor', { versionIds: rows.map((r) => r.version_id), editor }).catch(visFejl);
     },
-    // "Finished" kan saettes i haanden; en fil i Masters goer det af sig selv.
-    setStage: (stage) => {
+    rotate: (delta) => {
+      const f = getFocused();
+      if (f) invoke('img:rotate', { fileIds: [f.file_id], delta }).catch(visFejl);
+    },
+    // Skift fase. Mappe, serie, noegleord og visning hoerer til den fase
+    // man kom fra, saa de nulstilles; soegning og sortering bliver.
+    setFase: (fase) => {
+      localStorage.setItem('fase', String(fase));
+      setFilter((f) => (f.fase === fase ? f : {
+        ...f, fase, folder: null, serieId: null, keyword: null,
+        kunKandidater: false, kunKasserede: false, visKasserede: false,
+      }));
+    },
+    // Fase 2: en kopi i vaerkets Edits med programmets endelse, aabnet i programmet.
+    sendToEditor: async (program) => {
       const f = getFocused();
       if (!f) return;
-      // Kun godkendte billeder har Edits og Finished.
-      if (stage !== null && f.rating !== 'godkendt') return;
-      const harDet = stage !== null && Boolean(f.finished);
-      invoke('img:setStage', { versionIds: [f.version_id], stage: harDet ? null : stage })
-        .catch(visFejl);
+      try {
+        const res = await invoke('edit:send', { versionId: f.version_id, program });
+        setFejl(`Copied to ${res.rel} and opened in ${program}`);
+        setTimeout(() => setFejl(null), 5000);
+      } catch (err) { visFejl(err); }
     },
-    virtualCopy: () => {
+    // Det sidste i fase 2: den markerede fil bliver vaerkets master, og
+    // vaerket gaar videre til fase 3.
+    makeMaster: async () => {
       const f = getFocused();
-      // Kun et godkendt billede har versioner.
-      if (f && f.rating === 'godkendt') invoke('img:virtualCopy', { versionId: f.version_id }).catch(visFejl);
+      if (!f) return;
+      try {
+        const res = await invoke('edit:makeMaster', { versionId: f.version_id });
+        setFejl(`Master saved as ${res.rel}${res.konverteret ? ' (converted to TIFF)' : ''}. The work is now in 3 Product.`);
+        setTimeout(() => setFejl(null), 7000);
+      } catch (err) { visFejl(err); }
+    },
+    // Fase 2: kassér hele vaerket. Originalen gaar til Discarded, og
+    // redigeringerne i papirkurven.
+    discardWork: async () => {
+      const f = getFocused();
+      if (!f) return;
+      const ok = window.confirm(
+        'Discard this work?\n\n'
+        + 'The original goes to the Discarded folder. The files in Edits go to the Trash.'
+      );
+      if (!ok) return;
+      try {
+        const res = await invoke('work:discard', { versionId: f.version_id });
+        const n = res?.edits ?? 0;
+        setFejl(n ? `Discarded. ${n} edit file${n === 1 ? '' : 's'} moved to the Trash.` : 'Discarded.');
+        setTimeout(() => setFejl(null), 5000);
+      } catch (err) { visFejl(err); }
     },
     editIn: async (appPath, versionId = getFocused()?.version_id) => {
       if (!versionId) return;
@@ -594,10 +638,16 @@ export default function App() {
         setSelected([rs[next].version_id]);
         setActive(rs[next].version_id);
       };
+      // Cmd+1 til Cmd+5 skifter fase.
+      if ((e.metaKey || e.ctrlKey) && /^[1-5]$/.test(e.key)) {
+        e.preventDefault();
+        act.setFase(Number(e.key));
+        return;
+      }
+      const fase = filterRef.current.fase;
       // Bogstaverne foelger de engelske ord paa knapperne: A approve,
-      // C candidate, X discard, U unrated, E editing, F finished,
-      // V virtual copy. Foer stod de til de danske ord, saa man trykkede
-      // G for Approved og K for Candidate.
+      // C candidate, X discard, U unrated. Bedoemmelsen hoerer til fase 1;
+      // i fase 2 kasserer X hele vaerket, efter et spoergsmaal.
       switch (e.key.toLowerCase()) {
         case 'a':
           if (e.metaKey || e.ctrlKey) {
@@ -609,15 +659,16 @@ export default function App() {
               ankerRef.current = 0;
               setActive(rs[0].version_id);
             }
-          } else {
+          } else if (fase === 1) {
             act.setRating('godkendt');
           }
           break;
-        case 'c': act.setRating('kandidat'); break;
-        case 'x': act.setRating('kasseret'); break;
-        case 'u': act.setRating('ubedomt'); break;
-        case 'f': act.setStage('finished'); break;
-        case 'v': if (getFocused()?.rating === 'godkendt') act.virtualCopy(); break;
+        case 'c': if (fase === 1) act.setRating('kandidat'); break;
+        case 'x':
+          if (fase === 1) act.setRating('kasseret');
+          else if (fase === 2) act.discardWork();
+          break;
+        case 'u': if (fase === 1) act.setRating('ubedomt'); break;
         // [ og ] er svaere at ramme paa et dansk tastatur, saa L og R gør det samme.
         case '[': case 'l': if (!e.metaKey && !e.ctrlKey) act.rotate(-90); break;
         case ']': case 'r': if (!e.metaKey && !e.ctrlKey) act.rotate(90); break;
@@ -658,6 +709,7 @@ export default function App() {
         filter={filter}
         setFilter={setFilter}
         searchInfo={searchInfo}
+        faseTal={faseTal}
         onNewFolder={act.newFolder}
         onCleanup={act.cleanup}
         onChooseLibrary={act.chooseLibrary}
@@ -679,6 +731,7 @@ export default function App() {
           onDeleteSeries={act.deleteSeries}
           kwStatus={kwStatus}
           act={act}
+          fase={filter.fase}
         />
         {/* Midterfeltet baerer baade grid'et og forstoerrelsen, saa den
             store visning holder sig inden for de to kolonner. */}
@@ -697,6 +750,22 @@ export default function App() {
             columns={kolonner}
             thumbRev={thumbRev}
           />
+          {/* Fase 1: mappens billeder i den raekkefoelge de er skudt. */}
+          {filter.fase === 1 && focusedRow && (
+            <Filmstrip
+              row={focusedRow}
+              rows={rows}
+              visKasserede={filter.visKasserede}
+              dataRev={dataRev}
+              thumbRev={thumbRev}
+              onSelect={(versionId) => {
+                const i = rows.findIndex((r) => r.version_id === versionId);
+                if (i >= 0) ankerRef.current = i;
+                setSelected([versionId]);
+                setActive(versionId);
+              }}
+            />
+          )}
           {showPreview && focusedRow && (
             <PreviewOverlay
               row={focusedRow}
@@ -706,6 +775,7 @@ export default function App() {
         </div>
         <Inspector
           row={focusedRow}
+          fase={filter.fase}
           selectedCount={selected.length}
           activeKeyword={filter.keyword}
           editors={editors}

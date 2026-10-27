@@ -144,24 +144,47 @@ function Noegleordskoe({ status, act }) {
   );
 }
 
+const FASE_TEKST = {
+  2: ['Edit', 'Approved works without a master. Send a copy to an editor, and make the master as the last step.'],
+  4: ['Crops', 'The masters and their crops. Each crop is its own file in Masters.'],
+  5: ['Print', 'The crops, ready for print files.'],
+};
+
 export default function Sidebar({
   tree, series, topKeywords, filter, setFilter, onMoveTo, onRemoveFromSelected,
-  onRenameSeries, onDeleteSeries, kwStatus, act,
+  onRenameSeries, onDeleteSeries, kwStatus, act, fase = 1,
 }) {
   const visSerie = (id) => setFilter((f) => ({ ...f, ...KUN_EN_VISNING, serieId: id }));
   const visNoegleord = (word) => setFilter((f) => ({ ...f, ...KUN_EN_VISNING, keyword: word }));
 
+  // Hver fase viser det den bruger: mapperne til sorteringen, serier og
+  // noegleord til produktet. Fase 2, 4 og 5 arbejdes i inspektoeren.
+  if (fase !== 1 && fase !== 3) {
+    return (
+      <aside className="sidebar">
+        <section>
+          <h3>{FASE_TEKST[fase]?.[0]}</h3>
+          <p className="tom">{FASE_TEKST[fase]?.[1]}</p>
+        </section>
+      </aside>
+    );
+  }
+
   return (
     <aside className="sidebar">
+      {fase === 1 && (
       <section>
         <h3>Folders</h3>
         {tree && (
           <FolderNode node={tree} depth={0} filter={filter} setFilter={setFilter} onMoveTo={onMoveTo} />
         )}
       </section>
+      )}
       {/* Kandidatlisten stod her som sin egen sektion. Den er taget ud
           igen: Candidates-chippen i vaerktoejslinjen goer det samme, og
           to veje til den samme visning er én for meget. */}
+      {fase === 3 && (
+      <>
       <section>
         <h3>Series</h3>
         {series.length === 0 && <p className="tom">No series yet</p>}
@@ -219,6 +242,8 @@ export default function Sidebar({
           ))}
         </div>
       </section>
+      </>
+      )}
     </aside>
   );
 }

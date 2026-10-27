@@ -1,22 +1,29 @@
 import { useEffect, useState } from 'react';
+import { FASER } from '../faser';
 
 // Handlingerne paa det markerede, med den tast der goer det samme. Foer
 // stod de kun som en liste i inspektoerens tomme tilstand, altsaa netop
 // naar der ikke var noget at bruge dem paa. Her er de fremme hele tiden,
 // og tasten staar paa knappen, saa genvejene laeres af sig selv.
-const HANDLINGER = [
-  { tast: 'A', navn: 'approve', kraeverValg: true },
-  { tast: 'C', navn: 'candidate', kraeverValg: true },
-  { tast: 'X', navn: 'discard', kraeverValg: true },
-  { tast: 'U', navn: 'unrated', kraeverValg: true },
-  { tast: 'F', navn: 'finished', kraeverValg: true },
-  { tast: 'V', navn: 'virtual copy', kraeverValg: true },
-];
+//
+// Hver fase har sine egne: bedoemmelsen hoerer til fase 1, og i fase 2
+// kan et vaerk kun kasseres. De andre faser arbejdes i inspektoeren.
+const HANDLINGER = {
+  1: [
+    { tast: 'A', navn: 'approve' },
+    { tast: 'C', navn: 'candidate' },
+    { tast: 'X', navn: 'discard' },
+    { tast: 'U', navn: 'unrated' },
+  ],
+  2: [
+    { tast: 'X', navn: 'discard work' },
+  ],
+};
 // Space og Cmd+Z er ikke med. De sidder i fingrene i forvejen, og en
 // knap til dem ville bare fylde i raekken.
 
 export default function Toolbar({
-  filter, setFilter, searchInfo, onNewFolder, onCleanup, onChooseLibrary, onRescan, skanner,
+  filter, setFilter, searchInfo, faseTal, onNewFolder, onCleanup, onChooseLibrary, onRescan, skanner,
   act, harValg,
 }) {
   const [text, setText] = useState(filter.search);
@@ -40,7 +47,9 @@ export default function Toolbar({
   // spoergsmaal, men den staar mellem de andre og skal opfoere sig som
   // dem. Den viser nu kun de kasserede, i stedet for at laegge dem oven i
   // den visning man var i.
-  const VISNINGER = ['kunGodkendte', 'kunKandidater', 'kunRedigerede', 'kunFaerdige', 'kunKasserede'];
+  //
+  // Fasen bestemmer resten: Approved, Edits og Finished er nu faser.
+  const VISNINGER = ['kunKandidater', 'kunKasserede'];
 
   const visKun = (key) => setFilter((f) => {
     const aktiv = f[key];
@@ -60,10 +69,11 @@ export default function Toolbar({
     switch (tast) {
       case 'A': act.setRating('godkendt'); break;
       case 'C': act.setRating('kandidat'); break;
-      case 'X': act.setRating('kasseret'); break;
+      case 'X':
+        if (filter.fase === 2) act.discardWork();
+        else act.setRating('kasseret');
+        break;
       case 'U': act.setRating('ubedomt'); break;
-      case 'F': act.setStage('finished'); break;
-      case 'V': act.virtualCopy(); break;
       default: break;
     }
   };
@@ -71,6 +81,20 @@ export default function Toolbar({
   return (
     <header className="toolbar">
       <div className="titel">Stef G Art</div>
+      <nav className="faser">
+        {FASER.map(([nr, navn]) => (
+          <button
+            key={nr}
+            className={filter.fase === nr ? 'fase aktiv' : 'fase'}
+            onClick={() => act.setFase(nr)}
+            title={`Phase ${nr}: ${navn} (Cmd+${nr})`}
+          >
+            <span className="fasenr">{nr}</span>
+            {navn}
+            {faseTal && faseTal[nr] > 0 && <span className="antal">{faseTal[nr]}</span>}
+          </button>
+        ))}
+      </nav>
       <div className="soegefelt">
         <input
           type="search"
@@ -92,11 +116,12 @@ export default function Toolbar({
       </div>
       {searchInfo?.error && <span className="soegebesked">{searchInfo.error}</span>}
       <div className="filtre">
-        <button className={filter.kunGodkendte ? 'chip aktiv' : 'chip'} onClick={() => visKun('kunGodkendte')} title="Show approved only">Approved</button>
-        <button className={filter.kunKandidater ? 'chip aktiv' : 'chip'} onClick={() => visKun('kunKandidater')} title="Show candidates only, the ones waiting for a round in the editor">Candidates</button>
-        <button className={filter.kunRedigerede ? 'chip aktiv' : 'chip'} onClick={() => visKun('kunRedigerede')} title="Show only images with an Edits status, meaning edited in a program">Edits</button>
-        <button className={filter.kunFaerdige ? 'chip aktiv' : 'chip'} onClick={() => visKun('kunFaerdige')} title="Show finished only">Finished</button>
-        <button className={filter.kunKasserede ? 'chip aktiv' : 'chip'} onClick={() => visKun('kunKasserede')} title="Show discarded only">Discarded</button>
+        {filter.fase === 1 && (
+          <>
+            <button className={filter.kunKandidater ? 'chip aktiv' : 'chip'} onClick={() => visKun('kunKandidater')} title="Show candidates only">Candidates</button>
+            <button className={filter.kunKasserede ? 'chip aktiv' : 'chip'} onClick={() => visKun('kunKasserede')} title="Show discarded only">Discarded</button>
+          </>
+        )}
         <select
           value={filter.sort}
           onChange={(e) => setFilter((f) => ({ ...f, sort: e.target.value }))}
@@ -107,13 +132,13 @@ export default function Toolbar({
         </select>
       </div>
       <div className="handlinger">
-        {HANDLINGER.map((h) => (
+        {(HANDLINGER[filter.fase] || []).map((h) => (
           <button
             key={h.tast}
             className="handling"
-            disabled={h.kraeverValg && !harValg}
+            disabled={!harValg}
             onClick={() => koerHandling(h.tast)}
-            title={h.kraeverValg ? `${h.navn} — applies to the active image` : h.navn}
+            title={`${h.navn} — applies to the active image`}
           >
             <span className="tast">{h.tast}</span>
             <span className="handlingsnavn">{h.navn}</span>

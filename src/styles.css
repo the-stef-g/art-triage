@@ -239,8 +239,50 @@ input:focus, select:focus { outline: 1px solid var(--accent); }
 /* Midterfeltet mellem de to kolonner. Forstoerrelsen laegger sig oven i
    det her, ikke oven i hele vinduet, saa serier, noegleord og bedoemmelse
    stadig er synlige mens man kigger stort paa billedet. */
-.midte { flex: 1; min-width: 0; position: relative; display: flex; }
-.grid-omraade { flex: 1; min-width: 0; position: relative; }
+.midte { flex: 1; min-width: 0; position: relative; display: flex; flex-direction: column; }
+.grid-omraade { flex: 1; min-width: 0; min-height: 0; position: relative; }
+
+/* Fase 1: mappens billeder i skudraekkefoelge, nederst under grid'et. */
+.filmstrip {
+  flex: none;
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 6px 8px;
+  border-top: 1px solid var(--kant);
+  background: var(--bg-panel);
+}
+.film-billede {
+  flex: none;
+  width: 84px;
+  height: 64px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 4px;
+  background: var(--bg-hover);
+  overflow: hidden;
+}
+.film-billede img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.film-billede.aktiv { border-color: var(--accent); }
+.film-billede.kandidat { border-bottom-color: var(--kandidat, #d9a400); }
+.film-billede.kasseret img, .film-billede.udenfor img { opacity: 0.35; }
+.film-billede.udenfor { cursor: default; }
+
+/* Faserne: arbejdet gaar fra venstre mod hoejre. */
+.faser { display: flex; gap: 2px; align-items: center; }
+.fase {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  background: transparent;
+}
+.fase .fasenr { color: var(--tekst-svag); font-variant-numeric: tabular-nums; }
+.fase .antal { color: var(--tekst-svag); font-size: 11px; }
+.fase.aktiv { background: var(--accent); border-color: var(--accent); color: #fff; }
+.fase.aktiv .fasenr, .fase.aktiv .antal { color: rgba(255, 255, 255, 0.8); }
 .celle { padding: 8px; }
 .tile {
   height: 100%;

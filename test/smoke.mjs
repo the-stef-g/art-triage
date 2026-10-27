@@ -71,6 +71,9 @@ try {
     { timeout: 60000 }
   );
 
+  // Fasen huskes fra sidste koersel, saa testen starter selv i fase 1.
+  await page.locator('.fase', { hasText: 'Sort' }).click({ timeout: 60000 });
+
   // Grid med 4 billeder (3 i roden + 1 i undermappe, traeet viser alle).
   // Der maales paa selve kassen i stedet for Playwrights synlighedstjek,
   // saa ventetiden slutter praecis naar fliserne er lagt ud.
@@ -87,15 +90,33 @@ try {
   const tiles = await page.locator('.tile').count();
   if (tiles !== 4) throw new Error(`ventede 4 billeder i grid, fik ${tiles}`);
 
+  // Filmstrimlen nederst viser mappens billeder i skudraekkefoelge: de tre
+  // i roden, ikke den i undermappen.
+  await page.locator('.tile').first().click();
+  await page.waitForFunction(
+    () => document.querySelectorAll('.filmstrip .film-billede').length === 3
+      && document.querySelectorAll('.filmstrip .film-billede.aktiv').length === 1,
+    null,
+    { timeout: 10000 }
+  );
+
   // Vaelg foerste billede og godkend med A. Genvejene foelger de engelske
-  // ord paa knapperne: A approve, C candidate, E editing, F finished.
+  // ord paa knapperne: A approve, C candidate, X discard, U unrated.
+  // Et godkendt billede gaar videre til fase 2 og forlader fase 1, og det
+  // naeste billede bliver markeret.
   await page.locator('.tile').first().click();
   await page.keyboard.press('a');
-  await page.waitForSelector('.badge.godkendt', { timeout: 10000 });
+  await page.waitForFunction(
+    () => document.querySelectorAll('.tile').length === 3
+      && document.querySelectorAll('.tile.valgt').length === 1,
+    null,
+    { timeout: 10000 }
+  );
+  const editTal = await page.locator('.fase', { hasText: 'Edit' }).locator('.antal').innerText();
+  if (editTal.trim() !== '1') throw new Error(`Fase 2 taeller ${editTal} og ikke 1`);
 
-  // Kandidat med C paa naeste billede: eget badge, egen markering paa
-  // flisen, og arbejdslisten i sidepanelet skal taelle med.
-  await page.keyboard.press('ArrowRight');
+  // Kandidat med C: eget badge og egen markering paa flisen.
+  await page.locator('.tile').first().click();
   await page.keyboard.press('c');
   await page.waitForSelector('.badge.kandidat', { timeout: 10000 });
   // Bedoemmelserne er et trafiklys, saa kandidat er et spoergsmaalstegn
@@ -144,20 +165,10 @@ try {
   // at man foerst skal klikke sig ud af den forrige visning.
   await page.locator('.mappe', { hasText: 'All images' }).click();
   await page.waitForFunction(
-    () => document.querySelectorAll('.tile').length === 4,
+    () => document.querySelectorAll('.tile').length === 3,
     null,
     { timeout: 10000 }
   );
-
-  // Cloud-noegleordene har deres eget panel over ordene. Uden API-noegle
-  // skal det sige hvor noeglen saettes, ikke bare vaere tomt. Kanalen
-  // 'kw:status' skal ogsaa staa paa preloadens liste; gjorde den ikke det,
-  // fejlede hele metadata-hentningen i tavshed.
-  await page.waitForSelector('.kw-koe', { timeout: 10000 });
-  const koeTekst = await page.locator('.kw-koe').innerText();
-  if (!/API key/i.test(koeTekst)) {
-    throw new Error(`Noegleordspanelet siger ikke hvor noeglen saettes: ${koeTekst}`);
-  }
 
   // Tilbage til foerste billede, saa resten af flowet staar som foer.
   await page.locator('.tile').first().click();
@@ -176,24 +187,7 @@ try {
   });
   if (flyttet) throw new Error(`Tabulator flyttede fokus til ${flyttet}`);
 
-  // Edits og Finished findes kun for godkendte billeder. Det foerste billede
-  // er godkendt: F saetter Finished, og samme genvej igen rydder den. Paa et
-  // billede der ikke er godkendt, sker der intet.
-  await page.locator('.tile').first().click();
-  await page.keyboard.press('f');
-  await page.waitForSelector('.aktiv-faerdig', { timeout: 10000 });
-  await page.keyboard.press('f');
-  await page.waitForFunction(
-    () => document.querySelectorAll('.aktiv-faerdig').length === 0,
-    null,
-    { timeout: 10000 }
-  );
   await page.locator('.tile').nth(2).click();
-  await page.keyboard.press('f');
-  await page.waitForTimeout(400);
-  if (await page.locator('.aktiv-faerdig').count() !== 0) {
-    throw new Error('Finished kunne saettes paa et billede der ikke er godkendt');
-  }
 
   // Forstoerrelsen skal blive inden for midterfeltet, saa sidepanel og
   // inspektoer bliver staaende. Var den bundet til vinduet igen, ville
@@ -229,7 +223,7 @@ try {
       const hoejst = Math.max(...iFoersteRaekke.map((c) => c.right));
       return { rest: omraade.right - hoejst, iRaekken: iFoersteRaekke.length };
     });
-    // Der er fire billeder, saa ved syv kolonner fyldes raekken ikke, og
+    // Der er tre billeder, saa ved syv kolonner fyldes raekken ikke, og
     // der maales kun paa bredden ved tre.
     if (antal === 3 && maal.iRaekken !== 3) {
       throw new Error(`Skyderen gav ${maal.iRaekken} billeder i bredden og ikke ${antal}`);
@@ -240,10 +234,10 @@ try {
   }
   await page.locator('.kolonnevalg input').fill('4');
 
-  // Piletast-navigation gaar i ring. Der er fire billeder, saa fire tryk
+  // Piletast-navigation gaar i ring. Der er tre billeder, saa tre tryk
   // paa hoejre pil fra det foerste skal lande paa det foerste igen.
   await page.locator('.tile').first().click();
-  for (let i = 0; i < 4; i += 1) await page.keyboard.press('ArrowRight');
+  for (let i = 0; i < 3; i += 1) await page.keyboard.press('ArrowRight');
   const iRing = await page.evaluate(() => {
     const fliser = [...document.querySelectorAll('.tile')];
     return fliser.findIndex((t) => t.classList.contains('valgt')) === 0;
@@ -285,6 +279,9 @@ try {
     throw new Error(`Det aktive billede gik ikke i ring inde i markeringen (stod paa ${efterPil.aktiv})`);
   }
 
+  // Videre til det andet billede, som ikke er bedoemt endnu.
+  await page.keyboard.press('ArrowRight');
+
   // Bedoemmelse rammer kun det aktive billede, ikke hele markeringen.
   // Ellers kunne et enkelt tastetryk aendre tyve billeder man ikke havde
   // set paa, og en markering kunne ikke gennemgaas billede for billede.
@@ -318,7 +315,7 @@ try {
     const fliser = [...document.querySelectorAll('.tile')];
     return fliser.findIndex((t) => t.classList.contains('aktiv'));
   });
-  if (beholdtAktiv !== 0) {
+  if (beholdtAktiv !== 1) {
     throw new Error(`Escape beholdt ikke det aktive billede (stod paa ${beholdtAktiv})`);
   }
 
@@ -345,34 +342,20 @@ try {
     { timeout: 10000 }
   );
 
-  // Ny virtuel kopi med V: en ekstra flise dukker op. Kun godkendte billeder
-  // har versioner, saa det er det godkendte foerste billede der bruges.
-  await page.locator('.tile').first().click();
-  await page.keyboard.press('a');
-  await page.waitForSelector('.tile.aktiv .badge.godkendt', { timeout: 10000 });
-  await page.keyboard.press('v');
-  await page.waitForFunction(
-    () => document.querySelectorAll('.tile').length === 5,
-    null,
-    { timeout: 10000 }
-  );
-
-  // Kassér den valgte version med X: skjules som standard, og det
-  // naeste foto skal automatisk vaere markeret.
+  // Kassér med X: skjules som standard, og det naeste foto skal
+  // automatisk vaere markeret.
   await page.locator('.tile').first().click();
   await page.keyboard.press('x');
   await page.waitForFunction(
-    () => document.querySelectorAll('.tile').length === 4
+    () => document.querySelectorAll('.tile').length === 2
       && document.querySelectorAll('.tile.valgt').length === 1,
     null,
     { timeout: 10000 }
   );
 
   // Filter-chips i vaerktoejslinjen er visninger, ikke afkrydsninger:
-  // der er én aktiv ad gangen. Stod to taendt, skar de hinanden bort, og
-  // grid'et kunne blive tomt uden at det var til at se hvorfor. Discarded
-  // er med i raekken paa lige fod med de andre.
-  await page.locator('.chip', { hasText: 'Approved' }).click();
+  // der er én aktiv ad gangen.
+  await page.locator('.chip', { hasText: 'Candidates' }).click();
   await page.locator('.chip', { hasText: 'Discarded' }).click();
   await page.waitForFunction(
     () => document.querySelectorAll('.filtre .chip.aktiv').length === 1,
@@ -401,8 +384,38 @@ try {
     { timeout: 10000 }
   );
 
+  // Fase 2: det godkendte billede. Make master laver en kopi i Masters, og
+  // vaerket gaar videre til fase 3 og 4.
+  await page.keyboard.press('Control+2');
+  await page.waitForFunction(
+    () => document.querySelector('.fase.aktiv')?.textContent.includes('Edit')
+      && document.querySelectorAll('.tile').length === 1,
+    null,
+    { timeout: 10000 }
+  );
+  // Sidepanelet viser ikke mapperne uden for fase 1.
+  if (await page.locator('.mappe').count() !== 0) throw new Error('Mapperne staar i fase 2');
+  await page.locator('.tile').first().click();
+  await page.locator('button', { hasText: 'Make master' }).click();
+  await page.waitForFunction(() => document.querySelectorAll('.tile').length === 0, null, { timeout: 15000 });
+  await page.locator('.fase', { hasText: 'Product' }).click();
+  await page.waitForFunction(
+    () => document.querySelectorAll('.tile').length === 1
+      && document.querySelector('.tile-navn')?.title.includes('/Masters/'),
+    null,
+    { timeout: 10000 }
+  );
+  // Fase 3 har serier og noegleord i sidepanelet. Uden API-noegle skal
+  // noegleordspanelet sige hvor noeglen saettes, ikke bare vaere tomt.
+  await page.waitForSelector('.kw-koe', { timeout: 10000 });
+  const koeTekst = await page.locator('.kw-koe').innerText();
+  if (!/API key/i.test(koeTekst)) {
+    throw new Error(`Noegleordspanelet siger ikke hvor noeglen saettes: ${koeTekst}`);
+  }
+  await page.locator('.fase', { hasText: 'Sort' }).click();
+
   await page.screenshot({ path: join(projectRoot, 'smoke-grid.png') });
-  console.log('SMOKE OK: grid, godkend, kandidat, virtuel kopi, kassér og mappefilter virker');
+  console.log('SMOKE OK: faser, godkend, kandidat, filmstrimmel, kassér, mappefilter og master virker');
   succes = true;
 } catch (err) {
   console.error(`SMOKE FEJL: ${err?.message || err}`);

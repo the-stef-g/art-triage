@@ -8,11 +8,10 @@ import CropModal from './CropModal';
 // blev noegleordene kun hentet naar man skiftede billede, saa ord Claude
 // lige havde skrevet foerst dukkede op hvis man gik væk og tilbage igen.
 export default function Inspector({
-  row, selectedCount, activeKeyword, editors, statusNavne = [], series, act, dataRev, hasKey, shop, onShop, onError,
+  row, fase = 1, selectedCount, activeKeyword, editors, statusNavne = [], series, act, dataRev, hasKey, shop, onShop, onError,
 }) {
   const [versions, setVersions] = useState([]);
   const [keywords, setKeywords] = useState([]);
-  const [editorValg, setEditorValg] = useState('');
   const [nytOrd, setNytOrd] = useState('');
   const [beskaer, setBeskaer] = useState(false);
 
@@ -78,24 +77,20 @@ export default function Inspector({
     rel_path: masterVersion.rel_path,
   } : null;
 
-  const editorList = editors.length
-    ? editors
-    : [{ appPath: '', label: 'Default app' }];
+  const iArbejde = row.rel_path.startsWith('Approved/');
+  const iEdits = /^Approved\/[^/]+\/Edits\//.test(row.rel_path);
+  const PROGRAMMER = [['Luminar Neo', 'neo'], ['Topaz Photo AI', 'tp'], ['Photoshop', 'ps']];
+  const installeret = new Set(editors.map((e) => e.label));
 
   return (
     <aside className="inspector">
-      {/* Inspektoeren viser altid det aktive billede, ogsaa naar der er
-          flere markeret. Foer blev hele panelet skiftet ud med en
-          "N selected"-visning, saa man mistede billedet af syne netop
-          naar man skulle bruge det til at vaelge det rigtige. Det der
-          gaelder hele bunken, staar for sig herover. */}
+      {/* Inspektoeren viser det aktive billede og kun de vaerktoejer, den
+          fase man er i, har brug for. */}
       {selectedCount > 1 && (
         <div className="bunke">
           <h4>{selectedCount} selected</h4>
-          <p className="tom">
-            Rating and workflow stage below apply to the active image only.
-          </p>
-          {activeKeyword && (
+          {fase === 1 && <p className="tom">The rating applies to the active image only.</p>}
+          {fase === 3 && activeKeyword && (
             <div className="knapraekke">
               <button
                 className="fjern-fra-noegleord"
@@ -106,23 +101,25 @@ export default function Inspector({
               </button>
             </div>
           )}
-          <div className="knapraekke">
-            <select
-              value=""
-              onChange={(e) => {
-                const v = e.target.value;
-                if (v === 'ny') act.newSeries();
-                else if (v === 'fjern') act.assignSeries(null);
-                else if (v) act.assignSeries(Number(v));
-              }}
-              title="Applies to all the selected images"
-            >
-              <option value="">Set series for all {selectedCount} …</option>
-              {series.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-              <option value="ny">New series …</option>
-              <option value="fjern">Remove from series</option>
-            </select>
-          </div>
+          {fase === 3 && (
+            <div className="knapraekke">
+              <select
+                value=""
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v === 'ny') act.newSeries();
+                  else if (v === 'fjern') act.assignSeries(null);
+                  else if (v) act.assignSeries(Number(v));
+                }}
+                title="Applies to all the selected images"
+              >
+                <option value="">Set series for all {selectedCount} …</option>
+                {series.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                <option value="ny">New series …</option>
+                <option value="fjern">Remove from series</option>
+              </select>
+            </div>
+          )}
         </div>
       )}
       <div className="stor-preview">
@@ -141,47 +138,62 @@ export default function Inspector({
         {row.series_name ? ` · Series: ${row.series_name}` : ''}
       </p>
 
-      <h4>Rating</h4>
-      <div className="knapraekke">
-        <button
-          className={row.rating === 'godkendt' ? 'aktiv-godkendt' : ''}
-          onClick={() => act.setRating('godkendt')}
-        >
-          Approved
-        </button>
-        <button
-          className={row.rating === 'kandidat' ? 'aktiv-kandidat' : ''}
-          onClick={() => act.setRating('kandidat')}
-          title="Good subject, but needs editing before it can be decided"
-        >
-          Candidate
-        </button>
-        <button
-          className={row.rating === 'kasseret' ? 'aktiv-kasseret' : ''}
-          onClick={() => act.setRating('kasseret')}
-        >
-          Discarded
-        </button>
-        <button onClick={() => act.setRating('ubedomt')}>Clear</button>
-      </div>
-      <h4>Edits</h4>
-      {row.rating !== 'godkendt' ? (
-        <p className="tom">Edits and versions only apply to Approved images.</p>
-      ) : (
+      {fase === 1 && (
         <>
-          <p className="tom">
-            {row.editor ? `Edited in ${row.editor}.` : row.edited ? 'Has edits. Choose the program below to note which one.' : 'Not edited yet.'}
-            {' '}Save results in the Edits folder; the program you opened the image in becomes the status.
-            {selectedCount > 1 && ` A program you click applies to all ${selectedCount} selected Approved images.`}
-          </p>
+          <h4>Rating</h4>
           <div className="knapraekke">
-            {[...new Set([
-              ...statusNavne,
-              ...(row.editor ? [row.editor] : []),
-            ])].map((navn) => (
+          <button
+            className={row.rating === 'godkendt' ? 'aktiv-godkendt' : ''}
+            onClick={() => act.setRating('godkendt')}
+          >
+            Approved
+          </button>
+          <button
+            className={row.rating === 'kandidat' ? 'aktiv-kandidat' : ''}
+            onClick={() => act.setRating('kandidat')}
+            title="Good subject, but needs editing before it can be decided"
+          >
+            Candidate
+          </button>
+          <button
+            className={row.rating === 'kasseret' ? 'aktiv-kasseret' : ''}
+            onClick={() => act.setRating('kasseret')}
+          >
+            Discarded
+          </button>
+          <button onClick={() => act.setRating('ubedomt')}>Clear</button>
+          </div>
+        </>
+      )}
+
+      {fase === 2 && (
+        <>
+          <h4>Edits</h4>
+          <p className="tom">
+            {row.editor ? `Edited in ${row.editor}.` : iEdits ? 'An edit. The program is not in the file name.' : 'The original.'}
+          </p>
+          <p className="tom">Send a copy to a program. The copy goes in the Edits folder with the program&apos;s ending (-neo, -tp, -ps). Save your result in Edits too.</p>
+          <div className="knapraekke">
+            {PROGRAMMER.map(([navn, endelse]) => (
               <button
                 key={navn}
-                className={row.editor === navn ? 'aktiv-redigeres' : ''}
+                disabled={!installeret.has(navn)}
+                onClick={() => act.sendToEditor(navn)}
+                title={installeret.has(navn)
+                  ? `Copy this file to Edits as …-${endelse}, and open the copy in ${navn}`
+                  : `${navn} was not found in Applications`}
+              >
+                {navn}
+              </button>
+            ))}
+            <button className="lille" onClick={act.editInOther} title="Open the file in another program, without a copy">Other app …</button>
+          </div>
+          <p className="tom">Mark as edited in{selectedCount > 1 ? ` (all ${selectedCount} selected)` : ''}:</p>
+          <div className="knapraekke">
+            {[...new Set([...statusNavne, ...(row.editor ? [row.editor] : [])])].map((navn) => (
+              <button
+                key={navn}
+                className={`lille ${row.editor === navn ? 'aktiv-redigeres' : ''}`}
                 onClick={() => act.setEditor(row.editor === navn ? null : navn)}
                 title={row.editor === navn ? 'Click to clear the status' : `Mark as edited in ${navn}`}
               >
@@ -189,19 +201,88 @@ export default function Inspector({
               </button>
             ))}
           </div>
+
+          <h4>Master</h4>
+          <p className="tom">The last step here: make the finished edit the work&apos;s master. The work then moves on to Product.</p>
           <div className="knapraekke">
-            <button
-              className={row.finished ? 'aktiv-faerdig' : ''}
-              onClick={() => act.setStage(row.finished ? null : 'finished')}
-              title="The work on this image is over. A file in the Masters folder sets this automatically."
-            >
-              Finished
-            </button>
+            <button onClick={act.makeMaster} title="Copies the selected file to Masters, named after the work">Make master</button>
+          </div>
+
+          <h4>Discard</h4>
+          <div className="knapraekke">
+            <button onClick={act.discardWork} title="The original goes to Discarded, and the edits go to the Trash (shortcut X)">Discard work</button>
           </div>
         </>
       )}
 
-      {row.rating === 'godkendt' && (
+      {fase === 3 && (
+        <>
+          <h4>Series</h4>
+          <div className="knapraekke">
+            <select
+              value={row.series_id || ''}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v === 'ny') act.newSeries();
+                else act.assignSeries(v ? Number(v) : null);
+              }}
+            >
+              <option value="">No series</option>
+              {series.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+              <option value="ny">New series …</option>
+            </select>
+          </div>
+
+          <WorkPanel
+            key={row.image_id}
+            row={row}
+            versions={versions}
+            hasKey={hasKey}
+            shop={shop}
+            onShop={onShop}
+            onError={onError}
+          />
+
+          <h4>Keywords</h4>
+          {activeKeyword && keywords.some((k) => k.word === activeKeyword) && (
+            <div className="knapraekke">
+              <button
+                className="fjern-fra-noegleord"
+                onClick={() => fjernOrd(activeKeyword)}
+                title={`Remove this image from the keyword "${activeKeyword}"`}
+              >
+                Does not belong to «{activeKeyword}»
+              </button>
+            </div>
+          )}
+          <div className="chips">
+            {keywords.map((k) => (
+              <span
+                key={k.word}
+                className={`chip ${k.manual ? 'manuel' : ''}`}
+                title={k.manual ? 'Your own keyword' : 'Automatic keyword'}
+              >
+                {k.word}
+                <button className="chip-fjern" onClick={() => fjernOrd(k.word)} title="Remove keyword">×</button>
+              </span>
+            ))}
+            {keywords.length === 0 && <span className="tom">No keywords yet</span>}
+          </div>
+          <div className="knapraekke">
+            <input
+              value={nytOrd}
+              placeholder="Add keyword"
+              onChange={(e) => setNytOrd(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') tilfoejOrd();
+              }}
+            />
+            <button className="lille" onClick={tilfoejOrd}>Add</button>
+          </div>
+        </>
+      )}
+
+      {fase === 4 && (
         <>
           <h4>Crops</h4>
           <div className="knapraekke">
@@ -252,103 +333,25 @@ export default function Inspector({
         </>
       )}
 
-      {row.rel_path.startsWith('Approved/') && (
+      {fase === 5 && (
         <>
-          <h4>Work folder</h4>
-          <div className="knapraekke">
-            <button
-              className="lille"
-              onClick={() => invoke('img:openWorkFolder', { versionId: row.version_id }).catch(onError)}
-              title="Open the work's folder with Originals, Edits, Masters and Print files"
-            >
-              Show in Finder
-            </button>
-          </div>
+          <h4>Print files</h4>
+          <p className="tom">Making print files for Prodigi is the next step to build.</p>
         </>
       )}
 
-      <h4>Edit in</h4>
       <div className="knapraekke">
-        <select value={editorValg} onChange={(e) => setEditorValg(e.target.value)}>
-          {editorList.map((ed) => (
-            <option key={ed.appPath || 'std'} value={ed.appPath}>{ed.label}</option>
-          ))}
-        </select>
-        <button
-          onClick={() => act.editIn(editorValg || editorList[0]?.appPath || null)}
-          title="Open the file in the chosen app. Save the result in the Edits folder of the work. The program you open it in becomes the Edits status."
-        >
-          Open
-        </button>
-      </div>
-      <div className="knapraekke">
-        <button className="lille" onClick={act.editInOther}>Other app …</button>
-        {!row.rel_path.startsWith('Approved/') && (
+        {iArbejde ? (
+          <button
+            className="lille"
+            onClick={() => invoke('img:openWorkFolder', { versionId: row.version_id }).catch(onError)}
+            title="Open the work's folder with Originals, Edits, Masters and Print files"
+          >
+            Show in Finder
+          </button>
+        ) : (
           <button className="lille" onClick={act.reveal}>Show in Finder</button>
         )}
-      </div>
-
-      <h4>Series</h4>
-      <div className="knapraekke">
-        <select
-          value={row.series_id || ''}
-          onChange={(e) => {
-            const v = e.target.value;
-            if (v === 'ny') act.newSeries();
-            else act.assignSeries(v ? Number(v) : null);
-          }}
-        >
-          <option value="">No series</option>
-          {series.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-          <option value="ny">New series …</option>
-        </select>
-      </div>
-
-      <WorkPanel
-        key={row.image_id}
-        row={row}
-        versions={versions}
-        hasKey={hasKey}
-        shop={shop}
-        onShop={onShop}
-        onError={onError}
-      />
-
-      <h4>Keywords</h4>
-      {activeKeyword && keywords.some((k) => k.word === activeKeyword) && (
-        <div className="knapraekke">
-          <button
-            className="fjern-fra-noegleord"
-            onClick={() => fjernOrd(activeKeyword)}
-            title={`Remove this image from the keyword "${activeKeyword}"`}
-          >
-            Does not belong to «{activeKeyword}»
-          </button>
-        </div>
-      )}
-      <div className="chips">
-        {keywords.map((k) => (
-          <span
-            key={k.word}
-            className={`chip ${k.manual ? 'manuel' : ''}`}
-            title={k.manual ? 'Your own keyword' : 'Automatic keyword'}
-          >
-            {k.word}
-            <button className="chip-fjern" onClick={() => fjernOrd(k.word)} title="Remove keyword">×</button>
-          </span>
-        ))}
-        {keywords.length === 0 && <span className="tom">No keywords yet</span>}
-      </div>
-      <div className="knapraekke">
-        <input
-          value={nytOrd}
-          placeholder="Add keyword"
-          onChange={(e) => setNytOrd(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') tilfoejOrd();
-          }}
-        />
-        <button className="lille" onClick={tilfoejOrd}>Add</button>
       </div>
     </aside>
   );

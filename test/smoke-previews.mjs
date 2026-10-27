@@ -57,6 +57,8 @@ let succes = false;
 try {
   const page = await app.firstWindow({ timeout: 60000 });
   await page.waitForFunction(() => document.visibilityState === 'visible', null, { timeout: 60000 });
+  // Fasen huskes fra sidste koersel, saa testen starter selv i fase 1.
+  await page.locator('.fase', { hasText: 'Sort' }).click({ timeout: 60000 });
   await page.waitForFunction(() => document.querySelectorAll('.tile').length === 4, null, { timeout: 45000 });
 
   // De tre rigtige billeder skal faa et indlaest billede.

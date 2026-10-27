@@ -37,34 +37,30 @@ let succes = false;
 try {
   const page = await app.firstWindow({ timeout: 60000 });
   await page.waitForFunction(() => document.visibilityState === 'visible', null, { timeout: 60000 });
+  // Fasen huskes fra sidste koersel, saa testen starter selv i fase 1.
+  await page.locator('.fase', { hasText: 'Sort' }).click({ timeout: 60000 });
   await page.waitForSelector('.tile', { timeout: 60000 });
 
-  // Godkend: filen flytter ind i en arbejdsmappe.
+  // Fase 1, godkend: filen flytter ind i en arbejdsmappe og videre til fase 2.
   await page.locator('.tile').first().click();
   await page.keyboard.press('a');
+  await page.waitForFunction(() => document.querySelectorAll('.tile').length === 0, null, { timeout: 15000 });
+  await page.locator('.fase', { hasText: 'Edit' }).click();
   await page.waitForSelector('.tile-navn[title^="Approved/blaa/Originals/"]', { timeout: 15000 });
   if (!existsSync(join(lib, 'Approved', 'blaa', 'Masters'))) throw new Error('Masters-mappen blev ikke oprettet');
-
-  // Uden en master i Masters er knappen der, men slaaet fra.
   await page.locator('.tile').first().click();
-  await page.waitForSelector('text=Only finished works can be cropped', { timeout: 10000 });
-  if (await page.locator('button', { hasText: 'Crop master' }).isEnabled()) {
-    throw new Error('Crop-knappen er slaaet til uden en master');
-  }
+  await page.waitForSelector('button:has-text("Make master")', { timeout: 10000 });
 
-  // En masterfil lægges i Masters, og appen finder den.
+  // En masterfil lægges i Masters, og appen finder den. Vaerket forlader
+  // fase 2 og staar i fase 4 (Crops).
   await billede(join(lib, 'Approved', 'blaa', 'Masters', 'blaa master.png'));
   await page.locator('button', { hasText: 'Scan again' }).click();
+  await page.waitForFunction(() => document.querySelectorAll('.tile').length === 0, null, { timeout: 20000 });
+  await page.locator('.fase', { hasText: 'Crops' }).click();
   await page.waitForSelector('.tile-navn[title*="/Masters/"]', { timeout: 20000 });
-
-  // Knappen er synlig hele tiden og beskaerer værkets master, ogsaa naar det er
-  // originalen der er valgt.
-  await page.locator('.tile', { has: page.locator('.tile-navn[title*="/Originals/"]') }).click();
-  await page.waitForFunction(
-    () => [...document.querySelectorAll('button')].find((b) => b.textContent.includes('Crop master'))?.disabled === false,
-    null,
-    { timeout: 10000 }
-  );
+  if (await page.locator('.tile-navn[title*="/Originals/"]').count() !== 0) {
+    throw new Error('Originalen staar i fase 4');
+  }
 
   // Beskaer masteren til 1:1.
   await page.locator('.tile', { has: page.locator('.tile-navn[title*="/Masters/"]') }).click();
@@ -106,6 +102,15 @@ try {
     () => [...document.querySelectorAll('.tile')].some((t) => t.querySelector('.tile-navn')?.title.endsWith('blaa master 3-2.png') && t.querySelector('.badge.beskaering')?.textContent === '3:2'),
     null,
     { timeout: 20000 }
+  );
+
+  // Fase 5 (Print) viser beskaeringerne.
+  await page.locator('.fase', { hasText: 'Print' }).click();
+  await page.waitForFunction(
+    () => document.querySelectorAll('.tile').length === 1
+      && document.querySelector('.tile-navn')?.title.endsWith('blaa master 3-2.png'),
+    null,
+    { timeout: 10000 }
   );
 
   console.log('SMOKE OK: beskaering gemmer en ny fil i Masters');
