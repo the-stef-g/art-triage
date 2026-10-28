@@ -405,8 +405,17 @@ try {
     { timeout: 10000 }
   );
   // Sidepanelet viser vaerkernes mapper i fase 2, og ikke Import.
-  const mapper = await page.locator('.mappe .mappenavn').allInnerTexts();
-  if (mapper[0] !== 'All works' || !mapper.includes('blaa') || mapper.some((m) => /undermappe|Candidate/.test(m))) {
+  // Traeet hentes for sig, saa der ventes paa det.
+  const mapperOk = await page.waitForFunction(
+    () => {
+      const m = [...document.querySelectorAll('.mappe .mappenavn')].map((e) => e.textContent.trim());
+      return m[0] === 'All works' && m.includes('blaa') && !m.some((x) => /undermappe|Candidate/.test(x));
+    },
+    null,
+    { timeout: 10000 }
+  ).then(() => true, () => false);
+  if (!mapperOk) {
+    const mapper = await page.locator('.mappe .mappenavn').allInnerTexts();
     throw new Error(`Mapperne i fase 2: ${mapper.join(', ')}`);
   }
   await page.locator('.tile').first().click();
