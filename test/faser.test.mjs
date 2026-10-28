@@ -1,7 +1,7 @@
 // De fem faser: Sort, Edit, Product, Crops og Print. Fasen er ikke en status
 // man saetter, den foelger af mapperne, og det er det testene holder oeje med.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, writeFileSync, mkdirSync, rmSync, existsSync, readFileSync, utimesSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, mkdirSync, rmSync, existsSync, readFileSync, utimesSync, renameSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { openDatabase } from '../electron/lib/db.mjs';
@@ -175,6 +175,23 @@ describe('fase 2', () => {
     skriv('Approved/x/Master/x.tif', 'm');
     catalog.sync();
     expect(() => catalog.kasserVaerk(raekke('Approved/x/Master/x.tif').version_id)).toThrow(/master/);
+  });
+});
+
+describe('filer man selv lægger i Edits', () => {
+  it('en fil der allerede var i kataloget og flyttes ind i Edits, bliver en del af vaerket', () => {
+    skriv('Import/Ahl/andet.tif', 'tif');
+    catalog.sync();
+    catalog.setRating([raekke('Import/Ahl/x.cr2').version_id], 'godkendt');
+    renameSync(join(root, 'Import/Ahl/andet.tif'), join(root, 'Approved/x/Edits/andet.tif'));
+    catalog.sync();
+    const r = raekke('Approved/x/Edits/andet.tif');
+    expect(r.rating).toBe('godkendt');
+    expect(r.image_id).toBe(raekke('Approved/x/Original/x.cr2').image_id);
+    expect(fase(2)).toContain('Approved/x/Edits/andet.tif');
+    expect(fase(1)).not.toContain('Approved/x/Edits/andet.tif');
+    // Og det sker kun én gang.
+    expect(catalog._tilknytArbejdsmapper()).toBe(0);
   });
 });
 

@@ -502,36 +502,7 @@ export class Catalog extends EventEmitter {
 
         const stackImage = this._findStackTarget(n.rel, mappeIndeks);
         if (stackImage) {
-          // En ny version arver originalens bedoemmelse. Er den godkendt, er
-          // en fil i Edits "under redigering", og en fil i Master gør
-          // billedet "faerdigt" (originalen faar det trin med).
-          const arvet = this.db.get(
-            'SELECT rating FROM versions WHERE image_id=? AND is_master=1', stackImage.imageId
-          )?.rating ?? 'ubedomt';
-          const godkendt = arvet === 'godkendt';
-          const faerdig = godkendt && stackImage.kind === 'master';
-          // Status er det program billedet senest blev aabnet i. Kendes det
-          // ikke, faar filen ingen status; appen finder ikke selv paa et navn.
-          const editor = godkendt && stackImage.kind === 'edit' ? this._sidsteEditor(stackImage.imageId) : null;
-          this.db.run(
-            'INSERT INTO versions(image_id, file_id, name, is_master, rating, edited, finished, editor, created_at) VALUES(?,?,?,0,?,?,?,?,?)',
-            stackImage.imageId, fileId, stackImage.versionName, arvet,
-            godkendt && stackImage.kind === 'edit' ? 1 : 0, faerdig ? 1 : 0, editor, this.now()
-          );
-          // Har billedet en redigering, har originalen den ogsaa, medmindre
-          // vaerket er faerdigt.
-          if (godkendt && stackImage.kind === 'edit') {
-            this.db.run(
-              'UPDATE versions SET edited=1, editor=COALESCE(editor, ?) WHERE image_id=? AND is_master=1 AND finished=0',
-              editor, stackImage.imageId
-            );
-          }
-          if (faerdig) {
-            this.db.run(
-              'UPDATE versions SET edited=0, finished=1 WHERE image_id=? AND is_master=1',
-              stackImage.imageId
-            );
-          }
+          this._stakSomVersion(stackImage, fileId);
         } else {
           const imageId = this.db.run(
             'INSERT INTO images(master_file_id, created_at) VALUES(?,?)',
@@ -545,6 +516,7 @@ export class Catalog extends EventEmitter {
         this._indeksTilfoej(mappeIndeks, fileId, n.rel);
         changedFileIds.push(fileId);
       }
+      if (this._tilknytArbejdsmapper()) changedFileIds.push(-1);
     });
 
     if (changedFileIds.length || missing.length) this.emit('changed');
@@ -591,6 +563,69 @@ export class Catalog extends EventEmitter {
     const liste = indeks.get(dir);
     if (liste) liste.push({ id, rel_path: relPath });
     else indeks.set(dir, [{ id, rel_path: relPath }]);
+  }
+
+  // Gør filen til en version af billedet stackImage peger paa.
+  _stakSomVersion(stackImage, fileId) {
+    // En ny version arver originalens bedoemmelse. Er den godkendt, er
+    // en fil i Edits "under redigering", og en fil i Master gør
+    // billedet "faerdigt" (originalen faar det trin med).
+    const arvet = this.db.get(
+      'SELECT rating FROM versions WHERE image_id=? AND is_master=1', stackImage.imageId
+    )?.rating ?? 'ubedomt';
+    const godkendt = arvet === 'godkendt';
+    const faerdig = godkendt && stackImage.kind === 'master';
+    // Status er det program billedet senest blev aabnet i. Kendes det
+    // ikke, faar filen ingen status; appen finder ikke selv paa et navn.
+    const editor = godkendt && stackImage.kind === 'edit' ? this._sidsteEditor(stackImage.imageId) : null;
+    this.db.run(
+      'INSERT INTO versions(image_id, file_id, name, is_master, rating, edited, finished, editor, created_at) VALUES(?,?,?,0,?,?,?,?,?)',
+      stackImage.imageId, fileId, stackImage.versionName, arvet,
+      godkendt && stackImage.kind === 'edit' ? 1 : 0, faerdig ? 1 : 0, editor, this.now()
+    );
+    // Har billedet en redigering, har originalen den ogsaa, medmindre
+    // vaerket er faerdigt.
+    if (godkendt && stackImage.kind === 'edit') {
+      this.db.run(
+        'UPDATE versions SET edited=1, editor=COALESCE(editor, ?) WHERE image_id=? AND is_master=1 AND finished=0',
+        editor, stackImage.imageId
+      );
+    }
+    if (faerdig) {
+      this.db.run(
+        'UPDATE versions SET edited=0, finished=1 WHERE image_id=? AND is_master=1',
+        stackImage.imageId
+      );
+    }
+  }
+
+  // Mappen bestemmer: en fil i et vaerks Edits eller Master hoerer til
+  // vaerkets original, ogsaa naar filen var i kataloget i forvejen og er
+  // flyttet derind (saa den beholdt sin egen identitet som et ubedoemt
+  // billede og dukkede op i Sort i stedet for i Edit). Returnerer antallet.
+  _tilknytArbejdsmapper() {
+    const filer = this.db.all(
+      `SELECT id, rel_path FROM files WHERE present=1
+         AND (rel_path LIKE 'Approved/%/Edits/%' OR rel_path LIKE 'Approved/%/Master/%')`
+    );
+    let antal = 0;
+    for (const f of filer) {
+      const maal = this._arbejdsmappeMaal(f.rel_path);
+      if (!maal) continue;
+      const nu = this._imageForFile(f.id);
+      if (!nu || nu.imageId === maal.imageId) continue;
+      const egetBillede = this.db.get('SELECT id FROM images WHERE id=? AND master_file_id=?', nu.imageId, f.id);
+      if (egetBillede) {
+        // Filen var sit eget billede: det billede (og dets virtuelle kopier)
+        // forsvinder, og filen bliver en version af vaerket.
+        this.db.run('DELETE FROM images WHERE id=?', nu.imageId);
+      } else {
+        this.db.run('DELETE FROM versions WHERE file_id=?', f.id);
+      }
+      this._stakSomVersion(maal, f.id);
+      antal += 1;
+    }
+    return antal;
   }
 
   // En fil i Edits eller Master i en arbejdsmappe hoerer til originalen i
