@@ -111,7 +111,8 @@ jobs:
   # Paa main er koden som regel præcis den, der lige er bygget paa grenen
   # (main flettes frem til grenen). Saa laves grenens pre-release bare om
   # til den seneste udgave, i stedet for at vente paa en Mac igen. Kun hvis
-  # der er aendret kode siden (andet end tekst og docs), bygges der forfra.
+  # der er aendret kode siden (andet end tekst, docs og selve workflowet),
+  # bygges der forfra.
   promote:
     name: Promote the branch build (main only)
     runs-on: ubuntu-latest
@@ -136,7 +137,7 @@ jobs:
           target=$(printf '%s' "$info" | cut -f1)
           assets=$(printf '%s' "$info" | cut -f2)
           if [ -n "$target" ] && [[ ",$assets," == *",$fil,"* ]] \
-            && git diff --quiet "$target" "$GITHUB_SHA" -- . ':(exclude)*.md' ':(exclude)docs/**'; then
+            && git diff --quiet "$target" "$GITHUB_SHA" -- . ':(exclude)*.md' ':(exclude)docs/**' ':(exclude).github/**'; then
             gh release edit "$tag" --prerelease=false --latest \
               --notes "Stef G Art $v for Intel Macs. Download the zip below, unzip it and move Stef G Art to Applications."
             echo "Promoted $tag (built from $target)"
