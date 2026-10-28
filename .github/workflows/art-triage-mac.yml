@@ -149,7 +149,10 @@ jobs:
 
   build-mac:
     name: Build macOS app (Intel x64)
-    runs-on: macos-latest
+    # Appen er til en Intel-Mac, saa den bygges paa GitHubs Intel-Macs. De
+    # Apple Silicon-maskiner bag macos-latest er saa travle, at jobbet
+    # gentagne gange blev opgivet efter 15 minutter uden at faa en maskine.
+    runs-on: macos-15-intel
     timeout-minutes: 25
     needs: [test, promote]
     # Paa en gren springes promote over; paa main kun naar den ikke fandt
