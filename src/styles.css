@@ -269,7 +269,20 @@ button:focus, button:focus-visible, [tabindex]:focus, [tabindex]:focus-visible {
 }
 .film-billede img { width: 100%; height: 100%; object-fit: contain; display: block; }
 .film-billede.aktiv { border-color: var(--accent); }
-.film-billede.kandidat { border-bottom-color: var(--kandidat, #d9a400); }
+/* Kandidater faar det gule ?-maerke fra grid'et i hjoernet. */
+.film-billede { position: relative; }
+.film-maerke {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  padding: 0 4px;
+  border-radius: 3px;
+  background: var(--kandidat);
+  color: #3a2f00;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 14px;
+}
 .film-billede.kasseret img, .film-billede.udenfor img { opacity: 0.35; }
 .film-billede.udenfor { cursor: default; }
 

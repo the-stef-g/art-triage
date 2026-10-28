@@ -45,7 +45,7 @@ export default function Filmstrip({ row, rows, visKasserede, dataRev, thumbRev, 
           <button
             key={b.version_id}
             className={`film-billede ${b.file_id === row.file_id ? 'aktiv' : ''} ${findes ? '' : 'udenfor'} ${b.rating === 'kandidat' ? 'kandidat' : ''} ${b.rating === 'kasseret' ? 'kasseret' : ''}`}
-            title={`${i + 1}. ${b.rel_path}`}
+            title={`${i + 1}. ${b.rel_path}${b.rating === 'kandidat' ? ' (Candidate)' : ''}`}
             onClick={() => onSelect(b.version_id, findes)}
           >
             <img
@@ -55,6 +55,8 @@ export default function Filmstrip({ row, rows, visKasserede, dataRev, thumbRev, 
               loading="lazy"
               draggable={false}
             />
+            {/* Samme maerke som i grid'et, saa det kan genkendes. */}
+            {b.rating === 'kandidat' && <span className="film-maerke" title="Candidate">?</span>}
           </button>
         );
       })}

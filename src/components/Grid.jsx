@@ -20,19 +20,31 @@ const RULLEBREDDE = 14;
 // En fil i Master er per definition godkendt og faerdig, saa de to maerker
 // siger ikke noget dér.
 const iMaster = (rel) => /^Approved\/[^/]+\/Master\//.test(rel);
+// Alt under Approved er godkendt; maerket siger kun noget i Import.
+const iApproved = (rel) => rel.startsWith('Approved/');
+
+// Versionsnavnet kommer tit fra editorens endelse ("Mur 2-neo" bliver
+// "Neo"), og saa siger det det samme som editor-maerket.
+const EDITOR_ENDELSER = ['neo', 'tp', 'ps', 'giga'];
+function samme(row) {
+  const navn = String(row.version_name || '').trim().toLowerCase();
+  if (!navn) return true;
+  if (EDITOR_ENDELSER.includes(navn)) return true;
+  return Boolean(row.editor) && row.editor.toLowerCase().includes(navn);
+}
 
 function Badges({ row }) {
   const master = iMaster(row.rel_path);
   return (
     <div className="badges">
-      {row.rating === 'godkendt' && !master && <span className="badge godkendt" title="Approved">✓</span>}
+      {row.rating === 'godkendt' && !iApproved(row.rel_path) && <span className="badge godkendt" title="Approved">✓</span>}
       {row.rating === 'kandidat' && (
         <span className="badge kandidat" title="Candidate: good subject, needs editing before it can be decided">?</span>
       )}
       {row.rating === 'kasseret' && <span className="badge kasseret" title="Discarded">✕</span>}
       {Boolean(row.edited) && <span className="badge redigeret" title={row.editor ? `Edited in ${row.editor}` : 'Has edits'}>{row.editor || 'Edits'}</span>}
       {Boolean(row.finished) && !master && <span className="badge faerdig" title="Finished">F</span>}
-      {row.rating === 'godkendt' && !row.is_master && <span className="badge kopi" title={`Version: ${row.version_name}. A separate version of the original image, either a file with the same name in another format or an edit.`}>{row.version_name}</span>}
+      {row.rating === 'godkendt' && !row.is_master && !samme(row) && <span className="badge kopi" title={`Version: ${row.version_name}. A separate version of the original image, either a file with the same name in another format or an edit.`}>{row.version_name}</span>}
       {row.rating === 'godkendt' && row.crop && (
         <span className="badge beskaering" title={`Crop ${row.crop === 'free' ? 'free' : row.crop}`}>
           {row.crop === 'free' ? 'Free' : row.crop}

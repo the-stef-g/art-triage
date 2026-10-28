@@ -31,6 +31,12 @@ export default function CropModal({ row, onClose, onDone, onError }) {
   const fladeRef = useRef(null);
   const trak = useRef(null);
   const forhold = FORMATER.find(([f]) => f === format)[1];
+  // Samme navn som crop.mjs giver filen: "Mur 2 3-2.tif".
+  const kildeNavn = fileName(row.rel_path);
+  const punkt = kildeNavn.lastIndexOf('.');
+  const nytNavn = punkt > 0
+    ? `${kildeNavn.slice(0, punkt)} ${format.replace(':', '-')}${kildeNavn.slice(punkt)}`
+    : `${kildeNavn} ${format.replace(':', '-')}`;
 
   // Escape lukker, og ingen anden genvej maa ramme billederne bag vinduet.
   useEffect(() => {
@@ -159,7 +165,8 @@ export default function CropModal({ row, onClose, onDone, onError }) {
         </div>
         <div className="crop-bund">
           <span className="tom">
-            The crop is saved as a new file in Master. The master is not changed.
+            Saved in Master as «{nytNavn}», exactly {format}. Under 5 Print it is
+            enlarged in Gigapixel and becomes the print file.
           </span>
           <button onClick={onClose}>Cancel</button>
           <button disabled={gemmer} onClick={gem}>{gemmer ? 'Saving …' : 'Save crop'}</button>

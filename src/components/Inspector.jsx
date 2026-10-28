@@ -314,7 +314,7 @@ export default function Inspector({
               disabled={!master}
               onClick={() => setBeskaer(true)}
               title={master
-                ? `Crop ${master.rel_path.split('/').pop()}. The crop is saved as a new file in Master.`
+                ? `Crop ${master.rel_path.split('/').pop()} to an exact print format. The crop is saved as a new file in Master.`
                 : 'Only finished works can be cropped: put the master in the Master folder first.'}
             >
               Crop master …
