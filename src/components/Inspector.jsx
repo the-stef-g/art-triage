@@ -336,17 +336,35 @@ export default function Inspector({
 
       {fase === 5 && (
         <>
+          <h4>Enlargement</h4>
+          <p className="tom">
+            {row.forstoerrelse
+              ? `${row.forstoerrelse.split('/').pop()} in Edits. The print file is made from it.`
+              : 'Not enlarged yet. Send the crop to Gigapixel; the copy goes in Edits with -giga in its name. Save the enlargement in Edits too.'}
+          </p>
+          <div className="knapraekke">
+            <button
+              disabled={!installeret.has('Topaz Gigapixel AI')}
+              onClick={() => act.sendToEditor('Topaz Gigapixel AI')}
+              title={installeret.has('Topaz Gigapixel AI')
+                ? 'Copy this crop to Edits as …-giga, and open the copy in Gigapixel'
+                : 'Topaz Gigapixel AI was not found in Applications'}
+            >
+              Enlarge in Gigapixel
+            </button>
+          </div>
+
           <h4>Print file</h4>
           <p className="tom">
             {row.printfil
               ? `${row.printfil.rel.split('/').pop()} · ${formatBytes(row.printfil.bytes)}`
               : 'No print file yet.'}
           </p>
-          <p className="tom">A PNG in sRGB at full size, marked 300 DPI, in the work&apos;s Print files folder. The format is always in its name (Desert 3-2.png); a free crop gets the nearest of 1:1, 2:3, 3:2, 1:2 and 2:1. Prodigi&apos;s ICC profiles are for proofing and are not put in the file.</p>
+          <p className="tom">A PNG in sRGB at full size, marked 300 DPI, in the work&apos;s Print files folder. The format is always in its name (Desert 3-2.png), and the file is exactly that format. It is made from the largest enlargement in Edits, otherwise from the crop. Prodigi&apos;s ICC profiles are for proofing and are not put in the file.</p>
           <div className="knapraekke">
             <button
               onClick={act.makePrintFiles}
-              title="Make the print file from this crop. An old print file with the same name is replaced."
+              title="Make the print file from the enlargement (or the crop). An old print file with the same name is replaced."
             >
               {selectedCount > 1 ? `Make print files (${selectedCount})` : row.printfil ? 'Make print file again' : 'Make print file'}
             </button>

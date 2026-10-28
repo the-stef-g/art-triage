@@ -113,11 +113,29 @@ try {
     { timeout: 10000 }
   );
 
+  // Filen er kvadratisk (den blev beskaaret 1:1 og saa omdoebt), og en
+  // printfil skal vaere praecis i sit format: den afvises.
+  await page.locator('.tile').first().click();
+  await page.locator('button', { hasText: 'Make print file' }).click();
+  await page.waitForSelector('text=/is not 3:2/', { timeout: 20000 });
+  if (existsSync(join(lib, 'Approved', 'blaa', 'Print files', 'blaa master 3-2.png'))) {
+    throw new Error('Der blev lavet en printfil i et forkert format');
+  }
+
+  // Med det rigtige format i navnet gaar det.
+  renameSync(join(lib, 'Approved', 'blaa', 'Master', 'blaa master 3-2.png'), join(lib, 'Approved', 'blaa', 'Master', 'blaa master 1-1.png'));
+  await page.locator('button', { hasText: 'Scan again' }).click();
+  await page.waitForFunction(
+    () => document.querySelector('.tile-navn')?.title.endsWith('blaa master 1-1.png'),
+    null,
+    { timeout: 20000 }
+  );
+
   // Printfilen: en PNG i vaerkets Print files, og flisen faar en Print-etiket.
   await page.locator('.tile').first().click();
   await page.locator('button', { hasText: 'Make print file' }).click();
   await page.waitForSelector('.tile .badge.print', { timeout: 20000 });
-  const printfil = join(lib, 'Approved', 'blaa', 'Print files', 'blaa master 3-2.png');
+  const printfil = join(lib, 'Approved', 'blaa', 'Print files', 'blaa master 1-1.png');
   if (!existsSync(printfil)) throw new Error('Printfilen blev ikke lavet');
   const pm = await sharp(printfil).metadata();
   if (pm.format !== 'png' || pm.density !== 300) throw new Error(`Printfilen er ${pm.format} paa ${pm.density} DPI`);

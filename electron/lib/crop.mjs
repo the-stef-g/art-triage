@@ -24,17 +24,38 @@ export const BESKAERINGER = {
   free: { navn: 'free', forhold: null },
 };
 
+// Et rektangel i det viste billede gjort praecist: bredde og hoejde i
+// formatets forhold paa pixlen ("2:3" giver fx 2000 x 3000, aldrig 2000 x
+// 3001), saa stort som muligt inden for rektanglet og centreret i det.
+export function eksakt({ left, top, width, height }, ratio) {
+  const [p, q] = String(ratio || '').split(':').map(Number);
+  if (!p || !q) return { left, top, width, height };
+  const k = Math.max(1, Math.min(Math.floor(width / p), Math.floor(height / q)));
+  const nw = k * p;
+  const nh = k * q;
+  return {
+    left: left + Math.floor((width - nw) / 2),
+    top: top + Math.floor((height - nh) / 2),
+    width: nw,
+    height: nh,
+  };
+}
+
 // Rektanglet i billedets egen retning, naar billedet er vist drejet
-// `rotation` grader med uret. Alle tal er pixel.
-export function tilRaaPixel({ x, y, w, h }, bredde, hoejde, rotation) {
+// `rotation` grader med uret. Alle tal er pixel. Med et format bliver det
+// praecist i det format, som det vises.
+export function tilRaaPixel({ x, y, w, h }, bredde, hoejde, rotation, ratio = null) {
   const r = ((Number(rotation) || 0) % 360 + 360) % 360;
   const drejet = r === 90 || r === 270;
   const vistB = drejet ? hoejde : bredde;
   const vistH = drejet ? bredde : hoejde;
-  const dx = Math.max(0, Math.min(vistB - 1, Math.round(x * vistB)));
-  const dy = Math.max(0, Math.min(vistH - 1, Math.round(y * vistH)));
-  const dw = Math.max(1, Math.min(vistB - dx, Math.round(w * vistB)));
-  const dh = Math.max(1, Math.min(vistH - dy, Math.round(h * vistH)));
+  const fri = {
+    left: Math.max(0, Math.min(vistB - 1, Math.round(x * vistB))),
+    top: Math.max(0, Math.min(vistH - 1, Math.round(y * vistH))),
+  };
+  fri.width = Math.max(1, Math.min(vistB - fri.left, Math.round(w * vistB)));
+  fri.height = Math.max(1, Math.min(vistH - fri.top, Math.round(h * vistH)));
+  const { left: dx, top: dy, width: dw, height: dh } = ratio ? eksakt(fri, ratio) : fri;
   switch (r) {
     case 90: return { left: dy, top: hoejde - dx - dw, width: dh, height: dw };
     case 180: return { left: bredde - dx - dw, top: hoejde - dy - dh, width: dw, height: dh };
@@ -53,14 +74,15 @@ function filnavn(kilde, ratio, rect) {
 // rect er normaliseret (0 til 1) i det billede brugeren ser, med den drejning
 // der er lagt paa det. Returnerer { path, bit8 }.
 export async function cropMaster({
-  kilde, rect, rotation = 0, ratio = 'free', platform = process.platform, runner = run,
+  kilde, rect, rotation = 0, ratio, platform = process.platform, runner = run,
 }) {
   if (!existsSync(kilde)) throw new Error('The master file is not on disk');
-  if (!BESKAERINGER[ratio]) throw new Error(`Unknown crop format: ${ratio}`);
+  // Beskaeringerne er til print, og et print har et fast format: ingen fri.
+  if (!BESKAERINGER[ratio] || ratio === 'free') throw new Error(`Unknown crop format: ${ratio}`);
   const sharp = (await import('sharp')).default;
   const meta = await sharp(kilde, { failOn: 'none' }).metadata();
   if (!meta.width || !meta.height) throw new Error('Could not read the size of the master');
-  const raa = tilRaaPixel(rect, meta.width, meta.height, rotation);
+  const raa = tilRaaPixel(rect, meta.width, meta.height, rotation, ratio);
   const ud = uniquePath(join(dirname(kilde), filnavn(kilde, ratio, raa)));
   const tmp = `${ud}.tmp${extname(ud)}`;
   const r = ((Number(rotation) || 0) % 360 + 360) % 360;
@@ -99,7 +121,7 @@ export async function cropMaster({
   // Reserven kan ikke skrive 16 bit TIFF. Med retning eller drejning er
   // koordinaterne i det viste billede, ikke i filen.
   const vist = (harRetning || r)
-    ? tilVist({ x: rect.x, y: rect.y, w: rect.w, h: rect.h }, meta, harRetning, r)
+    ? tilVist({ x: rect.x, y: rect.y, w: rect.w, h: rect.h }, meta, harRetning, r, ratio)
     : raa;
   img = img.extract(vist);
   if (ext === '.tif' || ext === '.tiff') img = img.tiff({ compression: 'lzw' });
@@ -111,17 +133,17 @@ export async function cropMaster({
 }
 
 // Pixelrektangel i det viste billede (efter retning og drejning).
-function tilVist({ x, y, w, h }, meta, harRetning, r) {
+function tilVist({ x, y, w, h }, meta, harRetning, r, ratio) {
   let bredde = meta.width;
   let hoejde = meta.height;
   if (harRetning && meta.orientation >= 5) [bredde, hoejde] = [hoejde, bredde];
   if (r === 90 || r === 270) [bredde, hoejde] = [hoejde, bredde];
   const left = Math.max(0, Math.min(bredde - 1, Math.round(x * bredde)));
   const top = Math.max(0, Math.min(hoejde - 1, Math.round(y * hoejde)));
-  return {
+  return eksakt({
     left,
     top,
     width: Math.max(1, Math.min(bredde - left, Math.round(w * bredde))),
     height: Math.max(1, Math.min(hoejde - top, Math.round(h * hoejde))),
-  };
+  }, ratio);
 }

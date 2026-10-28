@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import sharp from 'sharp';
 import { openDatabase } from '../electron/lib/db.mjs';
 import { Catalog } from '../electron/lib/catalog.mjs';
-import { lavPrintfil, naermesteFormat } from '../electron/lib/printfil.mjs';
+import { lavPrintfil } from '../electron/lib/printfil.mjs';
 
 let root;
 let db;
@@ -63,32 +63,44 @@ describe('lavPrintfil', () => {
     expect(Math.abs(px[2] - 0)).toBeLessThanOrEqual(2);
   });
 
-  it('lægger brugerens drejning paa og erstatter en gammel printfil', async () => {
-    const kilde = join(root, 'k.tif');
-    await p3Tiff(kilde, 60, 40);
+  it('er altid praecis i formatet: en pixel for meget skaeres af, mere end 1 % afvises', async () => {
     const mappe = join(root, 'Print files');
-    // Uden et format i navnet (en fri beskaering) findes det taetteste.
-    expect((await lavPrintfil({ kilde, mappe, base: 'x' })).path).toBe(join(mappe, 'x 3-2.png'));
-    const res = await lavPrintfil({ kilde, mappe, base: 'x', rotation: 90 });
-    expect(res.path).toBe(join(mappe, 'x 2-3.png'));
+    const lidt = join(root, 'lidt.tif');
+    await p3Tiff(lidt, 301, 200);
+    const res = await lavPrintfil({ kilde: lidt, mappe, base: 'a', token: '3-2' });
+    expect([res.bredde, res.hoejde]).toEqual([300, 200]);
     const m = await sharp(res.path).metadata();
-    expect([m.width, m.height]).toEqual([40, 60]);
-    const igen = await lavPrintfil({ kilde, mappe, base: 'x', rotation: 90 });
-    expect(igen.path).toBe(res.path);
-    expect(existsSync(join(mappe, 'x 2-3 1.png'))).toBe(false);
+    expect([m.width, m.height]).toEqual([300, 200]);
+    const skaev = join(root, 'skaev.tif');
+    await p3Tiff(skaev, 80, 40);
+    await expect(lavPrintfil({ kilde: skaev, mappe, base: 'b', token: '3-2' })).rejects.toThrow(/not 3:2/);
   });
 
-  it('kender de fem printformater', () => {
-    expect(naermesteFormat(3000, 2000)).toBe('3-2');
-    expect(naermesteFormat(4000, 3000)).toBe('3-2');
-    expect(naermesteFormat(1000, 1050)).toBe('1-1');
-    expect(naermesteFormat(1000, 2100)).toBe('1-2');
+  it('bruger den stoerste forstoerrelse, og lægger brugerens drejning paa beskaeringen', async () => {
+    const mappe = join(root, 'Print files');
+    const kilde = join(root, 'k.tif');
+    await p3Tiff(kilde, 60, 40);
+    const giga = join(root, 'k-giga.tif');
+    await p3Tiff(giga, 240, 160);
+    const res = await lavPrintfil({ kilde, mappe, base: 'x', token: '3-2', forstoerrelser: [giga] });
+    expect(res.kilde).toBe(giga);
+    expect([res.bredde, res.hoejde]).toEqual([240, 160]);
+    // Uden forstoerrelse: beskaeringen, drejet som den vises.
+    const drejet = await lavPrintfil({ kilde, mappe, base: 'y', token: '2-3', rotation: 90 });
+    expect(drejet.kilde).toBe(kilde);
+    expect([drejet.bredde, drejet.hoejde]).toEqual([40, 60]);
+  });
+
+  it('kun de fem printformater', async () => {
+    const kilde = join(root, 'k.tif');
+    await p3Tiff(kilde, 60, 40);
+    await expect(lavPrintfil({ kilde, mappe: root, base: 'x', token: null })).rejects.toThrow(/five print formats/);
   });
 });
 
 describe('printfiler i kataloget', () => {
   it('fase 5 viser om en beskaering har en printfil, og printMaal peger paa Print files', async () => {
-    await p3Tiff(join(root, 'Approved', 'Desert', 'Master', 'Desert 2-3.tif'));
+    await p3Tiff(join(root, 'Approved', 'Desert', 'Master', 'Desert 2-3.tif'), 40, 60);
     catalog.sync();
     let r = catalog.listVersions({ fase: 5 })[0];
     expect(r.rel_path).toBe('Approved/Desert/Master/Desert 2-3.tif');
@@ -103,6 +115,13 @@ describe('printfiler i kataloget', () => {
     r = catalog.listVersions({ fase: 5 })[0];
     expect(r.printfil.rel).toBe('Approved/Desert/Print files/Desert 2-3.png');
     expect(r.printfil.bytes).toBeGreaterThan(0);
+    // En forstoerrelse i Edits bliver kilden til printfilen.
+    await p3Tiff(join(root, 'Approved', 'Desert', 'Edits', 'Desert 2-3-Giga.tif'), 120, 180);
+    catalog.sync();
+    r = catalog.listVersions({ fase: 5 })[0];
+    expect(r.forstoerrelse).toBe('Approved/Desert/Edits/Desert 2-3-Giga.tif');
+    const igen = await lavPrintfil(catalog.printMaal(r.version_id));
+    expect([igen.bredde, igen.hoejde]).toEqual([120, 180]);
     // Print files skannes ikke: printfilen bliver ikke en version af vaerket.
     catalog.sync();
     expect(alle().some((x) => x.rel_path.includes('Print files'))).toBe(false);

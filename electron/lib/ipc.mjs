@@ -671,12 +671,15 @@ export class AppSession {
       const ids = Array.isArray(versionIds) ? versionIds : [];
       const lavet = [];
       for (const id of ids) {
-        const res = await lavPrintfil(catalog.printMaal(id));
+        const maal = catalog.printMaal(id);
+        const res = await lavPrintfil(maal);
         lavet.push({
           rel: res.path.slice(catalog.root.length + 1),
           bytes: res.bytes,
           format: res.token.replace('-', ':'),
-          afvigelse: res.afvigelse,
+          bredde: res.bredde,
+          hoejde: res.hoejde,
+          forstoerret: res.kilde !== maal.kilde,
         });
       }
       this.log(`print: ${lavet.length} print file(s)`);

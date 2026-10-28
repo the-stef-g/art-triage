@@ -65,16 +65,25 @@ describe('beskaering', () => {
     expect(readdirSync(dir).filter((n) => n.endsWith('.png'))).toHaveLength(3);
   });
 
-  it('en fri beskaering faar maalene i navnet', async () => {
+  it('en beskaering er praecis i sit format, paa pixlen', async () => {
     const fil = await master('B.png');
-    const res = await cropMaster({ kilde: fil, rect: { x: 0, y: 0, w: 0.5, h: 0.5 }, ratio: 'free', platform: 'linux' });
-    expect(res.path).toMatch(/B free 200x100\.png$/);
+    // 200 x 100 vist, i 2:3 bliver det det stoerste 2:3 indenfor: 66 x 99.
+    const res = await cropMaster({ kilde: fil, rect: { x: 0, y: 0, w: 0.5, h: 0.5 }, ratio: '2:3', platform: 'linux' });
+    expect(res.path).toMatch(/B 2-3\.png$/);
+    const m = await sharp(res.path).metadata();
+    expect([m.width, m.height]).toEqual([66, 99]);
+    expect(m.width * 3).toBe(m.height * 2);
+  });
+
+  it('der findes ingen fri beskaering', async () => {
+    const fil = await master('B2.png');
+    await expect(cropMaster({ kilde: fil, rect: { x: 0, y: 0, w: 0.5, h: 0.5 }, ratio: 'free', platform: 'linux' })).rejects.toThrow(/Unknown crop format/);
   });
 
   it('en drejning laegges paa, saa filen staar som den vises', async () => {
     const fil = await master('C.png');
     // Vist 90 med uret er billedet 200 x 400, og det roede hjoerne ligger oeverst til hoejre.
-    const res = await cropMaster({ kilde: fil, rect: { x: 0.5, y: 0, w: 0.5, h: 0.25 }, rotation: 90, ratio: 'free', platform: 'linux' });
+    const res = await cropMaster({ kilde: fil, rect: { x: 0.5, y: 0, w: 0.5, h: 0.25 }, rotation: 90, ratio: '1:1', platform: 'linux' });
     const { data, info } = await sharp(res.path).raw().toBuffer({ resolveWithObject: true });
     expect([info.width, info.height]).toEqual([100, 100]);
     expect(data[0]).toBeGreaterThan(200); // roed i hjoernet
@@ -111,7 +120,7 @@ describe('beskaering paa macOS bruger sips', () => {
   it('en drejning laegges paa i et andet sips-kald', async () => {
     const fil = await master('F.tif');
     const kald = [];
-    await cropMaster({ kilde: fil, rect: { x: 0, y: 0, w: 0.5, h: 0.25 }, rotation: 90, platform: 'darwin', runner: falsk(kald) });
+    await cropMaster({ kilde: fil, rect: { x: 0, y: 0, w: 0.5, h: 0.25 }, rotation: 90, ratio: '1:1', platform: 'darwin', runner: falsk(kald) });
     expect(kald).toHaveLength(2);
     expect(kald[0][1].slice(0, 6)).toEqual(['--cropToHeightWidth', '100', '100', '--cropOffset', '100', '0']);
     expect(kald[1][1].slice(0, 2)).toEqual(['-r', '90']);
@@ -120,7 +129,7 @@ describe('beskaering paa macOS bruger sips', () => {
   it('falder tilbage paa sharp, og siger det, hvis sips svigter paa en TIFF', async () => {
     const fil = await master('G.tif');
     const res = await cropMaster({
-      kilde: fil, rect: { x: 0, y: 0, w: 0.5, h: 0.5 }, ratio: 'free', platform: 'darwin',
+      kilde: fil, rect: { x: 0, y: 0, w: 0.5, h: 0.5 }, ratio: '2:1', platform: 'darwin',
       runner: async () => { throw new Error('sips svigtede'); },
     });
     expect(res.bit8).toBe(true);

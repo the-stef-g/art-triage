@@ -4,7 +4,7 @@ import { fileName } from '../util';
 
 // Formaterne er de samme som printfilerne: forholdet er bredde / hoejde.
 const FORMATER = [
-  ['1:1', 1], ['2:3', 2 / 3], ['3:2', 3 / 2], ['1:2', 1 / 2], ['2:1', 2], ['free', null],
+  ['1:1', 1], ['2:3', 2 / 3], ['3:2', 3 / 2], ['1:2', 1 / 2], ['2:1', 2],
 ];
 const MIN = 0.03;
 

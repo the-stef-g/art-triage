@@ -114,6 +114,9 @@ describe('programmet staar i filnavnet', () => {
     expect(masterNavn('Lamps', 'IMG_9')).toBe('Lamps');
     expect(masterNavn('Lamps-ps', 'IMG_9')).toBe('Lamps');
     expect(masterNavn('Paint', 'IMG_9')).toBe('Paint');
+    // Gigapixel: "-giga" er programmet og en endelse.
+    expect(editorFraSti('Approved/w/Edits/Desert 3-2-giga.tif')).toBe('Topaz Gigapixel AI');
+    expect(masterNavn('Desert Canyon-Giga', 'IMG_9')).toBe('Desert Canyon');
     expect(udenEditorSuffiks('Desert-neo-Edit')).toBe('Desert-Edit');
   });
 

@@ -7,7 +7,7 @@ import {
 } from 'node:fs';
 import { join, dirname, basename, extname, posix } from 'node:path';
 import { exifTid } from './exif.mjs';
-import { printfilNavn, PRINTFORMATER } from './printfil.mjs';
+import { printfilNavn } from './printfil.mjs';
 import {
   walkImages, walkImagesAsync, walkDirs, findImportMappe, beskaeringFraSti, navnMedBeskaering,
   editorFraSti, masterNavn, quickHash, quickHashAsync, mapGraense, stemOf, slug, uniquePath, extOf, daCollator,
@@ -809,64 +809,67 @@ export class Catalog extends EventEmitter {
     const ud = this._filtrerFase(rows, fase);
     // Fase 5: om der er en printfil, og hvor stor den er. Print files
     // skannes ikke, saa det slaas op paa disken.
-    if (fase === 5) for (const r of ud) r.printfil = this._printfilInfo(r.rel_path);
+    if (fase === 5) {
+      for (const r of ud) {
+        r.printfil = this._printfilInfo(r.rel_path);
+        // Kopien til Gigapixel ligger ogsaa i Edits, men er ikke stoerre.
+        const st = this._printDele(r.rel_path)?.forstoerrelser[0];
+        r.forstoerrelse = st && st.size > r.size ? st.rel_path : null;
+      }
+    }
     return ud;
   }
 
-  // En fil i Master som print: vaerket, navnet uden format, formatet i
-  // navnet (kun de faste; en fri beskaering og masteren selv har intet) og
-  // de formater vaerkets beskaeringer i Master allerede daekker.
+  // En beskaering i Master som print: vaerket, navnet uden format, formatet
+  // ("2-3") og forstoerrelserne af den i Edits ("Desert 2-3-giga.tif" fra
+  // Gigapixel, med eller uden bindestreg, store eller smaa bogstaver),
+  // stoerste fil foerst. En fri beskaering har intet printformat.
   _printDele(rel) {
     const m = /^Approved\/([^/]+)\/Master\/([^/]+)$/.exec(rel);
     if (!m) return null;
     const crop = beskaeringFraSti(rel);
-    const tilToken = (c) => (c && c !== 'free' ? c.replace(':', '-') : null);
-    const optaget = this.db.all(
-      "SELECT rel_path FROM files WHERE present=1 AND rel_path LIKE ? ESCAPE '\\'",
-      `Approved/${escapeLike(m[1])}/Master/%`
-    ).map((r) => tilToken(beskaeringFraSti(r.rel_path))).filter(Boolean);
-    return {
-      work: m[1],
-      base: stemOf(navnMedBeskaering(m[2], null)),
-      token: tilToken(crop),
-      optaget: [...new Set(optaget)],
-    };
+    const token = crop && crop !== 'free' ? crop.replace(':', '-') : null;
+    const base = stemOf(navnMedBeskaering(m[2], null));
+    let forstoerrelser = [];
+    if (token) {
+      const start = `${base} ${token}`.toLowerCase();
+      forstoerrelser = this.db.all(
+        "SELECT rel_path, size FROM files WHERE present=1 AND rel_path LIKE ? ESCAPE '\\'",
+        `Approved/${escapeLike(m[1])}/Edits/%`
+      ).filter((f) => {
+        const stem = stemOf(posix.basename(f.rel_path)).toLowerCase();
+        return stem.startsWith(start) && /^[-_ ]*giga/.test(stem.slice(start.length));
+      }).sort((a, b) => b.size - a.size);
+    }
+    return { work: m[1], base, token, forstoerrelser };
   }
 
-  // Printfilen til en fil i Master: { rel, bytes } eller null. For masteren
-  // selv staar formatet ikke i dens navn, saa det er den printfil med
-  // samme navn, hvis format ingen beskaering daekker.
+  // Printfilen til en beskaering i Master: { rel, bytes } eller null.
   _printfilInfo(rel) {
     const d = this._printDele(rel);
-    if (!d) return null;
-    const mappe = `Approved/${d.work}/Print files`;
-    const kandidater = d.token
-      ? [d.token]
-      : Object.keys(PRINTFORMATER).filter((t) => !d.optaget.includes(t));
-    for (const t of kandidater) {
-      const printRel = `${mappe}/${printfilNavn(d.base, t)}`;
-      try {
-        return { rel: printRel, bytes: statSync(this.abs(printRel)).size };
-      } catch {
-        // ikke dette format
-      }
+    if (!d || !d.token) return null;
+    const printRel = `Approved/${d.work}/Print files/${printfilNavn(d.base, d.token)}`;
+    try {
+      return { rel: printRel, bytes: statSync(this.abs(printRel)).size };
+    } catch {
+      return null;
     }
-    return null;
   }
 
-  // Hvad der skal til for at lave printfilen til en fil i Master.
+  // Hvad der skal til for at lave printfilen til en beskaering i Master.
   printMaal(versionId) {
     const v = this.getVersion(versionId);
     const f = v ? this.getFile(v.effective_file_id) : null;
     if (!f || !f.present) throw new Error('The file is not available right now');
     const d = this._printDele(f.rel_path);
-    if (!d) throw new Error('Print files are made from files in Master');
+    if (!d) throw new Error('Print files are made from crops in Master');
+    if (!d.token) throw new Error('Only a crop in one of the five print formats (1:1, 2:3, 3:2, 1:2, 2:1) can be printed');
     return {
       kilde: this.abs(f.rel_path),
       mappe: join(this.root, 'Approved', d.work, 'Print files'),
       base: d.base,
       token: d.token,
-      optaget: d.optaget,
+      forstoerrelser: d.forstoerrelser.map((x) => this.abs(x.rel_path)),
       rotation: f.rotation || 0,
     };
   }
@@ -915,7 +918,7 @@ export class Catalog extends EventEmitter {
         return rows.filter((r) => behold.has(r.version_id));
       }
       case 4: return rows.filter((r) => godk(r) && iMaster(r));
-      case 5: return rows.filter((r) => godk(r) && iMaster(r) && r.crop);
+      case 5: return rows.filter((r) => godk(r) && iMaster(r) && r.crop && r.crop !== 'free');
       default: return rows;
     }
   }

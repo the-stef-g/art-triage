@@ -430,16 +430,16 @@ export default function App() {
       try {
         const res = await invoke('print:make', { versionIds: valgte });
         const mb = res.reduce((sum, r) => sum + r.bytes, 0) / 1e6;
-        // En fil hvis form ligger mere end et par procent fra formatet,
-        // beskaeres af Prodigi; det skal man vide.
-        const skaev = res.filter((r) => r.afvigelse > 2);
-        const advarsel = skaev.length
-          ? ` ${skaev.map((r) => r.rel.split('/').pop()).join(', ')}: the shape is ${skaev[0].afvigelse}% off ${skaev[0].format}, so Prodigi will trim it. Crop it under 4 Crops for an exact fit.`
+        // Det skal ikke kunne overses, hvis en printfil ikke er lavet af en
+        // forstoerrelse.
+        const ikke = res.filter((r) => !r.forstoerret);
+        const advarsel = ikke.length
+          ? ` Not enlarged: ${ikke.map((r) => r.rel.split('/').pop()).join(', ')}.`
           : '';
         setFejl((res.length === 1
-          ? `Print file saved as ${res[0].rel} (${mb.toFixed(1)} MB)`
+          ? `Print file saved as ${res[0].rel} (${res[0].bredde} × ${res[0].hoejde} px, ${mb.toFixed(1)} MB)`
           : `${res.length} print files saved in Print files (${mb.toFixed(1)} MB in all)`) + advarsel);
-        setTimeout(() => setFejl(null), skaev.length ? 12000 : 7000);
+        setTimeout(() => setFejl(null), ikke.length ? 10000 : 7000);
       } catch (err) { visFejl(err); }
     },
     // Fase 2: kassér hele vaerket. Originalen gaar til Discarded, og

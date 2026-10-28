@@ -241,12 +241,14 @@ export function navnMedBeskaering(fileName, crop) {
 // Programmerne en kopi kan sendes til, og det de tilfoejer filnavnet:
 // "Desert-neo.tif" er redigeret i Luminar Neo. Navnet er sandheden, som for
 // beskaeringerne: den sidste endelse er det seneste program.
-export const EDITOR_SUFFIKS = { 'Luminar Neo': 'neo', 'Topaz Photo AI': 'tp', Photoshop: 'ps' };
+export const EDITOR_SUFFIKS = {
+  'Luminar Neo': 'neo', 'Topaz Photo AI': 'tp', Photoshop: 'ps', 'Topaz Gigapixel AI': 'giga',
+};
 
 export function editorFraSti(rel) {
   if (!/^Approved\/[^/]+\/Edits\//.test(rel)) return null;
   const stem = stemOf(basename(rel));
-  const fund = [...stem.matchAll(/-(neo|tp|ps)(?=$|[-_ .])/gi)];
+  const fund = [...stem.matchAll(/-(neo|tp|ps|giga)(?=$|[-_ .])/gi)];
   if (!fund.length) return null;
   const s = fund[fund.length - 1][1].toLowerCase();
   return Object.keys(EDITOR_SUFFIKS).find((k) => EDITOR_SUFFIKS[k] === s) ?? null;
@@ -264,7 +266,7 @@ export function udenEditorSuffiks(stem) {
 // "Lamps" miste sit "ps".
 const LANGE_ENDELSER = [
   'denoise', 'denoised', 'sharpen', 'sharpened', 'enhance', 'enhanced', 'upscale', 'upscaled',
-  'gigapixel', 'photoai', 'topaz', 'luminar', 'lumi', 'paint', 'painted', 'sketch', 'pano',
+  'gigapixel', 'giga', 'photoai', 'topaz', 'luminar', 'lumi', 'paint', 'painted', 'sketch', 'pano',
   'panorama', 'edit', 'edited', 'final', 'copy', 'kopi', 'affinity', 'pixelmator', 'lightroom',
 ];
 const KORTE_ENDELSER = ['neo', 'tp', 'ps', 'gp', 'nr', 'dn', 'ai', 'lr', 'af', 'hdr', 'pxm', 'raw', 'dng'];
