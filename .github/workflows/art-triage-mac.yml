@@ -10,6 +10,10 @@ on:
       - '**.md'
   workflow_dispatch:
 
+# contents: write lader Mac-bygningen lægge appen som en Release.
+permissions:
+  contents: write
+
 concurrency:
   group: art-triage-${{ github.ref }}
   cancel-in-progress: true
@@ -130,10 +134,26 @@ jobs:
           rm -rf release/check && mkdir -p release/check
           unzip -q release/stef-g-art-mac-x64.zip -d release/check
           node scripts/check-packaged-sharp.mjs "release/check/Stef G Art.app/Contents/Resources" darwin-x64
-      - name: Upload app artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: stef-g-art-mac-x64
-          path: release/stef-g-art-mac-x64.zip
-          # Appen hentes kort efter bygningen. Gamle builds fyldte kvoten op.
-          retention-days: 14
+      # Appen lægges som en GitHub Release, én pr. version (v0.15.0 osv.).
+      # Release-filer tæller ikke med i Actions-kvoten, som de gamle
+      # artifacts fyldte op. En bygning fra en gren er en pre-release til
+      # afproevning; naar den samme version kommer paa main, bliver den den
+      # seneste udgave. Releasen laves forfra hver gang, saa den altid peger
+      # paa den commit appen er bygget af.
+      - name: Publish the app as a GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          v=$(node -p "require('./package.json').version")
+          tag="v$v"
+          fil="release/Stef-G-Art-$v-mac-x64.zip"
+          cp release/stef-g-art-mac-x64.zip "$fil"
+          if [ "$GITHUB_REF_NAME" = "main" ]; then
+            hvad="--latest"
+            noter="Stef G Art $v for Intel Macs. Download the zip below, unzip it and move Stef G Art to Applications."
+          else
+            hvad="--prerelease"
+            noter="Test build of Stef G Art $v from $GITHUB_REF_NAME, for Intel Macs. It becomes the latest release when it is merged into main."
+          fi
+          gh release delete "$tag" --cleanup-tag --yes 2>/dev/null || true
+          gh release create "$tag" "$fil" --target "$GITHUB_SHA" --title "Stef G Art $v" --notes "$noter" $hvad

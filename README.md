@@ -10,12 +10,14 @@ Libraries created in the Billedflow days keep their `.billedflow` folder and are
 
 ## Get the app
 
-The app is built automatically by GitHub Actions on every push.
+The app is built automatically by GitHub Actions on every push and published as a GitHub Release, one per version.
 
-1. Open the repository on GitHub and click the **Actions** tab.
-2. Pick the most recent green run of the **Build art-triage** workflow.
-3. Under **Artifacts**, download **art-triage-mac-x64**.
-4. Unzip it and drag **art-triage.app** to Applications.
+1. Open the repository on GitHub and click **Releases** in the right-hand column.
+2. The newest version on main is marked **Latest**. A build from a work branch is a **Pre-release**, for trying out before it is merged.
+3. Download **Stef-G-Art-<version>-mac-x64.zip**.
+4. Unzip it and drag **Stef G Art.app** to Applications.
+
+Releases do not count against the storage quota for Actions artifacts, which old builds used to fill up.
 
 ## First launch on macOS Sequoia
 
