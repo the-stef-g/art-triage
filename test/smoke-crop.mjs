@@ -1,7 +1,7 @@
 // Smoke test af beskaering i den byggede app: godkend et billede, laeg en
 // masterfil i Master, beskaer den, og se at der kommer en ny fil i Master.
 import { _electron as electron } from 'playwright-core';
-import { mkdtempSync, rmSync, existsSync, readdirSync, renameSync, copyFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, existsSync, readdirSync, renameSync, copyFileSync, utimesSync } from 'node:fs';
 import { mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -153,6 +153,22 @@ try {
   if (!existsSync(printfil)) throw new Error('Printfilen blev ikke lavet');
   const pm = await sharp(printfil).metadata();
   if (pm.format !== 'png' || pm.density !== 300) throw new Error(`Printfilen er ${pm.format} paa ${pm.density} DPI`);
+
+  // Gemmer Gigapixel en stoerre fil oven i -giga-filen, laver appen selv
+  // printfilen, naar filen har ligget stille et ojeblik.
+  rmSync(printfil);
+  const giga = join(edits, 'blaa master 1-1-giga.png');
+  const gm = await sharp(giga).metadata();
+  await sharp(giga).resize(gm.width * 2, gm.height * 2).png().toFile(`${giga}.tmp`);
+  renameSync(`${giga}.tmp`, giga);
+  const lidtSiden = new Date(Date.now() - 10_000);
+  utimesSync(giga, lidtSiden, lidtSiden);
+  await page.locator('button', { hasText: 'Scan again' }).click();
+  const slut = Date.now() + 30_000;
+  while (!existsSync(printfil) && Date.now() < slut) await page.waitForTimeout(250);
+  if (!existsSync(printfil)) throw new Error('Printfilen blev ikke lavet automatisk');
+  const am = await sharp(printfil).metadata();
+  if (am.width !== gm.width * 2) throw new Error(`Den automatiske printfil er ${am.width} px bred`);
 
   console.log('SMOKE OK: beskaering gemmer en ny fil i Master');
   succes = true;

@@ -870,10 +870,20 @@ export class Catalog extends EventEmitter {
     if (!d || !d.token) return null;
     const printRel = `Approved/${d.work}/Print files/${printfilNavn(d.base, d.token)}`;
     try {
-      return { rel: printRel, bytes: statSync(this.abs(printRel)).size };
+      const st = statSync(this.abs(printRel));
+      return { rel: printRel, bytes: st.size, mtime: Math.floor(st.mtimeMs) };
     } catch {
       return null;
     }
+  }
+
+  // De -giga-filer der er nyere end deres printfil (eller ikke har en): dem
+  // kan appen selv lave printfilen til, naar den har tjekket forstoerrelsen.
+  autoPrintKandidater() {
+    if (!this.mappestyring) return [];
+    return this.listVersions({ fase: 5 })
+      .filter((r) => r.giga && (!r.printfil || r.printfil.mtime < r.mtime))
+      .map((r) => ({ versionId: r.version_id, rel: r.rel_path, mtime: r.mtime }));
   }
 
   // Hvad der skal til for at lave printfilen. Den laves af forstoerrelsen i

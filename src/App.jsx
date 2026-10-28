@@ -401,12 +401,22 @@ export default function App() {
       }));
     },
     // Fase 2: en kopi i vaerkets Edits med programmets endelse, aabnet i programmet.
+    // Fase 5: alle de markerede beskaeringer til Gigapixel paa én gang.
+    // -giga-filerne blandt dem er allerede forstoerrelser og sendes ikke.
     sendToEditor: async (program) => {
       const f = getFocused();
       if (!f) return;
+      let ids = [f.version_id];
+      if (program === 'Topaz Gigapixel' && selectedRef.current.length > 1) {
+        const valgt = new Set(selectedRef.current);
+        const krop = rowsRef.current.filter((r) => valgt.has(r.version_id) && !r.giga).map((r) => r.version_id);
+        if (krop.length) ids = krop;
+      }
       try {
-        const res = await invoke('edit:send', { versionId: f.version_id, program });
-        setFejl(`Copied to ${res.rel} and opened in ${program}`);
+        const res = await invoke('edit:send', { versionIds: ids, program });
+        setFejl(res.antal > 1
+          ? `Copied ${res.antal} crops to Edits and opened them in ${program}`
+          : `Copied to ${res.rel} and opened in ${program}`);
         setTimeout(() => setFejl(null), 5000);
       } catch (err) { visFejl(err); }
     },

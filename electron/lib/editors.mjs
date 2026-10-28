@@ -65,15 +65,17 @@ export function detectEditors(customApps = []) {
   return found;
 }
 
-// Aabner filen i den valgte app (eller systemets standardprogram).
+// Aabner filen (eller filerne, paa én gang) i den valgte app eller i
+// systemets standardprogram.
 export function openInApp(appPath, filePath) {
+  const filer = Array.isArray(filePath) ? filePath : [filePath];
   return new Promise((resolve, reject) => {
     const done = (err) => (err ? reject(err) : resolve());
     if (process.platform === 'darwin') {
-      const args = appPath ? ['-a', appPath, filePath] : [filePath];
+      const args = appPath ? ['-a', appPath, ...filer] : filer;
       execFile('open', args, done);
     } else {
-      execFile('xdg-open', [filePath], done);
+      execFile('xdg-open', [filer[0]], done);
     }
   });
 }

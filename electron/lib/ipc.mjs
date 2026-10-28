@@ -2,7 +2,7 @@
 // watcher, indeksering) og registrerer alle IPC-handlers som UI'et kalder.
 import { ipcMain, dialog, shell } from 'electron';
 import { join } from 'node:path';
-import { existsSync } from 'node:fs';
+import { existsSync, statSync } from 'node:fs';
 import { cropMaster } from './crop.mjs';
 import { lavMaster } from './master.mjs';
 import { lavPrintfil, pixelAreal } from './printfil.mjs';
@@ -38,6 +38,9 @@ const RESCAN_DUTY = 10;
 // af databasen. Manuelle ord roeres ikke. Noeglen staar i meta, saa
 // oprydningen kun koerer en gang.
 const AUTOKW_RYDDET = 'autokw_ryddet';
+// En -giga-fil skal have ligget stille saa laenge, foer appen laver
+// printfilen af den: Gigapixel kan vaere ved at skrive den.
+const AUTO_PRINT_RO_MS = 5000;
 
 export class AppSession {
   constructor({ settings, ai, rasterizeSvg, log = () => {} }) {
@@ -59,6 +62,12 @@ export class AppSession {
     this.scanning = false;
     this.driveMissing = false;
     this.lastScanMs = 0;
+    // -giga-filer (sti og mtime) appen allerede har set paa, saa en fil
+    // der ikke er forstoerret, eller som ikke kunne bruges, ikke proeves
+    // igen foer den aendres.
+    this.autoPrintSet = new Set();
+    this.autoPrintKoerer = false;
+    this.autoPrintTimer = null;
 
     // Billedmodellen er klar foer tekstmodellen. Indekseringen skal ikke
     // vente paa soegningen, saa den startes her og ikke naar alt er klar.
@@ -118,7 +127,71 @@ export class AppSession {
         this.log(`auto series failed: ${String(err?.message || err).slice(0, 200)}`);
       }
     }
+    if (!res.unavailable && katalog === this.catalog) {
+      this._autoPrint().catch((err) => this.log(`auto print failed: ${String(err?.message || err).slice(0, 200)}`));
+    }
     return { ...res, skipped: false, reason, varighed: this.lastScanMs };
+  }
+
+  // Fase 5: naar Gigapixel har gemt en forstoerrelse, laver appen selv
+  // printfilen. Foerst naar filen har ligget stille et ojeblik, og kun naar
+  // den er stoerre end beskaeringen: ellers er det bare kopien, der blev
+  // sendt til Gigapixel.
+  async _autoPrint() {
+    if (this.autoPrintKoerer || !this.catalog) return;
+    this.autoPrintKoerer = true;
+    const catalog = this.catalog;
+    let igen = false;
+    try {
+      for (const k of catalog.autoPrintKandidater()) {
+        const noegle = `${k.rel}|${k.mtime}`;
+        if (this.autoPrintSet.has(noegle)) continue;
+        let nu;
+        try {
+          nu = Math.floor(statSync(catalog.abs(k.rel)).mtimeMs);
+        } catch {
+          continue;
+        }
+        // Filen er aendret siden skanningen, eller den er lige gemt.
+        if (nu !== k.mtime || Date.now() - nu < AUTO_PRINT_RO_MS) {
+          igen = true;
+          continue;
+        }
+        let maal;
+        try {
+          maal = catalog.printMaal(k.versionId);
+        } catch {
+          continue;
+        }
+        const areal = await pixelAreal(maal.kilde);
+        if (!areal) {
+          igen = true;
+          continue;
+        }
+        this.autoPrintSet.add(noegle);
+        if (maal.beskaering && areal <= await pixelAreal(maal.beskaering)) continue;
+        const navn = k.rel.split('/').pop();
+        try {
+          const res = await lavPrintfil(maal);
+          const rel = res.path.slice(catalog.root.length + 1);
+          this.log(`auto print: ${rel} from ${navn}`);
+          this.broadcast('besked', { tekst: `Print file made from ${navn}: ${rel.split('/').pop()} (${res.bredde} × ${res.hoejde} px)` });
+          this.broadcast('changed');
+        } catch (err) {
+          const tekst = String(err?.message || err).slice(0, 200);
+          this.log(`auto print failed for ${navn}: ${tekst}`);
+          this.broadcast('besked', { tekst: `No print file made from ${navn}: ${tekst}` });
+        }
+      }
+    } finally {
+      this.autoPrintKoerer = false;
+    }
+    if (igen) {
+      clearTimeout(this.autoPrintTimer);
+      this.autoPrintTimer = setTimeout(() => {
+        this._autoPrint().catch(() => {});
+      }, AUTO_PRINT_RO_MS);
+    }
   }
 
   // Melder kun naar tilstanden skifter, saa statuslinjen ikke blinker
@@ -643,17 +716,19 @@ export class AppSession {
     // Fase 2: en kopi til et program. Kopien faar programmets endelse
     // (-neo, -tp, -ps) og ligger i vaerkets Edits, saa resultatet ogsaa
     // gemmes dér, og statussen kan ses af navnet.
-    handle('edit:send', async ({ versionId, program }) => {
+    // En kopi pr. fil, og alle aabnes i programmet paa én gang.
+    handle('edit:send', async ({ versionId, versionIds, program }) => {
       const catalog = this.requireCatalog();
       const suffiks = EDITOR_SUFFIKS[program];
       if (!suffiks) throw new Error(`Unknown program: ${program}`);
       const app = detectEditors(this.settings.data.customEditors).find((e) => e.label === program);
       if (!app) throw new Error(`${program} was not found in Applications`);
-      const dest = catalog.kopiTilEdits(versionId, suffiks);
-      this.log(`edit: copy for ${program} -> ${dest.slice(catalog.root.length + 1)}`);
+      const ids = Array.isArray(versionIds) && versionIds.length ? versionIds : [versionId];
+      const filer = ids.map((id) => catalog.kopiTilEdits(id, suffiks));
+      for (const dest of filer) this.log(`edit: copy for ${program} -> ${dest.slice(catalog.root.length + 1)}`);
       await this.runSync('kopi til editor');
-      await openInApp(app.appPath, dest);
-      return { rel: dest.slice(catalog.root.length + 1) };
+      await openInApp(app.appPath, filer);
+      return { rel: filer[0].slice(catalog.root.length + 1), antal: filer.length };
     });
 
     // Fase 2, sidste skridt: den faerdige redigering bliver master.

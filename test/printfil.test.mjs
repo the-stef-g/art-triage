@@ -150,6 +150,16 @@ describe('printfiler i kataloget', () => {
     expect(res.path).toBe(join(root, 'Approved', 'Desert', 'Print files', 'Desert 3-2.png'));
   });
 
+  it('autoPrintKandidater: -giga-filer uden en nyere printfil', async () => {
+    await p3Tiff(join(root, 'Approved', 'Desert', 'Master', 'Desert 3-2.tif'), 60, 40);
+    await p3Tiff(join(root, 'Approved', 'Desert', 'Edits', 'Desert 3-2-giga.tif'), 240, 160);
+    catalog.sync();
+    const k = catalog.autoPrintKandidater();
+    expect(k.map((x) => x.rel)).toEqual(['Approved/Desert/Edits/Desert 3-2-giga.tif']);
+    await lavPrintfil(catalog.printMaal(k[0].versionId));
+    expect(catalog.autoPrintKandidater()).toEqual([]);
+  });
+
   it('kun en -giga-fil kan blive til en printfil', () => {
     const orig = alle().find((x) => x.rel_path.startsWith('Approved/Desert/Original/'));
     expect(() => catalog.printMaal(orig.version_id)).toThrow(/-giga/);

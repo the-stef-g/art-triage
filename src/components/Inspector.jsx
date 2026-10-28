@@ -339,18 +339,18 @@ export default function Inspector({
           <h4>Enlargement</h4>
           <p className="tom">
             {row.forstoerrelse
-              ? `${row.forstoerrelse.split('/').pop()} in Edits. Select it to make the print file.`
-              : 'Not enlarged yet. Send the crop to Gigapixel; the copy goes in Edits with -giga in its name. Save the enlargement over it, then select it to make the print file.'}
+              ? `${row.forstoerrelse.split('/').pop()} in Edits.`
+              : 'Not enlarged yet. Send the crop to Gigapixel; the copy goes in Edits with -giga in its name. Save the enlargement over it, and the app makes the print file.'}
           </p>
           <div className="knapraekke">
             <button
               disabled={!installeret.has('Topaz Gigapixel')}
               onClick={() => act.sendToEditor('Topaz Gigapixel')}
               title={installeret.has('Topaz Gigapixel')
-                ? 'Copy this crop to Edits as …-giga, and open the copy in Gigapixel'
+                ? 'Copy the crop (or all the selected crops) to Edits as …-giga, and open the copies in Gigapixel'
                 : 'Topaz Gigapixel was not found in Applications'}
             >
-              Enlarge in Gigapixel
+              {selectedCount > 1 ? 'Enlarge the selected in Gigapixel' : 'Enlarge in Gigapixel'}
             </button>
           </div>
           {row.printfil && (
