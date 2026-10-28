@@ -672,7 +672,12 @@ export class AppSession {
       const lavet = [];
       for (const id of ids) {
         const res = await lavPrintfil(catalog.printMaal(id));
-        lavet.push({ rel: res.path.slice(catalog.root.length + 1), bytes: res.bytes });
+        lavet.push({
+          rel: res.path.slice(catalog.root.length + 1),
+          bytes: res.bytes,
+          format: res.token.replace('-', ':'),
+          afvigelse: res.afvigelse,
+        });
       }
       this.log(`print: ${lavet.length} print file(s)`);
       this.broadcast('changed');

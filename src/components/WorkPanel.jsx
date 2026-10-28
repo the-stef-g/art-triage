@@ -216,15 +216,15 @@ export default function WorkPanel({ row, versions, tekstRev = 0, hasKey, shop, o
         </span>
       </label>
 
-      {/* Ikke et valg: et vaerk med en beskaering i Master saelges som print.
-          Appen skriver det til shoppen (work_prints), naar vaerket sendes. */}
+      {/* Ikke et valg: alle vaerker saelges som print, undtagen malerier og
+          skulpturer. Appen skriver det til shoppen (work_prints). */}
       <p
         className="vaerk-note"
-        title="Set by the app: a work with at least one crop in its Master folder is offered as prints in the shop."
+        title="Set by the app from the category: every work is offered as prints, except Paintings and Sculptures, which are sold as the original."
       >
         {work.prints
-          ? `Offered as prints: ${work.crops.map((c) => c.format).join(', ')}`
-          : 'Not offered as prints. Make a crop under 4 Crops to offer it.'}
+          ? 'Offered as prints.'
+          : 'Sold as the original, not as prints.'}
       </p>
 
       {work.unique && (

@@ -342,7 +342,7 @@ export default function Inspector({
               ? `${row.printfil.rel.split('/').pop()} · ${formatBytes(row.printfil.bytes)}`
               : 'No print file yet.'}
           </p>
-          <p className="tom">A PNG in sRGB at full size, marked 300 DPI, in the work&apos;s Print files folder. Prodigi&apos;s ICC profiles are for proofing and are not put in the file.</p>
+          <p className="tom">A PNG in sRGB at full size, marked 300 DPI, in the work&apos;s Print files folder. The format is always in its name (Desert 3-2.png); a free crop gets the nearest of 1:1, 2:3, 3:2, 1:2 and 2:1. Prodigi&apos;s ICC profiles are for proofing and are not put in the file.</p>
           <div className="knapraekke">
             <button
               onClick={act.makePrintFiles}

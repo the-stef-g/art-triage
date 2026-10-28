@@ -187,9 +187,9 @@ export class Works {
       sectionColour: row.section_colour,
       catalogueNumber: row.catalogue_number,
       video: row.video,
-      // Ikke et valg: et vaerk med mindst én beskaering i Master har et
-      // printformat og saelges som print, ellers ikke.
-      prints: this.cropsFor(imageId).length > 0,
+      // Ikke et valg: alle vaerker saelges som print, undtagen de unikke
+      // (malerier og skulpturer), som saelges som originalen.
+      prints: !UNIQUE_CATEGORIES.has(row.category),
       dimensions: row.dimensions,
       price: row.price,
       notes: row.notes,

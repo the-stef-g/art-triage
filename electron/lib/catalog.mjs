@@ -7,7 +7,7 @@ import {
 } from 'node:fs';
 import { join, dirname, basename, extname, posix } from 'node:path';
 import { exifTid } from './exif.mjs';
-import { printfilNavn } from './printfil.mjs';
+import { printfilNavn, PRINTFORMATER } from './printfil.mjs';
 import {
   walkImages, walkImagesAsync, walkDirs, findImportMappe, beskaeringFraSti, navnMedBeskaering,
   editorFraSti, masterNavn, quickHash, quickHashAsync, mapGraense, stemOf, slug, uniquePath, extOf, daCollator,
@@ -813,16 +813,45 @@ export class Catalog extends EventEmitter {
     return ud;
   }
 
-  // Printfilen til en fil i Master: { rel, bytes } eller null.
-  _printfilInfo(rel) {
+  // En fil i Master som print: vaerket, navnet uden format, formatet i
+  // navnet (kun de faste; en fri beskaering og masteren selv har intet) og
+  // de formater vaerkets beskaeringer i Master allerede daekker.
+  _printDele(rel) {
     const m = /^Approved\/([^/]+)\/Master\/([^/]+)$/.exec(rel);
     if (!m) return null;
-    const printRel = `Approved/${m[1]}/Print files/${printfilNavn(stemOf(m[2]))}`;
-    try {
-      return { rel: printRel, bytes: statSync(this.abs(printRel)).size };
-    } catch {
-      return null;
+    const crop = beskaeringFraSti(rel);
+    const tilToken = (c) => (c && c !== 'free' ? c.replace(':', '-') : null);
+    const optaget = this.db.all(
+      "SELECT rel_path FROM files WHERE present=1 AND rel_path LIKE ? ESCAPE '\\'",
+      `Approved/${escapeLike(m[1])}/Master/%`
+    ).map((r) => tilToken(beskaeringFraSti(r.rel_path))).filter(Boolean);
+    return {
+      work: m[1],
+      base: stemOf(navnMedBeskaering(m[2], null)),
+      token: tilToken(crop),
+      optaget: [...new Set(optaget)],
+    };
+  }
+
+  // Printfilen til en fil i Master: { rel, bytes } eller null. For masteren
+  // selv staar formatet ikke i dens navn, saa det er den printfil med
+  // samme navn, hvis format ingen beskaering daekker.
+  _printfilInfo(rel) {
+    const d = this._printDele(rel);
+    if (!d) return null;
+    const mappe = `Approved/${d.work}/Print files`;
+    const kandidater = d.token
+      ? [d.token]
+      : Object.keys(PRINTFORMATER).filter((t) => !d.optaget.includes(t));
+    for (const t of kandidater) {
+      const printRel = `${mappe}/${printfilNavn(d.base, t)}`;
+      try {
+        return { rel: printRel, bytes: statSync(this.abs(printRel)).size };
+      } catch {
+        // ikke dette format
+      }
     }
+    return null;
   }
 
   // Hvad der skal til for at lave printfilen til en fil i Master.
@@ -830,12 +859,14 @@ export class Catalog extends EventEmitter {
     const v = this.getVersion(versionId);
     const f = v ? this.getFile(v.effective_file_id) : null;
     if (!f || !f.present) throw new Error('The file is not available right now');
-    const m = /^Approved\/([^/]+)\/Master\/([^/]+)$/.exec(f.rel_path);
-    if (!m) throw new Error('Print files are made from files in Master');
+    const d = this._printDele(f.rel_path);
+    if (!d) throw new Error('Print files are made from files in Master');
     return {
       kilde: this.abs(f.rel_path),
-      mappe: join(this.root, 'Approved', m[1], 'Print files'),
-      stem: stemOf(m[2]),
+      mappe: join(this.root, 'Approved', d.work, 'Print files'),
+      base: d.base,
+      token: d.token,
+      optaget: d.optaget,
       rotation: f.rotation || 0,
     };
   }
@@ -846,7 +877,8 @@ export class Catalog extends EventEmitter {
   // 2 Edit: godkendte vaerker uden en master; originalen og redigeringerne.
   // 3 Product: vaerker med en master; én flise pr. vaerk.
   // 4 Crops: vaerker med en master; masteren og beskaeringerne.
-  // 5 Print: beskaeringerne.
+  // 5 Print: beskaeringerne, hver med sin printfil. Et vaerk der kun saelges
+  // i sin egen form, faar en beskaering i det format.
   // Fasen er ikke en status man saetter. Den foelger af mapperne.
 
   _mastersInfo() {

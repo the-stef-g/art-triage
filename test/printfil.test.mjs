@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import sharp from 'sharp';
 import { openDatabase } from '../electron/lib/db.mjs';
 import { Catalog } from '../electron/lib/catalog.mjs';
-import { lavPrintfil } from '../electron/lib/printfil.mjs';
+import { lavPrintfil, naermesteFormat } from '../electron/lib/printfil.mjs';
 
 let root;
 let db;
@@ -47,7 +47,7 @@ describe('lavPrintfil', () => {
   it('laver en 8 bit sRGB PNG paa 300 DPI i fuld stoerrelse, med farverne regnet om', async () => {
     const kilde = join(root, 'k.tif');
     await p3Tiff(kilde, 60, 40);
-    const res = await lavPrintfil({ kilde, mappe: join(root, 'Print files'), stem: 'Desert 3-2' });
+    const res = await lavPrintfil({ kilde, mappe: join(root, 'Print files'), base: 'Desert', token: '3-2' });
     expect(res.path).toBe(join(root, 'Print files', 'Desert 3-2.png'));
     const m = await sharp(res.path).metadata();
     expect(m.format).toBe('png');
@@ -67,12 +67,22 @@ describe('lavPrintfil', () => {
     const kilde = join(root, 'k.tif');
     await p3Tiff(kilde, 60, 40);
     const mappe = join(root, 'Print files');
-    await lavPrintfil({ kilde, mappe, stem: 'x' });
-    const res = await lavPrintfil({ kilde, mappe, stem: 'x', rotation: 90 });
-    expect(res.path).toBe(join(mappe, 'x.png'));
+    // Uden et format i navnet (en fri beskaering) findes det taetteste.
+    expect((await lavPrintfil({ kilde, mappe, base: 'x' })).path).toBe(join(mappe, 'x 3-2.png'));
+    const res = await lavPrintfil({ kilde, mappe, base: 'x', rotation: 90 });
+    expect(res.path).toBe(join(mappe, 'x 2-3.png'));
     const m = await sharp(res.path).metadata();
     expect([m.width, m.height]).toEqual([40, 60]);
-    expect(existsSync(join(mappe, 'x 1.png'))).toBe(false);
+    const igen = await lavPrintfil({ kilde, mappe, base: 'x', rotation: 90 });
+    expect(igen.path).toBe(res.path);
+    expect(existsSync(join(mappe, 'x 2-3 1.png'))).toBe(false);
+  });
+
+  it('kender de fem printformater', () => {
+    expect(naermesteFormat(3000, 2000)).toBe('3-2');
+    expect(naermesteFormat(4000, 3000)).toBe('3-2');
+    expect(naermesteFormat(1000, 1050)).toBe('1-1');
+    expect(naermesteFormat(1000, 2100)).toBe('1-2');
   });
 });
 
@@ -86,7 +96,8 @@ describe('printfiler i kataloget', () => {
 
     const maal = catalog.printMaal(r.version_id);
     expect(maal.mappe).toBe(join(root, 'Approved', 'Desert', 'Print files'));
-    expect(maal.stem).toBe('Desert 2-3');
+    expect(maal.base).toBe('Desert');
+    expect(maal.token).toBe('2-3');
     await lavPrintfil(maal);
 
     r = catalog.listVersions({ fase: 5 })[0];

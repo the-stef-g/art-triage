@@ -430,10 +430,16 @@ export default function App() {
       try {
         const res = await invoke('print:make', { versionIds: valgte });
         const mb = res.reduce((sum, r) => sum + r.bytes, 0) / 1e6;
-        setFejl(res.length === 1
+        // En fil hvis form ligger mere end et par procent fra formatet,
+        // beskaeres af Prodigi; det skal man vide.
+        const skaev = res.filter((r) => r.afvigelse > 2);
+        const advarsel = skaev.length
+          ? ` ${skaev.map((r) => r.rel.split('/').pop()).join(', ')}: the shape is ${skaev[0].afvigelse}% off ${skaev[0].format}, so Prodigi will trim it. Crop it under 4 Crops for an exact fit.`
+          : '';
+        setFejl((res.length === 1
           ? `Print file saved as ${res[0].rel} (${mb.toFixed(1)} MB)`
-          : `${res.length} print files saved in Print files (${mb.toFixed(1)} MB in all)`);
-        setTimeout(() => setFejl(null), 7000);
+          : `${res.length} print files saved in Print files (${mb.toFixed(1)} MB in all)`) + advarsel);
+        setTimeout(() => setFejl(null), skaev.length ? 12000 : 7000);
       } catch (err) { visFejl(err); }
     },
     // Fase 2: kassér hele vaerket. Originalen gaar til Discarded, og

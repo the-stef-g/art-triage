@@ -272,15 +272,16 @@ describe('serier og print af sig selv', () => {
     expect(works.autoSerier()).toBe(0);
   });
 
-  it('et vaerk saelges som print naar det har en beskaering i Master', () => {
+  it('alle vaerker saelges som print, undtagen malerier og skulpturer', () => {
     catalog.setRating([raekke('Import/Ahl/x.cr2').version_id], 'godkendt');
     skriv('Approved/x/Master/x.tif', 'm');
     catalog.sync();
     const works = new Works(catalog);
     const id = raekke('Approved/x/Original/x.cr2').image_id;
+    expect(works.get(id).prints).toBe(true);
+    works.save(id, { category: 'Paintings' });
     expect(works.get(id).prints).toBe(false);
-    skriv('Approved/x/Master/x 2-3.tif', 'c');
-    catalog.sync();
+    works.save(id, { category: 'Photography' });
     expect(works.get(id).prints).toBe(true);
   });
 });
