@@ -17,7 +17,7 @@ The app is built automatically by GitHub Actions on every push and published as 
 3. Download **Stef-G-Art-<version>-mac-x64.zip**.
 4. Unzip it and drag **Stef G Art.app** to Applications.
 
-Releases do not count against the storage quota for Actions artifacts, which old builds used to fill up.
+Releases do not count against the storage quota for Actions artifacts, which old builds used to fill up. When a version is merged into main without code changes since its branch build, main does not build the Mac app again: it turns the branch's pre-release into the latest release, which takes seconds instead of a wait for a Mac at GitHub.
 
 ## First launch on macOS Sequoia
 

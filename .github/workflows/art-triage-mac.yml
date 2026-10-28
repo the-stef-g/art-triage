@@ -108,11 +108,52 @@ jobs:
           if-no-files-found: ignore
           retention-days: 3
 
+  # Paa main er koden som regel præcis den, der lige er bygget paa grenen
+  # (main flettes frem til grenen). Saa laves grenens pre-release bare om
+  # til den seneste udgave, i stedet for at vente paa en Mac igen. Kun hvis
+  # der er aendret kode siden (andet end tekst og docs), bygges der forfra.
+  promote:
+    name: Promote the branch build (main only)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    outputs:
+      promoted: ${{ steps.p.outputs.promoted }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: p
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          v=$(node -p "require('./package.json').version")
+          tag="v$v"
+          fil="Stef-G-Art-$v-mac-x64.zip"
+          info=$(gh release view "$tag" --json targetCommitish,assets \
+            -q '[.targetCommitish, (.assets | map(.name) | join(","))] | @tsv' 2>/dev/null || true)
+          target=$(printf '%s' "$info" | cut -f1)
+          assets=$(printf '%s' "$info" | cut -f2)
+          if [ -n "$target" ] && [[ ",$assets," == *",$fil,"* ]] \
+            && git diff --quiet "$target" "$GITHUB_SHA" -- . ':(exclude)*.md' ':(exclude)docs/**'; then
+            gh release edit "$tag" --prerelease=false --latest \
+              --notes "Stef G Art $v for Intel Macs. Download the zip below, unzip it and move Stef G Art to Applications."
+            echo "Promoted $tag (built from $target)"
+            echo "promoted=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No matching pre-release for $tag; the Mac app is built."
+            echo "promoted=false" >> "$GITHUB_OUTPUT"
+          fi
+
   build-mac:
     name: Build macOS app (Intel x64)
     runs-on: macos-latest
     timeout-minutes: 25
-    needs: test
+    needs: [test, promote]
+    # Paa en gren springes promote over; paa main kun naar den ikke fandt
+    # en faerdig pre-release at bruge.
+    if: ${{ !cancelled() && needs.test.result == 'success' && needs.promote.outputs.promoted != 'true' }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
