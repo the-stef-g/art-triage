@@ -149,7 +149,7 @@ The Work panel in the Inspector holds everything that belongs to one artwork: ti
 
 **The field format.** The ACPT fields are written exactly as product 20 (Desert Canyon 04) has them: the value, `*_attachment_id` for images and video, the field's definition UUID in `*_id` and the field type in `*_type`. The reference is `docs/reference-product-20.json`, and a test checks that what Stef G Art writes is identical to it. Colour and catalogue number are only sent when you have filled them in: empty means the series colour and the number at the end of the title, which the site works out. Print on/off is sent as `1` or empty.
 
-**Check shop format** fetches product 20 live and compares its fields with what Stef G Art writes. If they match, nothing changes. If someone has changed the fields in WooCommerce, the differences are listed and Send to shop stays locked until a new check passes. Never having run the check does not lock anything.
+**The shop format is checked by itself.** When a library opens, and when the WooCommerce key is saved, the app fetches product 20 (Desert Canyon 04) and compares its fields with what Stef G Art writes. If they match, you hear nothing. If the fields have changed in WooCommerce, the status bar says so, the differences are listed under Shop, and Send to shop stays locked until a later check passes. If the shop cannot be reached, the last result stands.
 
 **Product type and attributes.** A unique work (Paintings, Sculptures) is a simple product with stock 1. Every other work is a variable product, like product 20, and gets its print variants from the CSV later. Stef G Art only writes the attributes Year, Technique and Dimensions. When a product is updated, the print attributes (Format, Material, Frame, Size) are sent back unchanged, so the variants are not lost. Tax class is Reduced rate for sculptures and standard for everything else.
 
@@ -213,7 +213,7 @@ Without keys, steps 1 to 9 work. Steps 10 to 16 need the two shop keys.
 7. Approve and finish the image, add notes, click Write texts. The three texts appear, the cost shows in the status bar, and the word and character counts are right.
 8. Edit the description, then click Write texts again. The app asks before it replaces your text. Say no and your text is kept.
 9. Look for dashes, "stunning", "unique" and mentions of AI or Photoshop in the texts. Any that slipped through show as a warning under the button.
-10. Add the WooCommerce key under Help, then click Check shop format. It should say the format matches.
+10. Add the WooCommerce key under Help. The format check runs by itself; the status bar only says something if the format differs.
 11. Add the WordPress application password under Help. Put the image in a series, fill in intro, template and colour, and click Send to shop. In WooCommerce there is a draft product with the right title, texts, image, category, attributes and the series, and the series term has its three fields.
 12. Open the draft in WooCommerce and check that the fields under Work show the values (template, crops with their images, print on/off) and not empty boxes.
 13. Change a text in the app and send again. The same product is updated, with no second one next to it. Change a text in WooCommerce and send again: the app's text wins.
