@@ -460,6 +460,8 @@ app.whenReady().then(() => {
     settings.data.wooSecret = secret;
     settings.save();
     aiLog(`WooCommerce-noegle ${key ? 'sat' : 'fjernet'}`);
+    // En ny noegle kan pege paa en shop med et andet format.
+    if (key) session?.tjekShopFormatSnart();
     return { harWooKey: Boolean(key) };
   });
   ipcMain.handle('app:setWpKey', (_event, payload) => {

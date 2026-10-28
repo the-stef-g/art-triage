@@ -308,6 +308,10 @@ export default function App() {
       if (evt.phase === 'faerdig') setTekstRev((n) => n + 1);
     } else if (evt.type === 'drev') {
       setDrev({ missing: evt.missing, root: evt.root });
+    } else if (evt.type === 'shopStatus') {
+      // Formattjekket koerer af sig selv; resultatet kommer her.
+      const { type: _type, ...status } = evt;
+      setShop(status);
     } else if (evt.type === 'besked') {
       setFejl(evt.tekst);
       setTimeout(() => setFejl(null), 6000);

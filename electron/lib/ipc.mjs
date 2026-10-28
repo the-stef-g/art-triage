@@ -186,6 +186,7 @@ export class AppSession {
     this.lastScanMs = 0;
     await this.runSync('aabning');
     this.autoTeksterKlar = true;
+    this.tjekShopFormatSnart();
     // Foerste aabning efter at de automatiske noegleord blev taget ud af
     // drift: fjern de gamle gaet, saa chips og soegning ikke bliver ved
     // med at vise dem. Stefs egne ord staar uroert.
@@ -434,6 +435,38 @@ export class AppSession {
   }
 
   // Samme maade at melde fremdrift paa som tekster og noegleord.
+  // Tjekker at ACPT-felterne paa produkt 20 stadig ser ud som dem appen
+  // skriver, og husker resultatet. Koerer af sig selv naar biblioteket
+  // aabnes og naar WooCommerce-noeglen gemmes. En forskel spaerrer for
+  // afsendelse og meldes i bundlinjen; ellers hoerer Stef intet.
+  async tjekShopFormat({ stille = false } = {}) {
+    const res = await this._shopCall(async (shop) => {
+      const { name, problems } = await shop.checkFormat();
+      this.settings.data.shopFormatOk = problems.length === 0;
+      this.settings.data.shopFormatProblems = problems;
+      this.settings.save();
+      return { name, problems };
+    });
+    this.broadcast('shopStatus', this.shopStatus());
+    if (res.problems.length) {
+      this.broadcast('besked', {
+        tekst: `The shop's product format has changed, so Send to shop is locked: ${res.problems.slice(0, 2).join('; ')}`,
+      });
+    } else if (!stille) {
+      this.broadcast('besked', { tekst: `The shop format matches (${res.name})` });
+    }
+    return res;
+  }
+
+  // I baggrunden og kun med en noegle. Kan shoppen ikke naas, roeres det
+  // seneste resultat ikke: det er ikke en forskel i formatet.
+  tjekShopFormatSnart() {
+    if (!this.shopStatus().harWoo) return;
+    this.tjekShopFormat({ stille: true }).catch((err) => {
+      this.log(`shop format check skipped: ${String(err?.message || err).slice(0, 200)}`);
+    });
+  }
+
   async _shopCall(fn) {
     this.broadcast('shop', { phase: 'koerer' });
     try {
@@ -794,13 +827,7 @@ export class AppSession {
     handle('shop:publish', ({ imageId }) => this._shopCall((shop) => shop.publish(imageId)));
     // Tjekker at ACPT-felterne paa produkt 20 stadig ser ud som dem vi
     // skriver, og husker resultatet.
-    handle('shop:checkFormat', () => this._shopCall(async (shop) => {
-      const { name, problems } = await shop.checkFormat();
-      this.settings.data.shopFormatOk = problems.length === 0;
-      this.settings.data.shopFormatProblems = problems;
-      this.settings.save();
-      return { name, problems };
-    }));
+    handle('shop:checkFormat', () => this.tjekShopFormat());
     handle('work:writeTexts', (payload) => this.writeWorkTexts(payload));
     handle('work:setCrop', ({ imageId, versionId, format }) =>
       this.requireWorks().setCrop(imageId, versionId, format ?? null));

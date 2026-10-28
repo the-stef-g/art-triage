@@ -116,19 +116,6 @@ export default function WorkPanel({ row, versions, tekstRev = 0, hasKey, shop, o
   const sendToShop = () => shopKald('shop:send', (r) =>
     (r.created ? `Created draft product ${r.productId} in the shop` : `Updated product ${r.productId} in the shop`));
   const publish = () => shopKald('shop:publish', (r) => `Product ${r.productId} is now ${r.status}`);
-  const checkFormat = async () => {
-    setBusy(true);
-    try {
-      const res = await invoke('shop:checkFormat');
-      onShop(res.problems.length
-        ? `The shop's field format differs from what Stef G Art writes: ${res.problems.slice(0, 3).join('; ')}`
-        : `The shop format matches (${res.name})`);
-    } catch (err) {
-      onError(err);
-    }
-    setBusy(false);
-  };
-
   // Seriens felter til shoppen. En ny serie faar altid en skabelon i
   // shoppen; en der findes, faar kun de felter der er udfyldt her.
   const saveSeries = async (patch) => {
@@ -269,21 +256,13 @@ export default function WorkPanel({ row, versions, tekstRev = 0, hasKey, shop, o
           onClick={sendToShop}
           title={!work.eligible ? 'The image must be Approved and Finished'
             : (!shop?.harWoo || !shop?.harWp) ? 'Add the WooCommerce key and the WordPress application password under Help'
-              : shop?.formatOk === false ? 'The shop format check found a difference' : ''}
+              : shop?.formatOk === false ? 'The shop\'s product format has changed since the app was made for it. Sending is locked so no product is damaged.' : ''}
         >
           Send to shop
         </button>
         {work.wooProductId && (
           <button disabled={busy} onClick={publish} title="Publish the draft in the shop">Publish</button>
         )}
-        <button
-          className="lille"
-          disabled={busy || !shop?.harWoo}
-          onClick={checkFormat}
-          title="Fetches product 20 from the shop and checks that its fields look like what Stef G Art writes"
-        >
-          Check shop format
-        </button>
       </div>
       {shop?.formatOk === false && (
         <ul className="vaerk-advarsler">
