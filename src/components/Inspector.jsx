@@ -334,13 +334,13 @@ export default function Inspector({
         </>
       )}
 
-      {fase === 5 && (
+      {fase === 5 && !row.giga && (
         <>
           <h4>Enlargement</h4>
           <p className="tom">
             {row.forstoerrelse
-              ? `${row.forstoerrelse.split('/').pop()} in Edits. The print file is made from it.`
-              : 'Not enlarged yet. Send the crop to Gigapixel; the copy goes in Edits with -giga in its name. Save the enlargement in Edits too.'}
+              ? `${row.forstoerrelse.split('/').pop()} in Edits. Select it to make the print file.`
+              : 'Not enlarged yet. Send the crop to Gigapixel; the copy goes in Edits with -giga in its name. Save the enlargement over it, then select it to make the print file.'}
           </p>
           <div className="knapraekke">
             <button
@@ -353,18 +353,28 @@ export default function Inspector({
               Enlarge in Gigapixel
             </button>
           </div>
+          {row.printfil && (
+            <>
+              <h4>Print file</h4>
+              <p className="tom">{`${row.printfil.rel.split('/').pop()} · ${formatBytes(row.printfil.bytes)}`}</p>
+            </>
+          )}
+        </>
+      )}
 
+      {fase === 5 && row.giga && (
+        <>
           <h4>Print file</h4>
           <p className="tom">
             {row.printfil
               ? `${row.printfil.rel.split('/').pop()} · ${formatBytes(row.printfil.bytes)}`
               : 'No print file yet.'}
           </p>
-          <p className="tom">A PNG in sRGB at full size, marked 300 DPI, in the work&apos;s Print files folder. The format is always in its name (Desert 3-2.png), and the file is exactly that format. It is made from the largest enlargement in Edits, otherwise from the crop. Prodigi&apos;s ICC profiles are for proofing and are not put in the file.</p>
+          <p className="tom">Made from this enlargement: a PNG in sRGB at full size, marked 300 DPI, in the work&apos;s Print files folder. The format is always in its name (Desert 3-2.png), and the file is exactly that format. Prodigi&apos;s ICC profiles are for proofing and are not put in the file.</p>
           <div className="knapraekke">
             <button
               onClick={act.makePrintFiles}
-              title="Make the print file from the enlargement (or the crop). An old print file with the same name is replaced."
+              title="Make the print file from this enlargement. An old print file with the same name is replaced."
             >
               {selectedCount > 1 ? `Make print files (${selectedCount})` : row.printfil ? 'Make print file again' : 'Make print file'}
             </button>

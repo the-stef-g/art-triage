@@ -99,36 +99,57 @@ describe('lavPrintfil', () => {
 });
 
 describe('printfiler i kataloget', () => {
-  it('fase 5 viser om en beskaering har en printfil, og printMaal peger paa Print files', async () => {
+  it('fase 5 viser beskaeringen og dens -giga-fil, og printfilen laves af -giga-filen', async () => {
     await p3Tiff(join(root, 'Approved', 'Desert', 'Master', 'Desert 2-3.tif'), 40, 60);
     catalog.sync();
-    let r = catalog.listVersions({ fase: 5 })[0];
-    expect(r.rel_path).toBe('Approved/Desert/Master/Desert 2-3.tif');
-    expect(r.printfil).toBe(null);
+    let liste = catalog.listVersions({ fase: 5 });
+    expect(liste.map((r) => r.rel_path)).toEqual(['Approved/Desert/Master/Desert 2-3.tif']);
+    const krop = liste[0];
+    expect(krop.printfil).toBe(null);
+    expect(krop.giga).toBe(false);
+    // Beskaeringen selv bliver ikke til en printfil.
+    expect(() => catalog.printMaal(krop.version_id)).toThrow(/-giga/);
 
-    const maal = catalog.printMaal(r.version_id);
+    // Forstoerrelsen fra Gigapixel i Edits kommer med i fase 5.
+    await p3Tiff(join(root, 'Approved', 'Desert', 'Edits', 'Desert 2-3-Giga.tif'), 120, 180);
+    catalog.sync();
+    liste = catalog.listVersions({ fase: 5 });
+    expect(liste.map((r) => r.rel_path).sort()).toEqual([
+      'Approved/Desert/Edits/Desert 2-3-Giga.tif',
+      'Approved/Desert/Master/Desert 2-3.tif',
+    ]);
+    expect(liste.find((r) => !r.giga).forstoerrelse).toBe('Approved/Desert/Edits/Desert 2-3-Giga.tif');
+    const giga = liste.find((r) => r.giga);
+    expect(giga.giga).toBe(true);
+
+    const maal = catalog.printMaal(giga.version_id);
+    expect(maal.kilde).toBe(join(root, 'Approved', 'Desert', 'Edits', 'Desert 2-3-Giga.tif'));
     expect(maal.mappe).toBe(join(root, 'Approved', 'Desert', 'Print files'));
     expect(maal.base).toBe('Desert');
     expect(maal.token).toBe('2-3');
-    await lavPrintfil(maal);
+    expect(maal.beskaering).toBe(join(root, 'Approved', 'Desert', 'Master', 'Desert 2-3.tif'));
+    const res = await lavPrintfil(maal);
+    expect([res.bredde, res.hoejde]).toEqual([120, 180]);
 
-    r = catalog.listVersions({ fase: 5 })[0];
-    expect(r.printfil.rel).toBe('Approved/Desert/Print files/Desert 2-3.png');
-    expect(r.printfil.bytes).toBeGreaterThan(0);
-    // En forstoerrelse i Edits bliver kilden til printfilen.
-    await p3Tiff(join(root, 'Approved', 'Desert', 'Edits', 'Desert 2-3-Giga.tif'), 120, 180);
-    catalog.sync();
-    r = catalog.listVersions({ fase: 5 })[0];
-    expect(r.forstoerrelse).toBe('Approved/Desert/Edits/Desert 2-3-Giga.tif');
-    const igen = await lavPrintfil(catalog.printMaal(r.version_id));
-    expect([igen.bredde, igen.hoejde]).toEqual([120, 180]);
+    liste = catalog.listVersions({ fase: 5 });
+    for (const r of liste) expect(r.printfil.rel).toBe('Approved/Desert/Print files/Desert 2-3.png');
     // Print files skannes ikke: printfilen bliver ikke en version af vaerket.
     catalog.sync();
     expect(alle().some((x) => x.rel_path.includes('Print files'))).toBe(false);
   });
 
-  it('kun filer i Master kan blive til en printfil', () => {
+  it('det Gigapixel selv kalder filen, kan ogsaa bruges', async () => {
+    await p3Tiff(join(root, 'Approved', 'Desert', 'Master', 'Desert 3-2.tif'), 60, 40);
+    await p3Tiff(join(root, 'Approved', 'Desert', 'Edits', 'Desert 3-2-giga-gigapixel-standard-4x.tif'), 240, 160);
+    catalog.sync();
+    const giga = catalog.listVersions({ fase: 5 }).find((r) => r.giga);
+    expect(giga.rel_path).toBe('Approved/Desert/Edits/Desert 3-2-giga-gigapixel-standard-4x.tif');
+    const res = await lavPrintfil(catalog.printMaal(giga.version_id));
+    expect(res.path).toBe(join(root, 'Approved', 'Desert', 'Print files', 'Desert 3-2.png'));
+  });
+
+  it('kun en -giga-fil kan blive til en printfil', () => {
     const orig = alle().find((x) => x.rel_path.startsWith('Approved/Desert/Original/'));
-    expect(() => catalog.printMaal(orig.version_id)).toThrow(/Master/);
+    expect(() => catalog.printMaal(orig.version_id)).toThrow(/-giga/);
   });
 });

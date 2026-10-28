@@ -24,6 +24,17 @@ async function vistStoerrelse(sharp, fil, rotation = 0) {
   return { b, h };
 }
 
+// Antal pixels i en fil, eller 0 hvis den ikke kan laeses.
+export async function pixelAreal(fil) {
+  try {
+    const sharp = (await import('sharp')).default;
+    const m = await sharp(fil, { failOn: 'none', limitInputPixels: false }).metadata();
+    return (m.width || 0) * (m.height || 0);
+  } catch {
+    return 0;
+  }
+}
+
 // base er filens navn uden format, og token formatet ("2-3"). Printfilen
 // laves af den stoerste forstoerrelse fra Edits (fx "Desert 2-3-giga.tif"
 // fra Gigapixel), og ellers af beskaeringen selv. Den er altid praecis i sit

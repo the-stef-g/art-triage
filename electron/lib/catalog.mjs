@@ -812,8 +812,9 @@ export class Catalog extends EventEmitter {
     if (fase === 5) {
       for (const r of ud) {
         r.printfil = this._printfilInfo(r.rel_path);
+        r.giga = Boolean(this._gigaDele(r.rel_path));
         // Kopien til Gigapixel ligger ogsaa i Edits, men er ikke stoerre.
-        const st = this._printDele(r.rel_path)?.forstoerrelser[0];
+        const st = r.giga ? null : this._printDele(r.rel_path)?.forstoerrelser[0];
         r.forstoerrelse = st && st.size > r.size ? st.rel_path : null;
       }
     }
@@ -844,9 +845,22 @@ export class Catalog extends EventEmitter {
     return { work: m[1], base, token, forstoerrelser };
   }
 
-  // Printfilen til en beskaering i Master: { rel, bytes } eller null.
+  // En forstoerrelse i Edits af en beskaering: "Desert 2-3-giga.tif", eller
+  // det Gigapixel selv gemmer ("Desert 2-3-giga-gigapixel-4x.tif"). Navnet
+  // uden format, og formatet. Det er den printfilen laves af.
+  _gigaDele(rel) {
+    const m = /^Approved\/([^/]+)\/Edits\/([^/]+)$/.exec(rel);
+    if (!m) return null;
+    const stem = stemOf(m[2]);
+    const g = /^(.*\S)[ _](1-1|2-3|3-2|1-2|2-1)[-_ ]*giga/i.exec(stem);
+    if (!g) return null;
+    return { work: m[1], base: g[1], token: g[2] };
+  }
+
+  // Printfilen til en beskaering i Master eller en forstoerrelse i Edits:
+  // { rel, bytes } eller null.
   _printfilInfo(rel) {
-    const d = this._printDele(rel);
+    const d = this._printDele(rel) || this._gigaDele(rel);
     if (!d || !d.token) return null;
     const printRel = `Approved/${d.work}/Print files/${printfilNavn(d.base, d.token)}`;
     try {
@@ -856,22 +870,34 @@ export class Catalog extends EventEmitter {
     }
   }
 
-  // Hvad der skal til for at lave printfilen til en beskaering i Master.
+  // Hvad der skal til for at lave printfilen. Den laves af forstoerrelsen i
+  // Edits (-giga), praecis den fil der er valgt. beskaering er filen i Master
+  // den er lavet af, saa det kan ses om den faktisk er blevet stoerre.
   printMaal(versionId) {
     const v = this.getVersion(versionId);
     const f = v ? this.getFile(v.effective_file_id) : null;
     if (!f || !f.present) throw new Error('The file is not available right now');
-    const d = this._printDele(f.rel_path);
-    if (!d) throw new Error('Print files are made from crops in Master');
-    if (!d.token) throw new Error('Only a crop in one of the five print formats (1:1, 2:3, 3:2, 1:2, 2:1) can be printed');
-    return {
-      kilde: this.abs(f.rel_path),
-      mappe: join(this.root, 'Approved', d.work, 'Print files'),
-      base: d.base,
-      token: d.token,
-      forstoerrelser: d.forstoerrelser.map((x) => this.abs(x.rel_path)),
-      rotation: f.rotation || 0,
-    };
+    const g = this._gigaDele(f.rel_path);
+    if (g) {
+      const start = `${g.base} ${g.token}`.toLowerCase();
+      const krop = this.db.all(
+        "SELECT rel_path FROM files WHERE present=1 AND rel_path LIKE ? ESCAPE '\\'",
+        `Approved/${escapeLike(g.work)}/Master/%`
+      ).find((x) => stemOf(posix.basename(x.rel_path)).toLowerCase() === start);
+      return {
+        kilde: this.abs(f.rel_path),
+        mappe: join(this.root, 'Approved', g.work, 'Print files'),
+        base: g.base,
+        token: g.token,
+        forstoerrelser: [],
+        rotation: f.rotation || 0,
+        beskaering: krop ? this.abs(krop.rel_path) : null,
+      };
+    }
+    if (this._printDele(f.rel_path)?.token) {
+      throw new Error('Select the enlargement in Edits (the file with -giga in its name). The print file is made from it, not from the crop.');
+    }
+    throw new Error('Print files are made from the enlargement in Edits (the file with -giga in its name)');
   }
 
   // ---------- Faser ----------
@@ -918,7 +944,9 @@ export class Catalog extends EventEmitter {
         return rows.filter((r) => behold.has(r.version_id));
       }
       case 4: return rows.filter((r) => godk(r) && iMaster(r));
-      case 5: return rows.filter((r) => godk(r) && iMaster(r) && r.crop && r.crop !== 'free');
+      // Beskaeringerne i Master og forstoerrelserne af dem i Edits.
+      case 5: return rows.filter((r) => godk(r)
+        && ((iMaster(r) && r.crop && r.crop !== 'free') || this._gigaDele(r.rel_path)));
       default: return rows;
     }
   }

@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { existsSync } from 'node:fs';
 import { cropMaster } from './crop.mjs';
 import { lavMaster } from './master.mjs';
-import { lavPrintfil } from './printfil.mjs';
+import { lavPrintfil, pixelAreal } from './printfil.mjs';
 import { openDatabase } from './db.mjs';
 import { Catalog } from './catalog.mjs';
 import { Thumbnailer } from './thumbs.mjs';
@@ -665,7 +665,7 @@ export class AppSession {
       return { rel: res.path.slice(catalog.root.length + 1), konverteret: res.konverteret };
     });
 
-    // Fase 5: printfiler til Prodigi, én pr. markeret fil i Master.
+    // Fase 5: printfiler til Prodigi, én pr. markeret forstoerrelse i Edits.
     handle('print:make', async ({ versionIds }) => {
       const catalog = this.requireCatalog();
       const ids = Array.isArray(versionIds) ? versionIds : [];
@@ -679,7 +679,9 @@ export class AppSession {
           format: res.token.replace('-', ':'),
           bredde: res.bredde,
           hoejde: res.hoejde,
-          forstoerret: res.kilde !== maal.kilde,
+          // Er -giga-filen stoerre end beskaeringen? Ellers er det bare
+          // kopien der blev sendt til Gigapixel.
+          forstoerret: !maal.beskaering || res.bredde * res.hoejde > await pixelAreal(maal.beskaering),
         });
       }
       this.log(`print: ${lavet.length} print file(s)`);

@@ -421,7 +421,7 @@ export default function App() {
         setTimeout(() => setFejl(null), 7000);
       } catch (err) { visFejl(err); }
     },
-    // Fase 5: en printfil til Prodigi for hver markeret fil, ellers den aktive.
+    // Fase 5: en printfil til Prodigi for hver markeret -giga-fil, ellers den aktive.
     makePrintFiles: async () => {
       const f = getFocused();
       if (!f) return;
@@ -434,7 +434,7 @@ export default function App() {
         // forstoerrelse.
         const ikke = res.filter((r) => !r.forstoerret);
         const advarsel = ikke.length
-          ? ` Not enlarged: ${ikke.map((r) => r.rel.split('/').pop()).join(', ')}.`
+          ? ` Not larger than the crop, so not enlarged yet: ${ikke.map((r) => r.rel.split('/').pop()).join(', ')}.`
           : '';
         setFejl((res.length === 1
           ? `Print file saved as ${res[0].rel} (${res[0].bredde} × ${res[0].hoejde} px, ${mb.toFixed(1)} MB)`

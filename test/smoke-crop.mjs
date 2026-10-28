@@ -1,7 +1,7 @@
 // Smoke test af beskaering i den byggede app: godkend et billede, laeg en
 // masterfil i Master, beskaer den, og se at der kommer en ny fil i Master.
 import { _electron as electron } from 'playwright-core';
-import { mkdtempSync, rmSync, existsSync, readdirSync, renameSync } from 'node:fs';
+import { mkdtempSync, rmSync, existsSync, readdirSync, renameSync, copyFileSync } from 'node:fs';
 import { mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -113,9 +113,26 @@ try {
     { timeout: 10000 }
   );
 
+  // Paa beskaeringen selv er der ingen printknap: printfilen laves af
+  // forstoerrelsen fra Gigapixel i Edits.
+  await page.locator('.tile').first().click();
+  await page.waitForSelector('button:has-text("Enlarge in Gigapixel")', { timeout: 10000 });
+  if (await page.locator('button', { hasText: 'Make print file' }).count()) {
+    throw new Error('Beskaeringen har en printknap');
+  }
+
+  // "Forstoerrelsen" er en kopi i Edits med -giga i navnet. Den kommer med i
+  // fase 5 ved siden af beskaeringen.
+  const edits = join(lib, 'Approved', 'blaa', 'Edits');
+  mkdirSync(edits, { recursive: true });
+  copyFileSync(join(lib, 'Approved', 'blaa', 'Master', 'blaa master 3-2.png'), join(edits, 'blaa master 3-2-giga.png'));
+  await page.locator('button', { hasText: 'Scan again' }).click();
+  await page.waitForSelector('.tile-navn[title$="blaa master 3-2-giga.png"]', { timeout: 20000 });
+  if (await page.locator('.tile').count() !== 2) throw new Error('Fase 5 viser ikke beskaeringen og -giga-filen');
+
   // Filen er kvadratisk (den blev beskaaret 1:1 og saa omdoebt), og en
   // printfil skal vaere praecis i sit format: den afvises.
-  await page.locator('.tile').first().click();
+  await page.locator('.tile', { has: page.locator('.tile-navn[title$="3-2-giga.png"]') }).click();
   await page.locator('button', { hasText: 'Make print file' }).click();
   await page.waitForSelector('text=/is not 3:2/', { timeout: 20000 });
   if (existsSync(join(lib, 'Approved', 'blaa', 'Print files', 'blaa master 3-2.png'))) {
@@ -124,15 +141,12 @@ try {
 
   // Med det rigtige format i navnet gaar det.
   renameSync(join(lib, 'Approved', 'blaa', 'Master', 'blaa master 3-2.png'), join(lib, 'Approved', 'blaa', 'Master', 'blaa master 1-1.png'));
+  renameSync(join(edits, 'blaa master 3-2-giga.png'), join(edits, 'blaa master 1-1-giga.png'));
   await page.locator('button', { hasText: 'Scan again' }).click();
-  await page.waitForFunction(
-    () => document.querySelector('.tile-navn')?.title.endsWith('blaa master 1-1.png'),
-    null,
-    { timeout: 20000 }
-  );
+  await page.waitForSelector('.tile-navn[title$="blaa master 1-1-giga.png"]', { timeout: 20000 });
 
   // Printfilen: en PNG i vaerkets Print files, og flisen faar en Print-etiket.
-  await page.locator('.tile').first().click();
+  await page.locator('.tile', { has: page.locator('.tile-navn[title$="1-1-giga.png"]') }).click();
   await page.locator('button', { hasText: 'Make print file' }).click();
   await page.waitForSelector('.tile .badge.print', { timeout: 20000 });
   const printfil = join(lib, 'Approved', 'blaa', 'Print files', 'blaa master 1-1.png');
