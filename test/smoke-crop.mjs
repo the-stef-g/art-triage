@@ -149,6 +149,9 @@ try {
   await page.locator('.tile', { has: page.locator('.tile-navn[title$="1-1-giga.png"]') }).click();
   await page.locator('button', { hasText: 'Make print file' }).click();
   await page.waitForSelector('.tile .badge.print', { timeout: 20000 });
+  // Kun paa -giga-flisen, ikke paa beskaeringen i Master.
+  const medPrint = await page.$$eval('.tile', (ts) => ts.filter((t) => t.querySelector('.badge.print')).map((t) => t.querySelector('.tile-navn').title));
+  if (medPrint.length !== 1 || !medPrint[0].endsWith('1-1-giga.png')) throw new Error(`Print file-maerket sidder paa ${medPrint.join(', ')}`);
   const printfil = join(lib, 'Approved', 'blaa', 'Print files', 'blaa master 1-1.png');
   if (!existsSync(printfil)) throw new Error('Printfilen blev ikke lavet');
   const pm = await sharp(printfil).metadata();

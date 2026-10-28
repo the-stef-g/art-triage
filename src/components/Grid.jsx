@@ -53,7 +53,8 @@ function Badges({ row }) {
       {row.rating === 'godkendt' && Boolean(row.is_master) && row.version_count > 1 && (
         <span className="badge stak" title={`${row.version_count} versions`}>⧉ {row.version_count}</span>
       )}
-      {row.printfil && <span className="badge print" title={`Print file: ${row.printfil.rel.split('/').pop()}`}>Print</span>}
+      {/* Printfilen er lavet af -giga-filen, saa det er dér den vises. */}
+      {row.printfil && row.giga && <span className="badge print" title={`Print file: ${row.printfil.rel.split('/').pop()}`}>Print file</span>}
       {row.series_name && <span className="badge serie" title={`Series: ${row.series_name}`}>{row.series_name}</span>}
     </div>
   );
