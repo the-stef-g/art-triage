@@ -52,6 +52,9 @@ export default function App() {
   const [thumbRev, setThumbRev] = useState(0);
   const [shop, setShop] = useState(null); // shop-noegler og om formatet er tjekket
   const [textStatus, setTextStatus] = useState(null); // vaerk-tekster: koerer, seneste pris
+  // Taeller op hver gang tekster er skrevet, ogsaa i baggrunden, saa
+  // vaerk-panelet henter dem.
+  const [tekstRev, setTekstRev] = useState(0);
   const [kwStatus, setKwStatus] = useState(null); // cloud-noegleord: noegle, model, koe
   // Taeller op ved hver katalog-aendring. Inspektoeren henter noegleord om
   // paa den, saa ord der bliver skrevet mens man kigger paa billedet, ogsaa
@@ -302,6 +305,7 @@ export default function App() {
       if (evt.progress?.phase === 'faerdig') invoke('kw:status').then(setKwStatus).catch(() => {});
     } else if (evt.type === 'wt') {
       setTextStatus((s) => ({ koerer: evt.phase === 'koerer', cost: evt.cost ?? s?.cost ?? null }));
+      if (evt.phase === 'faerdig') setTekstRev((n) => n + 1);
     } else if (evt.type === 'drev') {
       setDrev({ missing: evt.missing, root: evt.root });
     } else if (evt.type === 'besked') {
@@ -825,6 +829,7 @@ export default function App() {
           series={series}
           act={act}
           dataRev={dataRev}
+          tekstRev={tekstRev}
           hasKey={Boolean(kwStatus?.harKey)}
           shop={shop}
           onShop={(besked) => {

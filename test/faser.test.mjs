@@ -209,6 +209,23 @@ describe('filer man selv lægger i Edits', () => {
   });
 });
 
+describe('nyt vaerk', () => {
+  it('melder ny-master naar en ny fil lander i Master, saa teksterne kan skrives', () => {
+    catalog.setRating([raekke('Import/Ahl/x.cr2').version_id], 'godkendt');
+    const meldt = [];
+    catalog.on('ny-master', (id) => meldt.push(id));
+    skriv('Approved/x/Edits/x-denoise.tif', 'e');
+    catalog.sync();
+    expect(meldt).toEqual([]);
+    skriv('Approved/x/Master/x.tif', 'm');
+    catalog.sync();
+    expect(meldt).toEqual([raekke('Approved/x/Original/x.cr2').image_id]);
+    // En skanning mere melder ikke igen.
+    catalog.sync();
+    expect(meldt.length).toBe(1);
+  });
+});
+
 describe('tomme mapper i Import', () => {
   it('slettes ved en skanning, naar de har staaet tomme et stykke tid', () => {
     mkdirSync(join(root, 'Import', 'Gammel', 'Under'), { recursive: true });

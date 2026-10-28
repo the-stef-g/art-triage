@@ -17,16 +17,21 @@ const TEKST_HOEJDE = 92;
 // klemt eller skubbet ud, naar der er flere raekker end der er plads til.
 const RULLEBREDDE = 14;
 
+// En fil i Master er per definition godkendt og faerdig, saa de to maerker
+// siger ikke noget dér.
+const iMaster = (rel) => /^Approved\/[^/]+\/Master\//.test(rel);
+
 function Badges({ row }) {
+  const master = iMaster(row.rel_path);
   return (
     <div className="badges">
-      {row.rating === 'godkendt' && <span className="badge godkendt" title="Approved">✓</span>}
+      {row.rating === 'godkendt' && !master && <span className="badge godkendt" title="Approved">✓</span>}
       {row.rating === 'kandidat' && (
         <span className="badge kandidat" title="Candidate: good subject, needs editing before it can be decided">?</span>
       )}
       {row.rating === 'kasseret' && <span className="badge kasseret" title="Discarded">✕</span>}
       {Boolean(row.edited) && <span className="badge redigeret" title={row.editor ? `Edited in ${row.editor}` : 'Has edits'}>{row.editor || 'Edits'}</span>}
-      {Boolean(row.finished) && <span className="badge faerdig" title="Finished">F</span>}
+      {Boolean(row.finished) && !master && <span className="badge faerdig" title="Finished">F</span>}
       {row.rating === 'godkendt' && !row.is_master && <span className="badge kopi" title={`Version: ${row.version_name}. A separate version of the original image, either a file with the same name in another format or an edit.`}>{row.version_name}</span>}
       {row.rating === 'godkendt' && row.crop && (
         <span className="badge beskaering" title={`Crop ${row.crop === 'free' ? 'free' : row.crop}`}>

@@ -174,10 +174,18 @@ export class AppSession {
       this.indexer.invalidateFiles(fileIds);
     });
     this.indexer.on('progress', (progress) => this.broadcast('index', { progress }));
+    // Naar et vaerk faar sin master, skrives teksterne af sig selv. Ikke ved
+    // den foerste skanning efter aabning: dér ville hver master i biblioteket
+    // ellers blive sendt til Claude paa én gang.
+    this.autoTeksterKlar = false;
+    this.catalog.on('ny-master', (imageId) => {
+      if (this.autoTeksterKlar) this._autoTekster(imageId);
+    });
 
     this.driveMissing = false;
     this.lastScanMs = 0;
     await this.runSync('aabning');
+    this.autoTeksterKlar = true;
     // Foerste aabning efter at de automatiske noegleord blev taget ud af
     // drift: fjern de gamle gaet, saa chips og soegning ikke bliver ved
     // med at vise dem. Stefs egne ord staar uroert.
@@ -302,6 +310,25 @@ export class AppSession {
   // Tekster til vaerket. Foer noget sendes: vaerket skal vaere godkendt og
   // faerdigt, og har Stef rettet i en tekst, spoerges der foer den
   // overskrives. Svaret uden overwrite koster ingenting.
+  // Teksterne til et nyt vaerk, i baggrunden og én ad gangen. Kun naar der
+  // er en Claude-noegle og ingen tekster i forvejen; Stefs egne roeres ikke.
+  _autoTekster(imageId) {
+    if (!this.settings.data.claudeKey) return;
+    this.autoTekstKoe = (this.autoTekstKoe || Promise.resolve()).then(async () => {
+      try {
+        const work = this.requireWorks().get(imageId);
+        if (!work.eligible || work.description || work.shortText || work.altText) return;
+        await this.writeWorkTexts({ imageId });
+        this.log(`texts written for new work: ${work.effective.title}`);
+        this.broadcast('besked', { tekst: `Texts written for ${work.effective.title}` });
+        this.broadcast('changed');
+      } catch (err) {
+        this.log(`auto texts failed: ${String(err?.message || err).slice(0, 200)}`);
+        this.broadcast('besked', { tekst: `The texts could not be written: ${String(err?.message || err).slice(0, 160)}` });
+      }
+    });
+  }
+
   async writeWorkTexts({ imageId, overwrite = false }) {
     const works = this.requireWorks();
     const work = works.get(imageId);

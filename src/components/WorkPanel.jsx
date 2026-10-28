@@ -12,7 +12,7 @@ const TEXT_LABELS = {
 // Vaerk-panelet (docs/plan-shop.md). Teksterne rettes kun her; Woo er en
 // kopi. Felterne gemmes naar man forlader dem, ikke for hver tast, saa
 // en igangvaerende rettelse aldrig bliver skrevet over af en genindlaesning.
-export default function WorkPanel({ row, versions, hasKey, shop, onShop, onError }) {
+export default function WorkPanel({ row, versions, tekstRev = 0, hasKey, shop, onShop, onError }) {
   const imageId = row.image_id;
   const [work, setWork] = useState(null);
   const [draft, setDraft] = useState({});
@@ -47,7 +47,7 @@ export default function WorkPanel({ row, versions, hasKey, shop, onShop, onError
       .catch(onError);
     return () => { live = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [imageId, row.rating, row.finished]);
+  }, [imageId, row.rating, row.finished, tekstRev]);
 
   if (!work) return null;
 

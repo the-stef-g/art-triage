@@ -8,7 +8,7 @@ import CropModal from './CropModal';
 // blev noegleordene kun hentet naar man skiftede billede, saa ord Claude
 // lige havde skrevet foerst dukkede op hvis man gik væk og tilbage igen.
 export default function Inspector({
-  row, fase = 1, selectedCount, activeKeyword, editors, statusNavne = [], series, act, dataRev, hasKey, shop, onShop, onError,
+  row, fase = 1, selectedCount, activeKeyword, editors, statusNavne = [], series, act, dataRev, tekstRev = 0, hasKey, shop, onShop, onError,
 }) {
   const [versions, setVersions] = useState([]);
   const [keywords, setKeywords] = useState([]);
@@ -237,6 +237,7 @@ export default function Inspector({
             key={row.image_id}
             row={row}
             versions={versions}
+            tekstRev={tekstRev}
             hasKey={hasKey}
             shop={shop}
             onShop={onShop}

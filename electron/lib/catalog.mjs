@@ -520,7 +520,7 @@ export class Catalog extends EventEmitter {
 
         const stackImage = this._findStackTarget(n.rel, mappeIndeks);
         if (stackImage) {
-          this._stakSomVersion(stackImage, fileId);
+          this._stakSomVersion(stackImage, fileId, { ny: true });
         } else {
           const imageId = this.db.run(
             'INSERT INTO images(master_file_id, created_at) VALUES(?,?)',
@@ -584,7 +584,7 @@ export class Catalog extends EventEmitter {
   }
 
   // Gør filen til en version af billedet stackImage peger paa.
-  _stakSomVersion(stackImage, fileId) {
+  _stakSomVersion(stackImage, fileId, { ny = false } = {}) {
     // En ny version arver originalens bedoemmelse. Er den godkendt, er
     // en fil i Edits "under redigering", og en fil i Master gør
     // billedet "faerdigt" (originalen faar det trin med).
@@ -614,6 +614,8 @@ export class Catalog extends EventEmitter {
         'UPDATE versions SET edited=0, finished=1 WHERE image_id=? AND is_master=1',
         stackImage.imageId
       );
+      // En ny fil i Master: vaerket er blevet til. Teksterne kan skrives.
+      if (ny) this.emit('ny-master', stackImage.imageId);
     }
   }
 
