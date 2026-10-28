@@ -8,7 +8,7 @@ import { homedir } from 'node:os';
 const KNOWN = [
   { re: /luminar/i, label: 'Luminar Neo' },
   { re: /topaz photo|photo ai/i, label: 'Topaz Photo AI' },
-  { re: /gigapixel/i, label: 'Topaz Gigapixel AI' },
+  { re: /gigapixel/i, label: 'Topaz Gigapixel' },
   { re: /photoshop/i, label: 'Photoshop' },
   { re: /affinity photo/i, label: 'Affinity Photo' },
   { re: /pixelmator/i, label: 'Pixelmator Pro' },

@@ -24,12 +24,12 @@ const iMaster = (rel) => /^Approved\/[^/]+\/Master\//.test(rel);
 const iApproved = (rel) => rel.startsWith('Approved/');
 
 // Versionsnavnet kommer tit fra editorens endelse ("Mur 2-neo" bliver
-// "Neo"), og saa siger det det samme som editor-maerket.
-const EDITOR_ENDELSER = ['neo', 'tp', 'ps', 'giga'];
+// "Neo", "Roofs 2-3-giga" bliver "2-3-giga"), og saa siger det det samme
+// som editor-maerket og beskaeringsmaerket.
 function samme(row) {
   const navn = String(row.version_name || '').trim().toLowerCase();
   if (!navn) return true;
-  if (EDITOR_ENDELSER.includes(navn)) return true;
+  if (/(^|[-_ ])(neo|tp|ps|giga)([-_ ]|$)/.test(navn)) return true;
   return Boolean(row.editor) && row.editor.toLowerCase().includes(navn);
 }
 

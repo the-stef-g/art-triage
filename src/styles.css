@@ -374,7 +374,7 @@ button:focus, button:focus-visible, [tabindex]:focus, [tabindex]:focus-visible {
 .badge.godkendt { background: var(--godkendt); color: #04260c; }
 .badge.kandidat { background: var(--kandidat); color: #3a2f00; }
 .badge.kasseret { background: var(--kasseret); color: #2d0503; }
-.badge.redigeret { background: var(--redigeret); color: #05233f; }
+.badge.redigeret { background: var(--redigeret); color: #05233f; max-width: none; }
 .badge.faerdig { background: var(--faerdig); color: #2b1f00; }
 .badge.kopi { background: #6e40c9; color: #f2e8ff; }
 .badge.beskaering { background: #1f9d8a; color: #04231e; }

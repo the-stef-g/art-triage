@@ -344,11 +344,11 @@ export default function Inspector({
           </p>
           <div className="knapraekke">
             <button
-              disabled={!installeret.has('Topaz Gigapixel AI')}
-              onClick={() => act.sendToEditor('Topaz Gigapixel AI')}
-              title={installeret.has('Topaz Gigapixel AI')
+              disabled={!installeret.has('Topaz Gigapixel')}
+              onClick={() => act.sendToEditor('Topaz Gigapixel')}
+              title={installeret.has('Topaz Gigapixel')
                 ? 'Copy this crop to Edits as …-giga, and open the copy in Gigapixel'
-                : 'Topaz Gigapixel AI was not found in Applications'}
+                : 'Topaz Gigapixel was not found in Applications'}
             >
               Enlarge in Gigapixel
             </button>

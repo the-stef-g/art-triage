@@ -244,6 +244,9 @@ export class Catalog extends EventEmitter {
       editor TEXT NOT NULL,
       opened_at INTEGER NOT NULL
     )`);
+    // Gigapixel hed foer "Topaz Gigapixel AI" i appen.
+    this.db.run("UPDATE versions SET editor='Topaz Gigapixel' WHERE editor='Topaz Gigapixel AI'");
+    this.db.run("UPDATE editor_log SET editor='Topaz Gigapixel' WHERE editor='Topaz Gigapixel AI'");
     // De to trin var foer uafhaengige flag, saa et billede kunne staa som
     // baade under redigering og faerdigt. Faerdig vinder: det er det trin
     // man selv har sat sidst, og det er den tilstand der betyder noget.
@@ -797,7 +800,10 @@ export class Catalog extends EventEmitter {
     // Beskaeringen og programmet staar i filnavnet, saa de foelger med naar
     // filen omdoebes.
     for (const r of rows) {
-      r.crop = beskaeringFraSti(r.rel_path);
+      // En forstoerrelse i Edits har beskaeringens format i navnet
+      // ("Roofs 2-3-giga.tif") og faar det samme maerke som den.
+      const giga = this._gigaDele(r.rel_path);
+      r.crop = beskaeringFraSti(r.rel_path) || (giga ? giga.token.replace('-', ':') : null);
       const editor = editorFraSti(r.rel_path);
       if (editor) {
         r.editor = editor;

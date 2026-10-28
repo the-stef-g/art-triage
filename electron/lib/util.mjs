@@ -242,7 +242,7 @@ export function navnMedBeskaering(fileName, crop) {
 // "Desert-neo.tif" er redigeret i Luminar Neo. Navnet er sandheden, som for
 // beskaeringerne: den sidste endelse er det seneste program.
 export const EDITOR_SUFFIKS = {
-  'Luminar Neo': 'neo', 'Topaz Photo AI': 'tp', Photoshop: 'ps', 'Topaz Gigapixel AI': 'giga',
+  'Luminar Neo': 'neo', 'Topaz Photo AI': 'tp', Photoshop: 'ps', 'Topaz Gigapixel': 'giga',
 };
 
 export function editorFraSti(rel) {

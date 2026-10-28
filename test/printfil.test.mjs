@@ -121,6 +121,8 @@ describe('printfiler i kataloget', () => {
     expect(liste.find((r) => !r.giga).forstoerrelse).toBe('Approved/Desert/Edits/Desert 2-3-Giga.tif');
     const giga = liste.find((r) => r.giga);
     expect(giga.giga).toBe(true);
+    // Samme beskaeringsmaerke som beskaeringen i Master.
+    expect(giga.crop).toBe('2:3');
 
     const maal = catalog.printMaal(giga.version_id);
     expect(maal.kilde).toBe(join(root, 'Approved', 'Desert', 'Edits', 'Desert 2-3-Giga.tif'));
