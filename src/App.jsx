@@ -27,6 +27,7 @@ export default function App() {
   const [rows, setRows] = useState([]);
   const [counts, setCounts] = useState(null);
   const [faseTal, setFaseTal] = useState(null);
+  const [editVaerker, setEditVaerker] = useState(null);
   const [searchInfo, setSearchInfo] = useState(null);
   const [tree, setTree] = useState(null);
   const [series, setSeries] = useState([]);
@@ -99,6 +100,7 @@ export default function App() {
       setRows(res.rows);
       setCounts(res.counts);
       setFaseTal(res.faseTal || null);
+      setEditVaerker(res.editVaerker || null);
       setSearchInfo(res.searchInfo);
       const valid = new Set(res.rows.map((r) => r.version_id));
       const beholdt = selectedRef.current.filter((id) => valid.has(id));
@@ -760,6 +762,7 @@ export default function App() {
           kwStatus={kwStatus}
           act={act}
           fase={filter.fase}
+          editVaerker={editVaerker}
         />
         {/* Midterfeltet baerer baade grid'et og forstoerrelsen, saa den
             store visning holder sig inden for de to kolonner. */}

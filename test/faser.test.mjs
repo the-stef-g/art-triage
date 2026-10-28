@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { openDatabase } from '../electron/lib/db.mjs';
 import { Catalog } from '../electron/lib/catalog.mjs';
-import { editorFraSti, udenEditorSuffiks } from '../electron/lib/util.mjs';
+import { editorFraSti, udenEditorSuffiks, masterNavn } from '../electron/lib/util.mjs';
 import { exifTidFromBuffer } from '../electron/lib/exif.mjs';
 import { lavMaster } from '../electron/lib/master.mjs';
 
@@ -72,10 +72,13 @@ describe('fasen foelger af mapperne', () => {
     skriv('Approved/x/Edits/x-neo.tif', 'e');
     skriv('Approved/y/Master/y.tif', 'm');
     skriv('Approved/y/Master/y 2-3.tif', 'c');
+    // Et vaerk med en master er ude af Edit, ogsaa med sine filer i Edits.
+    skriv('Approved/y/Edits/y-denoise.tif', 'd');
     catalog.sync();
 
     expect(fase(1)).toEqual(['Candidate/Ahl/z.cr2']);
     expect(fase(2)).toEqual(['Approved/x/Edits/x-neo.tif', 'Approved/x/Original/x.cr2']);
+    expect(catalog.editVaerker()).toEqual(['x']);
     expect(fase(3)).toEqual(['Approved/y/Master/y.tif']); // én flise pr. vaerk
     expect(fase(4)).toEqual(['Approved/y/Master/y 2-3.tif', 'Approved/y/Master/y.tif']);
     expect(fase(5)).toEqual(['Approved/y/Master/y 2-3.tif']);
@@ -99,6 +102,17 @@ describe('programmet staar i filnavnet', () => {
     expect(editorFraSti('Approved/w/Edits/neon.tif')).toBe(null);
     expect(editorFraSti('Approved/w/Master/a-neo.tif')).toBe(null);
     expect(udenEditorSuffiks('Desert-neo-tp')).toBe('Desert');
+    // Masterens navn: vaerkets navn naar redigeringen begynder med det,
+    // ellers uden de kendte endelser, uanset store og smaa bogstaver og
+    // med eller uden bindestreg.
+    expect(masterNavn('IMG_1234-Denoise-paint-tp', 'IMG_1234')).toBe('IMG_1234');
+    expect(masterNavn('img_1234denoise', 'IMG_1234')).toBe('IMG_1234');
+    expect(masterNavn('Desert Canyon-denoise', 'IMG_9')).toBe('Desert Canyon');
+    expect(masterNavn('Desert Canyon Sketch_PS', 'IMG_9')).toBe('Desert Canyon');
+    expect(masterNavn('Desert Canyonpano', 'IMG_9')).toBe('Desert Canyon');
+    expect(masterNavn('Lamps', 'IMG_9')).toBe('Lamps');
+    expect(masterNavn('Lamps-ps', 'IMG_9')).toBe('Lamps');
+    expect(masterNavn('Paint', 'IMG_9')).toBe('Paint');
     expect(udenEditorSuffiks('Desert-neo-Edit')).toBe('Desert-Edit');
   });
 
@@ -192,6 +206,21 @@ describe('filer man selv lægger i Edits', () => {
     expect(fase(1)).not.toContain('Approved/x/Edits/andet.tif');
     // Og det sker kun én gang.
     expect(catalog._tilknytArbejdsmapper()).toBe(0);
+  });
+});
+
+describe('tomme mapper i Import', () => {
+  it('slettes ved en skanning, naar de har staaet tomme et stykke tid', () => {
+    mkdirSync(join(root, 'Import', 'Gammel', 'Under'), { recursive: true });
+    mkdirSync(join(root, 'Import', 'Ny'), { recursive: true });
+    const gammel = new Date(Date.now() - 60 * 60 * 1000);
+    utimesSync(join(root, 'Import', 'Gammel', 'Under'), gammel, gammel);
+    utimesSync(join(root, 'Import', 'Gammel'), gammel, gammel);
+    catalog.sync();
+    expect(existsSync(join(root, 'Import', 'Gammel'))).toBe(false);
+    // En mappe man lige har lavet, faar lov at staa.
+    expect(existsSync(join(root, 'Import', 'Ny'))).toBe(true);
+    expect(existsSync(join(root, 'Import'))).toBe(true);
   });
 });
 

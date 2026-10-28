@@ -37,17 +37,17 @@ function Mappetal({ counts }) {
   );
 }
 
-function FolderNode({ node, depth, filter, setFilter, onMoveTo }) {
+function FolderNode({ node, depth, filter, setFilter, onMoveTo, rodNavn = 'All images', udenTal = false }) {
   const [open, setOpen] = useState(depth < 1);
   const [dragOver, setDragOver] = useState(false);
-  const aktiv = (filter.folder || '') === node.rel;
+  const aktiv = (filter.folder || '') === node.rel || (depth === 0 && !filter.folder);
 
   const onDrop = (e) => {
     e.preventDefault();
     setDragOver(false);
     try {
       const data = JSON.parse(e.dataTransfer.getData('application/x-art-triage-files'));
-      if (Array.isArray(data) && data.length) onMoveTo(data, node.rel);
+      if (onMoveTo && Array.isArray(data) && data.length) onMoveTo(data, node.rel);
     } catch {
       // ikke vores drag-data
     }
@@ -71,8 +71,8 @@ function FolderNode({ node, depth, filter, setFilter, onMoveTo }) {
             {open ? '▾' : '▸'}
           </button>
         )}
-        <span className="mappenavn">{depth === 0 ? 'All images' : node.name}</span>
-        <Mappetal counts={node.counts} />
+        <span className="mappenavn">{depth === 0 ? rodNavn : node.name}</span>
+        {!(udenTal && depth === 0) && <Mappetal counts={node.counts} />}
       </div>
       {open && node.children.map((child) => (
         <FolderNode
@@ -152,13 +152,36 @@ const FASE_TEKST = {
 
 export default function Sidebar({
   tree, series, topKeywords, filter, setFilter, onMoveTo, onRemoveFromSelected,
-  onRenameSeries, onDeleteSeries, kwStatus, act, fase = 1,
+  onRenameSeries, onDeleteSeries, kwStatus, act, fase = 1, editVaerker = null,
 }) {
   const visSerie = (id) => setFilter((f) => ({ ...f, ...KUN_EN_VISNING, serieId: id }));
   const visNoegleord = (word) => setFilter((f) => ({ ...f, ...KUN_EN_VISNING, keyword: word }));
 
   // Hver fase viser det den bruger: mapperne til sorteringen, serier og
   // noegleord til produktet. Fase 2, 4 og 5 arbejdes i inspektoeren.
+  // Fase 2: vaerkernes mapper i Approved, kun dem der endnu ikke har en
+  // master. Et klik viser kun det vaerks filer. Der flyttes ikke filer her:
+  // mapperne i et vaerk er appens struktur.
+  if (fase === 2) {
+    const approved = tree?.children?.find((c) => c.rel === 'Approved');
+    const navne = new Set(editVaerker || []);
+    const rod = approved
+      ? { ...approved, children: approved.children.filter((c) => navne.has(c.name)) }
+      : null;
+    return (
+      <aside className="sidebar">
+        <section>
+          <h3>Folders</h3>
+          {rod && rod.children.length > 0 ? (
+            <FolderNode node={rod} depth={0} filter={filter} setFilter={setFilter} onMoveTo={null} rodNavn="All works" udenTal />
+          ) : (
+            <p className="tom">{FASE_TEKST[2][1]}</p>
+          )}
+        </section>
+      </aside>
+    );
+  }
+
   if (fase !== 1 && fase !== 3) {
     return (
       <aside className="sidebar">

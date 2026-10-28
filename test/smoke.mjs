@@ -404,8 +404,11 @@ try {
     null,
     { timeout: 10000 }
   );
-  // Sidepanelet viser ikke mapperne uden for fase 1.
-  if (await page.locator('.mappe').count() !== 0) throw new Error('Mapperne staar i fase 2');
+  // Sidepanelet viser vaerkernes mapper i fase 2, og ikke Import.
+  const mapper = await page.locator('.mappe .mappenavn').allInnerTexts();
+  if (mapper[0] !== 'All works' || !mapper.includes('blaa') || mapper.some((m) => /undermappe|Candidate/.test(m))) {
+    throw new Error(`Mapperne i fase 2: ${mapper.join(', ')}`);
+  }
   await page.locator('.tile').first().click();
   await page.locator('button', { hasText: 'Make master' }).click();
   await page.waitForFunction(() => document.querySelectorAll('.tile').length === 0, null, { timeout: 15000 });

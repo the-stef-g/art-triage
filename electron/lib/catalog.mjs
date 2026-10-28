@@ -10,7 +10,7 @@ import { exifTid } from './exif.mjs';
 import { printfilNavn } from './printfil.mjs';
 import {
   walkImages, walkImagesAsync, walkDirs, findImportMappe, beskaeringFraSti, navnMedBeskaering,
-  editorFraSti, udenEditorSuffiks, quickHash, quickHashAsync, mapGraense, stemOf, slug, uniquePath, extOf, daCollator,
+  editorFraSti, masterNavn, quickHash, quickHashAsync, mapGraense, stemOf, slug, uniquePath, extOf, daCollator,
   libraryAvailable,
 } from './util.mjs';
 
@@ -35,6 +35,9 @@ export const BEDOEMMELSESMAPPE = {
 };
 export const ARBEJDSMAPPER = ['Original', 'Edits', 'Master', 'Print files'];
 // Navnene foer 0.16: Originals blev til Original og Masters til Master.
+// En tom mappe i Import slettes ved en skanning, naar den har staaet
+// uroert saa laenge.
+const TOM_MAPPE_ALDER_MS = 10 * 60 * 1000;
 const GAMLE_ARBEJDSMAPPER = [['Originals', 'Original'], ['Masters', 'Master']];
 
 // "Approved/Desert/Edits/x.tif" -> { work: 'Desert', del: 'Edits' }, ellers null.
@@ -375,7 +378,20 @@ export class Catalog extends EventEmitter {
     if (!libraryAvailable(this.root)) {
       return { changed: 0, edited: 0, unavailable: true };
     }
-    return this._afstem(new Map(walkImages(this.root, this.inkluder).map((f) => [f.rel, f])), null);
+    const res = this._afstem(new Map(walkImages(this.root, this.inkluder).map((f) => [f.rel, f])), null);
+    this._ryddEfterSkanning();
+    return res;
+  }
+
+  // Efter en skanning: tomme mapper i Import, fx efter filer er flyttet i
+  // Finder, slettes, naar de har vaeret tomme et stykke tid.
+  _ryddEfterSkanning() {
+    if (!this.inkluder) return;
+    try {
+      this.ryddTommeMapper({ minAlderMs: TOM_MAPPE_ALDER_MS });
+    } catch {
+      // En mappe der ikke kan slettes, maa ikke vaelte skanningen.
+    }
   }
 
   // Det samme, men filsystemet laeses uden at blokere: mapperne, filernes
@@ -402,7 +418,9 @@ export class Catalog extends EventEmitter {
     // Drevet kan vaere taget ud mens der blev laest. Saa er listen tom, og
     // en afstemning ville markere alt som forsvundet.
     if (!libraryAvailable(this.root)) return { changed: 0, edited: 0, unavailable: true };
-    return this._afstem(new Map(liste.map((f) => [f.rel, f])), hashes);
+    const res = this._afstem(new Map(liste.map((f) => [f.rel, f])), hashes);
+    this._ryddEfterSkanning();
+    return res;
   }
 
   // hashes: forudberegnede hashes fra syncAsync, eller null.
@@ -889,6 +907,23 @@ export class Catalog extends EventEmitter {
     return { 1: sort, 2: edit, 3: vaerker, 4: vaerker, 5: medBeskaering.size };
   }
 
+  // Navnene paa vaerkerne i fase 2 (godkendt, ingen master endnu), til
+  // mapperne i sidepanelet.
+  editVaerker() {
+    const { medMaster } = this._mastersInfo();
+    const navne = new Set();
+    for (const r of this.db.all(
+      `SELECT v.image_id, f.rel_path FROM versions v JOIN images i ON i.id = v.image_id
+       JOIN files f ON f.id = i.master_file_id
+       WHERE v.is_master=1 AND f.present=1 AND v.rating='godkendt'`
+    )) {
+      if (medMaster.has(r.image_id)) continue;
+      const am = arbejdsmappeFor(r.rel_path);
+      if (am) navne.add(am.work);
+    }
+    return [...navne].sort((a, b) => daCollator.compare(a, b));
+  }
+
   // ---------- Filmstrip ----------
 
   // Alle billederne i Import, med undermapper, i den raekkefoelge de er
@@ -966,7 +1001,7 @@ export class Catalog extends EventEmitter {
   }
 
   // Hvor en master af filen skal ligge, og hvad den skal hedde: vaerkets
-  // Master, med navnet uden programendelser ("Desert-neo-tp.tif" -> "Desert.tif").
+  // Master, med navnet uden endelser ("IMG_1234-Denoise-tp.tif" -> "IMG_1234.tif").
   masterMaal(versionId) {
     const vaerk = this._vaerkFor(versionId);
     if (!vaerk) throw new Error('Only Approved works can get a master');
@@ -975,7 +1010,7 @@ export class Catalog extends EventEmitter {
     return {
       kilde: this.abs(f.rel_path),
       mappe: join(this.root, 'Approved', vaerk.work, 'Master'),
-      stem: udenEditorSuffiks(stemOf(basename(f.rel_path))),
+      stem: masterNavn(stemOf(basename(f.rel_path)), vaerk.work),
     };
   }
 
@@ -1517,13 +1552,25 @@ export class Catalog extends EventEmitter {
   }
 
   // Gennemgaar hele Import og sletter de tomme mapper. Returnerer antallet.
-  ryddTommeMapper() {
+  // minAlderMs skaaner mapper der er aendret for nylig, fx en mappe man
+  // lige har lavet med New folder og endnu ikke har lagt noget i.
+  ryddTommeMapper({ minAlderMs = 0 } = {}) {
     const top = this.importMappe;
-    const mapper = walkDirs(this.root, null)
+    const graense = this.now() - minAlderMs;
+    const mapper = walkDirs(this.root, new Set([top]))
       .filter((d) => d.startsWith(`${top}/`))
       .sort((a, b) => b.length - a.length);
     for (const d of mapper) {
-      if (existsSync(join(this.root, d))) this._fjernTomMappe(d);
+      const abs = join(this.root, d);
+      if (!existsSync(abs)) continue;
+      if (minAlderMs) {
+        try {
+          if (statSync(abs).mtimeMs > graense) continue;
+        } catch {
+          continue;
+        }
+      }
+      this._fjernTomMappe(d);
     }
     const slettet = mapper.filter((d) => !existsSync(join(this.root, d))).length;
     if (slettet) this.emit('changed');

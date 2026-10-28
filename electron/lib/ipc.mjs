@@ -467,7 +467,13 @@ export class AppSession {
         }
       }
       const rows = catalog.listVersions(effective);
-      return { rows, counts: catalog.counts(), faseTal: catalog.faseTal(), searchInfo };
+      return {
+        rows,
+        counts: catalog.counts(),
+        faseTal: catalog.faseTal(),
+        editVaerker: Number(filter?.fase) === 2 ? catalog.editVaerker() : null,
+        searchInfo,
+      };
     });
 
     handle('img:imageVersions', ({ imageId }) =>

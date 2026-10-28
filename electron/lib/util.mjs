@@ -257,6 +257,36 @@ export function udenEditorSuffiks(stem) {
   return stem.replace(/(-(neo|tp|ps))+(?=$|[-_ .])/gi, '').replace(/[-_ .]+$/, '') || stem;
 }
 
+// Endelser som programmerne og jeg selv saetter paa en redigering. De
+// fjernes fra masterens navn. Store og smaa bogstaver er lige gode, og
+// bindestregen kan ogsaa vaere et mellemrum, en understreg eller mangle.
+// Korte endelser (neo, tp, ps ...) kraever et skilletegn, ellers ville fx
+// "Lamps" miste sit "ps".
+const LANGE_ENDELSER = [
+  'denoise', 'denoised', 'sharpen', 'sharpened', 'enhance', 'enhanced', 'upscale', 'upscaled',
+  'gigapixel', 'photoai', 'topaz', 'luminar', 'lumi', 'paint', 'painted', 'sketch', 'pano',
+  'panorama', 'edit', 'edited', 'final', 'copy', 'kopi', 'affinity', 'pixelmator', 'lightroom',
+];
+const KORTE_ENDELSER = ['neo', 'tp', 'ps', 'gp', 'nr', 'dn', 'ai', 'lr', 'af', 'hdr', 'pxm', 'raw', 'dng'];
+const LANG_RE = new RegExp(`[-_ .]*(${LANGE_ENDELSER.join('|')})$`, 'i');
+const KORT_RE = new RegExp(`[-_ .]+(${KORTE_ENDELSER.join('|')})$`, 'i');
+
+// Navnet paa masteren. Begynder redigeringens navn med vaerkets navn (som
+// er originalens), er det vaerkets navn, uanset hvad der staar efter:
+// "IMG_1234-Denoise-paint" -> "IMG_1234". Ellers fjernes de kendte
+// endelser bagfra: "Desert Canyon sketch-tp" -> "Desert Canyon".
+export function masterNavn(stem, work = '') {
+  const w = String(work || '').trim();
+  if (w && stem.toLowerCase().startsWith(w.toLowerCase())) return w;
+  let navn = stem;
+  for (;;) {
+    const kortere = navn.replace(LANG_RE, '').replace(KORT_RE, '').replace(/[-_ .]+$/, '');
+    if (!kortere || kortere === navn) break;
+    navn = kortere;
+  }
+  return navn || stem;
+}
+
 export function stemOf(fileName) {
   const e = extname(fileName);
   return e ? fileName.slice(0, -e.length) : fileName;
