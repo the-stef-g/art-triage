@@ -590,7 +590,7 @@ export default function App() {
     },
     kwReanalyse: async () => {
       const ok = window.confirm(
-        'Send every approved image to Claude again?\n\n'
+        'Send every master to Claude again?\n\n'
         + 'This costs money once more. The words you typed yourself are not touched.'
       );
       if (!ok) return;

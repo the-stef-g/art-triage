@@ -27,6 +27,10 @@ export const TEXT_SYSTEM_PROMPT = [
   'ALT TEXT: one sentence, at most about 150 characters. What the picture shows, not what it',
   'means.',
   '',
+  'Also return SECTION COLOUR: one colour as a hex code (#rrggbb) for the background of the',
+  'section the work is shown in on the website. It must make the subject stand out. Do not',
+  'simply repeat the strongest colour in the picture; choose a colour that sets the subject off.',
+  '',
   'Rules for all three:',
   '- No superlatives and no clichés: never "stunning", "unique", "one-of-a-kind" or "perfect',
   '  gift". No sales tricks.',
@@ -45,8 +49,9 @@ export const TEXT_SCHEMA = {
     description: { type: 'string' },
     short_text: { type: 'string' },
     alt_text: { type: 'string' },
+    section_colour: { type: 'string' },
   },
-  required: ['description', 'short_text', 'alt_text'],
+  required: ['description', 'short_text', 'alt_text', 'section_colour'],
 };
 
 // Det der skifter fra vaerk til vaerk. Tomme felter udelades helt i stedet
@@ -106,6 +111,10 @@ export function parseTexts(message) {
     if (typeof json?.[field] !== 'string' || !json[field].trim()) return null;
     ud[field] = cleanText(json[field]);
   }
+  // Farven er en hjaelp, ikke et krav: et svar uden en brugbar farve er
+  // stadig gode tekster.
+  const farve = String(json?.section_colour ?? '').trim();
+  if (/^#[0-9a-f]{6}$/i.test(farve)) ud.section_colour = farve.toLowerCase();
   return ud;
 }
 
@@ -127,6 +136,7 @@ export function lintTexts(texts) {
     advarsler.push(`The alt text is ${texts.alt_text.length} characters; it should be about 150 at most`);
   }
   for (const [field, text] of Object.entries(texts)) {
+    if (field === 'section_colour') continue;
     for (const re of FORBUDTE) {
       const m = re.exec(text || '');
       if (m) advarsler.push(`The ${field.replace('_', ' ')} says "${m[0]}"`);

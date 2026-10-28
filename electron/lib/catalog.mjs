@@ -909,6 +909,17 @@ export class Catalog extends EventEmitter {
     return { 1: sort, 2: edit, 3: vaerker, 4: vaerker, 5: medBeskaering.size };
   }
 
+  // Vaerkets master i Master: helst den uden et format i navnet.
+  masterFil(imageId) {
+    const filer = this.db.all(
+      `SELECT f.id, f.rel_path, f.rotation FROM versions v JOIN files f ON f.id = v.file_id
+       WHERE v.image_id=? AND f.present=1 AND f.rel_path LIKE 'Approved/%/Master/%'
+       ORDER BY f.id`,
+      imageId
+    );
+    return filer.find((f) => !beskaeringFraSti(f.rel_path)) || filer[0] || null;
+  }
+
   // Navnene paa vaerkerne i fase 2 (godkendt, ingen master endnu), til
   // mapperne i sidepanelet.
   editVaerker() {
@@ -1667,12 +1678,19 @@ export class Catalog extends EventEmitter {
   // En fil kan vaere den effektive fil for flere versioner. Er bare én af
   // dem godkendt, hoerer filen med; det er billedet der beskrives, og
   // versionerne deler motiv.
+  // Kun masterne: noegleordene hoerer til vaerket i fase 3, og hver
+  // redigering og original undervejs ville koste uden at blive brugt. Et
+  // bibliotek uden mappestyring (kun i aeldre tests) har ingen Master-mapper.
+  _kunMastre() {
+    return this.mappestyring ? "AND f.rel_path LIKE 'Approved/%/Master/%'" : '';
+  }
+
   filesNeedingKeywords(limit = 5000) {
     return this.db.all(
       `WITH godkendte AS MATERIALIZED (${effektiveFiler("v.rating = 'godkendt'")})
        SELECT f.id, f.rel_path, f.mtime FROM files f
        JOIN godkendte g ON g.fid = f.id
-       WHERE f.present=1
+       WHERE f.present=1 ${this._kunMastre()}
          AND NOT EXISTS (SELECT 1 FROM keyword_runs r WHERE r.file_id = f.id)
        ORDER BY f.id LIMIT ?`,
       limit
@@ -1686,7 +1704,7 @@ export class Catalog extends EventEmitter {
       `WITH godkendte AS MATERIALIZED (${effektiveFiler("v.rating = 'godkendt'")})
        SELECT COUNT(*) AS c FROM files f
        JOIN godkendte g ON g.fid = f.id
-       WHERE f.present=1
+       WHERE f.present=1 ${this._kunMastre()}
          AND NOT EXISTS (SELECT 1 FROM keyword_runs r WHERE r.file_id = f.id)`
     ).c;
   }

@@ -86,6 +86,14 @@ describe('svaret', () => {
     expect(parseTexts({ content: [{ type: 'text', text: 'ikke json' }] })).toBeNull();
   });
 
+  it('tager sektionsfarven med, naar den er en hex-farve', () => {
+    expect(parseTexts(svar({ ...gode, section_colour: '#1F4E79' })).section_colour).toBe('#1f4e79');
+    // En ubrugelig farve vaelter ikke teksterne.
+    const uden = parseTexts(svar({ ...gode, section_colour: 'deep blue' }));
+    expect(uden.description).toBe(gode.description);
+    expect(uden.section_colour).toBeUndefined();
+  });
+
   it('fjerner tankestreger', () => {
     expect(cleanText('Light — and stone')).toBe('Light, and stone');
     expect(cleanText('2019–2021')).toBe('2019-2021');

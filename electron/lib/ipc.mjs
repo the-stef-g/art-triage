@@ -179,7 +179,7 @@ export class AppSession {
     // ellers blive sendt til Claude paa én gang.
     this.autoTeksterKlar = false;
     this.catalog.on('ny-master', (imageId) => {
-      if (this.autoTeksterKlar) this._autoTekster(imageId);
+      if (this.autoTeksterKlar) this._nytVaerk(imageId);
     });
 
     this.driveMissing = false;
@@ -310,11 +310,22 @@ export class AppSession {
   // Tekster til vaerket. Foer noget sendes: vaerket skal vaere godkendt og
   // faerdigt, og har Stef rettet i en tekst, spoerges der foer den
   // overskrives. Svaret uden overwrite koster ingenting.
-  // Teksterne til et nyt vaerk, i baggrunden og én ad gangen. Kun naar der
-  // er en Claude-noegle og ingen tekster i forvejen; Stefs egne roeres ikke.
-  _autoTekster(imageId) {
-    if (!this.settings.data.claudeKey) return;
+  // Et vaerk er lige blevet til (en ny fil i Master). Skabelonen saettes
+  // efter formatet, og med en Claude-noegle skrives teksterne og
+  // noegleordene, i baggrunden og én ad gangen.
+  _nytVaerk(imageId) {
     this.autoTekstKoe = (this.autoTekstKoe || Promise.resolve()).then(async () => {
+      try {
+        await this._skabelonEfterFormat(imageId);
+      } catch (err) {
+        this.log(`template from format failed: ${String(err?.message || err).slice(0, 200)}`);
+      }
+      if (!this.settings.data.claudeKey) return;
+      try {
+        this._keywordRunner().start();
+      } catch (err) {
+        this.log(`auto keywords failed: ${String(err?.message || err).slice(0, 200)}`);
+      }
       try {
         const work = this.requireWorks().get(imageId);
         if (!work.eligible || work.description || work.shortText || work.altText) return;
@@ -327,6 +338,22 @@ export class AppSession {
         this.broadcast('besked', { tekst: `The texts could not be written: ${String(err?.message || err).slice(0, 160)}` });
       }
     });
+  }
+
+  // Bredformat bliver til skabelonen spread, hoejformat og kvadratisk til
+  // poster. Formatet er masterens, som den vises (EXIF-retning og egen
+  // drejning med).
+  async _skabelonEfterFormat(imageId) {
+    const catalog = this.requireCatalog();
+    const master = catalog.masterFil(imageId);
+    if (!master) return;
+    const sharp = (await import('sharp')).default;
+    const meta = await sharp(catalog.abs(master.rel_path), { failOn: 'none' }).metadata();
+    if (!meta.width || !meta.height) return;
+    let [b, h] = [meta.width, meta.height];
+    if (meta.orientation >= 5) [b, h] = [h, b];
+    if ((((master.rotation || 0) % 180) + 180) % 180 === 90) [b, h] = [h, b];
+    this.requireWorks().save(imageId, { template: b > h ? 'spread' : 'poster' });
   }
 
   async writeWorkTexts({ imageId, overwrite = false }) {
@@ -355,7 +382,11 @@ export class AppSession {
     this.broadcast('wt', { phase: 'koerer', cost: null });
     try {
       const res = await this.textService.write(thumbPath, work);
-      const saved = works.saveGeneratedTexts(imageId, res.texts);
+      let saved = works.saveGeneratedTexts(imageId, res.texts);
+      // Sektionsfarven fra Claude, kun hvis Stef ikke selv har valgt en.
+      if (res.texts.section_colour && !saved.sectionColour) {
+        saved = works.save(imageId, { section_colour: res.texts.section_colour });
+      }
       this.broadcast('wt', { phase: 'faerdig', cost: res.cost });
       return { work: saved, warnings: res.warnings, cost: res.cost };
     } catch (err) {

@@ -221,13 +221,18 @@ export default function WorkPanel({ row, versions, tekstRev = 0, hasKey, shop, o
         </span>
       </label>
 
-      <label className="vaerk-check">
+      {/* Et valg, ikke en status: skal vaerket kunne koebes som print?
+          Appen skriver det til shoppen (work_prints), naar vaerket sendes. */}
+      <label
+        className="vaerk-check"
+        title="Your choice: tick it if the work can be bought as a print. It is sent to the shop with the work. Leave it off for a work sold only as the original."
+      >
         <input
           type="checkbox"
           checked={work.prints}
           onChange={(e) => commit({ prints: e.target.checked })}
         />
-        Sold as prints
+        Offer as prints
       </label>
 
       {work.unique && (

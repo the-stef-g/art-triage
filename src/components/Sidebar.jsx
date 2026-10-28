@@ -120,7 +120,7 @@ function Noegleordskoe({ status, act }) {
             className="lille"
             onClick={act.kwRun}
             disabled={koe === 0}
-            title="Send the approved images that have not been analysed yet. Candidates and discarded images are never sent."
+            title="Send the masters that have not been analysed yet. Only files in a work's Master folder get keywords; a new master is sent by itself."
           >
             {koe > 0 ? `Analyse ${koe}` : 'Nothing waiting'}
           </button>

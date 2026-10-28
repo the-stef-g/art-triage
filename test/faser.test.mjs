@@ -226,6 +226,19 @@ describe('nyt vaerk', () => {
   });
 });
 
+describe('noegleord kun til masterne', () => {
+  it('koeen rummer kun filer i Master, ikke originaler og redigeringer', () => {
+    catalog.setRating([raekke('Import/Ahl/x.cr2').version_id], 'godkendt');
+    skriv('Approved/x/Edits/x-neo.tif', 'e');
+    catalog.sync();
+    expect(catalog.keywordQueueSize()).toBe(0);
+    skriv('Approved/x/Master/x.tif', 'm');
+    catalog.sync();
+    expect(catalog.filesNeedingKeywords().map((f) => f.rel_path)).toEqual(['Approved/x/Master/x.tif']);
+    expect(catalog.masterFil(raekke('Approved/x/Original/x.cr2').image_id).rel_path).toBe('Approved/x/Master/x.tif');
+  });
+});
+
 describe('tomme mapper i Import', () => {
   it('slettes ved en skanning, naar de har staaet tomme et stykke tid', () => {
     mkdirSync(join(root, 'Import', 'Gammel', 'Under'), { recursive: true });
