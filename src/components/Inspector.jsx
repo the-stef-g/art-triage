@@ -227,7 +227,7 @@ export default function Inspector({
                 else act.assignSeries(v ? Number(v) : null);
               }}
             >
-              <option value="">No series</option>
+              <option value="">Not in a series</option>
               {series.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
               <option value="ny">New series …</option>
             </select>

@@ -33,7 +33,7 @@ export default function Filmstrip({ row, rows, visKasserede, dataRev, thumbRev, 
     el?.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
   }, [row.file_id, billeder]);
 
-  if (billeder.length < 2) return null;
+  if (!billeder.length) return null;
   const iGrid = new Set(rows.map((r) => r.version_id));
 
   return (

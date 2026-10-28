@@ -9,6 +9,7 @@ import { Catalog } from '../electron/lib/catalog.mjs';
 import { editorFraSti, udenEditorSuffiks, masterNavn } from '../electron/lib/util.mjs';
 import { exifTidFromBuffer } from '../electron/lib/exif.mjs';
 import { lavMaster } from '../electron/lib/master.mjs';
+import { Works, serieNavnFraTitel } from '../electron/lib/works.mjs';
 
 let root;
 let db;
@@ -236,6 +237,51 @@ describe('noegleord kun til masterne', () => {
     catalog.sync();
     expect(catalog.filesNeedingKeywords().map((f) => f.rel_path)).toEqual(['Approved/x/Master/x.tif']);
     expect(catalog.masterFil(raekke('Approved/x/Original/x.cr2').image_id).rel_path).toBe('Approved/x/Master/x.tif');
+  });
+});
+
+describe('serier og print af sig selv', () => {
+  it('finder seriens navn i titlen, men ikke i kameranavne', () => {
+    expect(serieNavnFraTitel('Desert Canyon 04')).toBe('Desert Canyon');
+    expect(serieNavnFraTitel('Desert Canyon 4')).toBe('Desert Canyon');
+    expect(serieNavnFraTitel('Desert Canyon')).toBe(null);
+    expect(serieNavnFraTitel('IMG_1234')).toBe(null);
+    expect(serieNavnFraTitel('DSC 0123')).toBe(null);
+    expect(serieNavnFraTitel('2019 2020')).toBe(null);
+  });
+
+  it('samler vaerker med master i en serie og lader en valgt serie vaere', () => {
+    for (const n of ['Desert Canyon 01', 'Desert Canyon 02', 'Ild 03']) {
+      skriv(`Import/Ahl/${n}.tif`, n);
+    }
+    catalog.sync();
+    for (const n of ['Desert Canyon 01', 'Desert Canyon 02', 'Ild 03']) {
+      catalog.setRating([raekke(`Import/Ahl/${n}.tif`).version_id], 'godkendt');
+      skriv(`Approved/${n}/Master/${n}.tif`, `m${n}`);
+    }
+    catalog.sync();
+    const egen = catalog.createSeries('Ild og vand');
+    catalog.assignSeries([raekke('Approved/Ild 03/Original/Ild 03.tif').image_id], egen);
+    const works = new Works(catalog);
+    expect(works.autoSerier()).toBe(2);
+    const serie = (n) => raekke(`Approved/${n}/Original/${n}.tif`).series_name;
+    expect(serie('Desert Canyon 01')).toBe('Desert Canyon');
+    expect(serie('Desert Canyon 02')).toBe('Desert Canyon');
+    expect(serie('Ild 03')).toBe('Ild og vand');
+    // Én gang er nok.
+    expect(works.autoSerier()).toBe(0);
+  });
+
+  it('et vaerk saelges som print naar det har en beskaering i Master', () => {
+    catalog.setRating([raekke('Import/Ahl/x.cr2').version_id], 'godkendt');
+    skriv('Approved/x/Master/x.tif', 'm');
+    catalog.sync();
+    const works = new Works(catalog);
+    const id = raekke('Approved/x/Original/x.cr2').image_id;
+    expect(works.get(id).prints).toBe(false);
+    skriv('Approved/x/Master/x 2-3.tif', 'c');
+    catalog.sync();
+    expect(works.get(id).prints).toBe(true);
   });
 });
 

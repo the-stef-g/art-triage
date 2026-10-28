@@ -43,7 +43,15 @@ export default function WorkPanel({ row, versions, tekstRev = 0, hasKey, shop, o
     let live = true;
     setWarnings([]);
     invoke('work:get', { imageId })
-      .then((w) => { if (live) adopt(w); })
+      .then((w) => {
+        if (!live) return;
+        adopt(w);
+        // Et faerdigt vaerk uden tekster faar dem nu, sammen med skabelon,
+        // sektionsfarve og noegleord, som et nyt vaerk ville have faaet.
+        if (hasKey && w.eligible && !w.description && !w.shortText && !w.altText) {
+          invoke('work:auto', { imageId }).catch(() => {});
+        }
+      })
       .catch(onError);
     return () => { live = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -208,19 +216,16 @@ export default function WorkPanel({ row, versions, tekstRev = 0, hasKey, shop, o
         </span>
       </label>
 
-      {/* Et valg, ikke en status: skal vaerket kunne koebes som print?
+      {/* Ikke et valg: et vaerk med en beskaering i Master saelges som print.
           Appen skriver det til shoppen (work_prints), naar vaerket sendes. */}
-      <label
-        className="vaerk-check"
-        title="Your choice: tick it if the work can be bought as a print. It is sent to the shop with the work. Leave it off for a work sold only as the original."
+      <p
+        className="vaerk-note"
+        title="Set by the app: a work with at least one crop in its Master folder is offered as prints in the shop."
       >
-        <input
-          type="checkbox"
-          checked={work.prints}
-          onChange={(e) => commit({ prints: e.target.checked })}
-        />
-        Offer as prints
-      </label>
+        {work.prints
+          ? `Offered as prints: ${work.crops.map((c) => c.format).join(', ')}`
+          : 'Not offered as prints. Make a crop under 4 Crops to offer it.'}
+      </p>
 
       {work.unique && (
         <div className="vaerk-raekke">

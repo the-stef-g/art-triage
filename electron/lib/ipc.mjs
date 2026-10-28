@@ -109,6 +109,15 @@ export class AppSession {
     }
     this.lastScanMs = Date.now() - start;
     this._reportDrive(Boolean(res.unavailable));
+    // Vaerker med et nummer sidst i titlen samles i serier.
+    if (!res.unavailable && katalog === this.catalog && this.works) {
+      try {
+        const antal = this.works.autoSerier();
+        if (antal) this.log(`auto series: ${antal} work(s)`);
+      } catch (err) {
+        this.log(`auto series failed: ${String(err?.message || err).slice(0, 200)}`);
+      }
+    }
     return { ...res, skipped: false, reason, varighed: this.lastScanMs };
   }
 
@@ -187,6 +196,14 @@ export class AppSession {
     await this.runSync('aabning');
     this.autoTeksterKlar = true;
     this.tjekShopFormatSnart();
+    // Mastere uden noegleord faar dem nu; kun mastere, saa det er til at overse.
+    if (this.settings.data.claudeKey && this.catalog.keywordQueueSize() > 0) {
+      try {
+        this._keywordRunner().start();
+      } catch (err) {
+        this.log(`auto keywords at opening failed: ${String(err?.message || err).slice(0, 200)}`);
+      }
+    }
     // Foerste aabning efter at de automatiske noegleord blev taget ud af
     // drift: fjern de gamle gaet, saa chips og soegning ikke bliver ved
     // med at vise dem. Stefs egne ord staar uroert.
@@ -315,6 +332,9 @@ export class AppSession {
   // efter formatet, og med en Claude-noegle skrives teksterne og
   // noegleordene, i baggrunden og én ad gangen.
   _nytVaerk(imageId) {
+    this.autoBehandlet = this.autoBehandlet || new Set();
+    if (this.autoBehandlet.has(imageId)) return;
+    this.autoBehandlet.add(imageId);
     this.autoTekstKoe = (this.autoTekstKoe || Promise.resolve()).then(async () => {
       try {
         await this._skabelonEfterFormat(imageId);
@@ -829,6 +849,16 @@ export class AppSession {
     // skriver, og husker resultatet.
     handle('shop:checkFormat', () => this.tjekShopFormat());
     handle('work:writeTexts', (payload) => this.writeWorkTexts(payload));
+    // Et vaerk der aabnes i Product uden tekster (fx en master fra foer
+    // teksterne blev skrevet af sig selv) faar det samme som et nyt vaerk.
+    // Kun med en Claude-noegle, saa skabelonen ikke saettes om ved hvert kig.
+    handle('work:auto', ({ imageId }) => {
+      if (!this.settings.data.claudeKey) return { started: false };
+      const work = this.requireWorks().get(imageId);
+      if (!work.eligible || work.description || work.shortText || work.altText) return { started: false };
+      this._nytVaerk(imageId);
+      return { started: true };
+    });
     handle('work:setCrop', ({ imageId, versionId, format }) =>
       this.requireWorks().setCrop(imageId, versionId, format ?? null));
 

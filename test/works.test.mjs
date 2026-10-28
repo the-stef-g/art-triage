@@ -139,7 +139,7 @@ describe('felterne', () => {
     const w = works.get(id);
     expect(w).toMatchObject({
       category: 'Photography', technique: 'Digital art', template: 'poster',
-      sectionColour: '#aabbcc', video: 'film.mp4', prints: true, notes: 'Early light',
+      sectionColour: '#aabbcc', video: 'film.mp4', notes: 'Early light',
       description: 'D', shortText: 'S', altText: 'A',
     });
   });

@@ -64,6 +64,18 @@ const FELTER = {
 };
 
 // Titlen er filnavnet uden endelse, medmindre den er rettet.
+// Seriens navn ud fra titlen: "Desert Canyon 04" -> "Desert Canyon". Kun
+// et tal paa op til tre cifre efter et mellemrum taeller, og kameranavne
+// som IMG_1234 og DSC01234 er aldrig en serie.
+export function serieNavnFraTitel(title) {
+  const m = /^(.*\S)\s+\d{1,3}$/.exec(String(title || '').trim());
+  if (!m) return null;
+  const base = m[1].replace(/[-_.]+$/, '').trim();
+  if (!/\p{L}/u.test(base)) return null;
+  if (/^(img|dsc|dscf|dsc_|_mg|_dsc|pxl|mvimg|p\d)/i.test(base)) return null;
+  return base;
+}
+
 export function defaultTitle(relPath) {
   return stemOf(basename(relPath));
 }
@@ -175,7 +187,9 @@ export class Works {
       sectionColour: row.section_colour,
       catalogueNumber: row.catalogue_number,
       video: row.video,
-      prints: Boolean(row.prints),
+      // Ikke et valg: et vaerk med mindst én beskaering i Master har et
+      // printformat og saelges som print, ellers ikke.
+      prints: this.cropsFor(imageId).length > 0,
       dimensions: row.dimensions,
       price: row.price,
       notes: row.notes,
@@ -203,6 +217,35 @@ export class Works {
       eligible: this.isEligible(imageId),
       editedTexts: editedTexts(row, generated),
     };
+  }
+
+  // Samler vaerker i serier ud fra titlen: alle vaerker med en master og
+  // ingen serie, hvis titel ender paa et nummer, kommer i serien med
+  // titlens navn uden nummeret. En serie Stef selv har givet, roeres ikke.
+  // Returnerer antallet af vaerker der fik en serie.
+  autoSerier() {
+    const rows = this.db.all(
+      `SELECT i.id AS image_id, f.rel_path, w.title FROM images i
+       JOIN files f ON f.id = i.master_file_id
+       LEFT JOIN works w ON w.image_id = i.id
+       WHERE i.series_id IS NULL AND f.present=1
+         AND EXISTS (SELECT 1 FROM versions v JOIN files mf ON mf.id = v.file_id
+                     WHERE v.image_id = i.id AND mf.present=1 AND mf.rel_path LIKE 'Approved/%/Master/%')`
+    );
+    const grupper = new Map();
+    for (const r of rows) {
+      const navn = serieNavnFraTitel(r.title || defaultTitle(r.rel_path));
+      if (!navn) continue;
+      if (!grupper.has(navn)) grupper.set(navn, []);
+      grupper.get(navn).push(r.image_id);
+    }
+    let antal = 0;
+    for (const [navn, ids] of grupper) {
+      const findes = this.db.get('SELECT id FROM series WHERE name=? COLLATE NOCASE', navn);
+      this.catalog.assignSeries(ids, findes ? findes.id : this.catalog.createSeries(navn));
+      antal += ids.length;
+    }
+    return antal;
   }
 
   // patch bruger de samme navne som kolonnerne. Ukendte felter afvises.
