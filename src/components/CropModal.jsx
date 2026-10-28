@@ -159,7 +159,7 @@ export default function CropModal({ row, onClose, onDone, onError }) {
         </div>
         <div className="crop-bund">
           <span className="tom">
-            The crop is saved as a new file in Masters. The master is not changed.
+            The crop is saved as a new file in Master. The master is not changed.
           </span>
           <button onClick={onClose}>Cancel</button>
           <button disabled={gemmer} onClick={gem}>{gemmer ? 'Saving …' : 'Save crop'}</button>

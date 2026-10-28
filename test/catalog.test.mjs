@@ -510,20 +510,20 @@ describe('mappedrevet arbejdsgang', () => {
     catalog.sync();
     const r = raekke('Import/Desert Canyon.cr2');
     catalog.setRating([r.version_id], 'godkendt');
-    const rel = 'Approved/Desert Canyon/Originals/Desert Canyon.cr2';
+    const rel = 'Approved/Desert Canyon/Original/Desert Canyon.cr2';
     expect(existsSync(join(root, rel))).toBe(true);
     expect(existsSync(join(root, 'Import/Desert Canyon.cr2'))).toBe(false);
-    for (const d of ['Originals', 'Edits', 'Masters', 'Print files']) {
+    for (const d of ['Original', 'Edits', 'Master', 'Print files']) {
       expect(existsSync(join(root, 'Approved/Desert Canyon', d))).toBe(true);
     }
     expect(raekke(rel).rating).toBe('godkendt');
   });
 
-  it('en fil i Edits bliver en version under redigering, en i Masters goer vaerket faerdigt', () => {
+  it('en fil i Edits bliver en version under redigering, en i Master goer vaerket faerdigt', () => {
     skriv('a.cr2', 'original');
     catalog.sync();
     catalog.setRating([raekke('a.cr2').version_id], 'godkendt');
-    catalog.noteEditor(raekke('Approved/a/Originals/a.cr2').version_id, 'Topaz Photo AI');
+    catalog.noteEditor(raekke('Approved/a/Original/a.cr2').version_id, 'Topaz Photo AI');
     skriv('Approved/a/Edits/helt-andet-navn.tif', 'redigeret');
     catalog.sync();
     let rows = catalog.listVersions({});
@@ -534,12 +534,12 @@ describe('mappedrevet arbejdsgang', () => {
     expect(edit.edited).toBe(1);
     expect(edit.editor).toBe('Topaz Photo AI');
 
-    skriv('Approved/a/Masters/a master.tif', 'master');
+    skriv('Approved/a/Master/a master.tif', 'master');
     skriv('Approved/a/Print files/a 1-1.tif', 'til tryk');
     catalog.sync();
     rows = catalog.listVersions({});
     expect(rows).toHaveLength(3); // Print files er ikke billeder at sortere
-    const master = rows.find((r) => r.rel_path.endsWith('Masters/a master.tif'));
+    const master = rows.find((r) => r.rel_path.endsWith('Master/a master.tif'));
     expect(master.version_name).toBe('Master');
     expect(master.finished).toBe(1);
     const original = rows.find((r) => r.is_master);
@@ -580,7 +580,7 @@ describe('mappedrevet arbejdsgang', () => {
     skriv('Desert Canyon.cr2', 'dc');
     catalog.sync();
     catalog.setRating([raekke('Desert Canyon.cr2').version_id], 'godkendt');
-    const nyt = raekke('Approved/Desert Canyon/Originals/Desert Canyon.cr2');
+    const nyt = raekke('Approved/Desert Canyon/Original/Desert Canyon.cr2');
     catalog.setRating([nyt.version_id], 'kasseret');
     expect(existsSync(join(root, 'Discarded/Desert Canyon/Desert Canyon.cr2'))).toBe(true);
   });
@@ -599,7 +599,7 @@ describe('mappedrevet arbejdsgang', () => {
     catalog.setStage([id], 'edited'); // ubedoemt: ingen virkning
     expect(catalog.stageOf(catalog.getVersion(id))).toBe(null);
     catalog.setRating([id], 'godkendt');
-    const nyId = raekke('Approved/z/Originals/z.cr2').version_id;
+    const nyId = raekke('Approved/z/Original/z.cr2').version_id;
     catalog.setStage([nyId], 'finished');
     expect(catalog.stageOf(catalog.getVersion(nyId))).toBe('finished');
     catalog.setRating([nyId], 'kandidat'); // forlader Approved: trinnet ryddes
@@ -655,13 +655,13 @@ describe('Import-mappen', () => {
 
   it('laeser kun Import (ogsaa med mellemrum foran) og de bedoemte mapper, ikke resten af roden', () => {
     skriv(' Import/Ahl Strand/a.cr2', 'a');
-    skriv('Approved/w/Originals/w.cr2', 'w');
+    skriv('Approved/w/Original/w.cr2', 'w');
     skriv('Candidate/c.cr2', 'c');
     skriv('SoMe/s.jpg', 's');
     skriv('los.jpg', 'l');
     catalog.brugMappestruktur();
     catalog.sync();
-    expect(fil()).toEqual([' Import/Ahl Strand/a.cr2', 'Approved/w/Originals/w.cr2', 'Candidate/c.cr2']);
+    expect(fil()).toEqual([' Import/Ahl Strand/a.cr2', 'Approved/w/Original/w.cr2', 'Candidate/c.cr2']);
     expect(catalog.folderTree().children.map((m) => m.name ?? m.rel)).toBeTruthy();
   });
 
@@ -675,7 +675,7 @@ describe('Import-mappen', () => {
     catalog.setRating([id()], 'ubedomt');
     expect(existsSync(join(root, ' Import/Ahl Strand/a.cr2'))).toBe(true);
     catalog.setRating([id()], 'godkendt');
-    expect(existsSync(join(root, 'Approved/a/Originals/a.cr2'))).toBe(true);
+    expect(existsSync(join(root, 'Approved/a/Original/a.cr2'))).toBe(true);
   });
 
   it('uden en Import-mappe laeses hele roden, som foer', () => {
@@ -755,56 +755,56 @@ describe('beskaering som etiket', () => {
     skriv('Desert.cr2', 'original');
     catalog.sync();
     catalog.setRating([raekke('Desert.cr2').version_id], 'godkendt');
-    skriv(`Approved/Desert/Masters/${navn}`, 'master');
+    skriv(`Approved/Desert/Master/${navn}`, 'master');
     catalog.sync();
-    return raekke(`Approved/Desert/Masters/${navn}`);
+    return raekke(`Approved/Desert/Master/${navn}`);
   }
 
-  it('laeser beskaeringen ud af filnavnet, kun i Masters', async () => {
+  it('laeser beskaeringen ud af filnavnet, kun i Master', async () => {
     const m = await medMaster('Desert Canyon 01 2-3.tif');
     expect(m.crop).toBe('2:3');
     skriv('Approved/Desert/Edits/Desert Canyon 3-2.tif', 'e');
-    skriv('Approved/Desert/Masters/Desert Canyon 02 free 300x200.tif', 'f');
+    skriv('Approved/Desert/Master/Desert Canyon 02 free 300x200.tif', 'f');
     catalog.sync();
     expect(raekke('Approved/Desert/Edits/Desert Canyon 3-2.tif').crop).toBe(null);
-    expect(raekke('Approved/Desert/Masters/Desert Canyon 02 free 300x200.tif').crop).toBe('free');
-    expect(raekke('Approved/Desert/Originals/Desert.cr2').crop).toBe(null);
+    expect(raekke('Approved/Desert/Master/Desert Canyon 02 free 300x200.tif').crop).toBe('free');
+    expect(raekke('Approved/Desert/Original/Desert.cr2').crop).toBe(null);
   });
 
   it('foelger med naar filen omdoebes i Finder', async () => {
     const m = await medMaster('Desert Canyon 01.tif');
     expect(m.crop).toBe(null);
-    renameSync(join(root, 'Approved/Desert/Masters/Desert Canyon 01.tif'), join(root, 'Approved/Desert/Masters/Desert Canyon 01 1-2.tif'));
+    renameSync(join(root, 'Approved/Desert/Master/Desert Canyon 01.tif'), join(root, 'Approved/Desert/Master/Desert Canyon 01 1-2.tif'));
     catalog.sync();
-    const nu = raekke('Approved/Desert/Masters/Desert Canyon 01 1-2.tif');
+    const nu = raekke('Approved/Desert/Master/Desert Canyon 01 1-2.tif');
     expect(nu.crop).toBe('1:2');
     expect(nu.version_id).toBe(m.version_id); // samme fil, ikke en ny
   });
 
   it('at saette beskaeringen omdoeber filen, skifter en gammel ud og kan fjernes', async () => {
     const m = await medMaster('Desert Canyon 01.tif');
-    expect(catalog.setBeskaering(m.version_id, '2:3')).toBe('Approved/Desert/Masters/Desert Canyon 01 2-3.tif');
-    expect(existsSync(join(root, 'Approved/Desert/Masters/Desert Canyon 01 2-3.tif'))).toBe(true);
-    expect(catalog.setBeskaering(m.version_id, '3:2')).toBe('Approved/Desert/Masters/Desert Canyon 01 3-2.tif');
-    expect(existsSync(join(root, 'Approved/Desert/Masters/Desert Canyon 01 2-3.tif'))).toBe(false);
-    expect(raekke('Approved/Desert/Masters/Desert Canyon 01 3-2.tif').crop).toBe('3:2');
-    expect(catalog.setBeskaering(m.version_id, null)).toBe('Approved/Desert/Masters/Desert Canyon 01.tif');
-    expect(raekke('Approved/Desert/Masters/Desert Canyon 01.tif').crop).toBe(null);
+    expect(catalog.setBeskaering(m.version_id, '2:3')).toBe('Approved/Desert/Master/Desert Canyon 01 2-3.tif');
+    expect(existsSync(join(root, 'Approved/Desert/Master/Desert Canyon 01 2-3.tif'))).toBe(true);
+    expect(catalog.setBeskaering(m.version_id, '3:2')).toBe('Approved/Desert/Master/Desert Canyon 01 3-2.tif');
+    expect(existsSync(join(root, 'Approved/Desert/Master/Desert Canyon 01 2-3.tif'))).toBe(false);
+    expect(raekke('Approved/Desert/Master/Desert Canyon 01 3-2.tif').crop).toBe('3:2');
+    expect(catalog.setBeskaering(m.version_id, null)).toBe('Approved/Desert/Master/Desert Canyon 01.tif');
+    expect(raekke('Approved/Desert/Master/Desert Canyon 01.tif').crop).toBe(null);
     expect(() => catalog.setBeskaering(m.version_id, '4:3')).toThrow(/Unknown crop format/);
   });
 
-  it('kun en fil i Masters kan faa en beskaering', async () => {
+  it('kun en fil i Master kan faa en beskaering', async () => {
     await medMaster();
-    const original = raekke('Approved/Desert/Originals/Desert.cr2');
-    expect(() => catalog.setBeskaering(original.version_id, '1:1')).toThrow(/Masters/);
+    const original = raekke('Approved/Desert/Original/Desert.cr2');
+    expect(() => catalog.setBeskaering(original.version_id, '1:1')).toThrow(/Master/);
   });
 
   it('en omdoebt fil rammer ikke en der allerede har navnet', async () => {
     const m = await medMaster('Desert Canyon 01.tif');
-    skriv('Approved/Desert/Masters/Desert Canyon 01 2-3.tif', 'findes allerede');
+    skriv('Approved/Desert/Master/Desert Canyon 01 2-3.tif', 'findes allerede');
     catalog.sync();
     const ny = catalog.setBeskaering(m.version_id, '2:3');
-    expect(ny).not.toBe('Approved/Desert/Masters/Desert Canyon 01 2-3.tif');
-    expect(existsSync(join(root, 'Approved/Desert/Masters/Desert Canyon 01 2-3.tif'))).toBe(true);
+    expect(ny).not.toBe('Approved/Desert/Master/Desert Canyon 01 2-3.tif');
+    expect(existsSync(join(root, 'Approved/Desert/Master/Desert Canyon 01 2-3.tif'))).toBe(true);
   });
 });

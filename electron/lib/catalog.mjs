@@ -29,15 +29,17 @@ export function erRedigeretUdgave(suffiks, ext, masterExt) {
 
 // Den mappedrevne struktur. Bedoemmelsen bestemmer hvilken mappe en fil
 // ligger i, og et godkendt billede faar sin egen arbejdsmappe:
-//   Approved/<filnavn>/Originals | Edits | Masters | Print files
+//   Approved/<filnavn>/Original | Edits | Master | Print files
 export const BEDOEMMELSESMAPPE = {
   ubedomt: 'Import', godkendt: 'Approved', kandidat: 'Candidate', kasseret: 'Discarded',
 };
-export const ARBEJDSMAPPER = ['Originals', 'Edits', 'Masters', 'Print files'];
+export const ARBEJDSMAPPER = ['Original', 'Edits', 'Master', 'Print files'];
+// Navnene foer 0.16: Originals blev til Original og Masters til Master.
+const GAMLE_ARBEJDSMAPPER = [['Originals', 'Original'], ['Masters', 'Master']];
 
 // "Approved/Desert/Edits/x.tif" -> { work: 'Desert', del: 'Edits' }, ellers null.
 export function arbejdsmappeFor(rel) {
-  const m = /^Approved\/([^/]+)\/(Originals|Edits|Masters|Print files)\//.exec(rel);
+  const m = /^Approved\/([^/]+)\/(Original|Edits|Master|Print files)\//.exec(rel);
   return m ? { work: m[1], del: m[2] } : null;
 }
 
@@ -285,11 +287,63 @@ export class Catalog extends EventEmitter {
   // Slaar den mappedrevne arbejdsgang til for et bibliotek, og finder Import.
   brugMappestruktur() {
     this.mappestyring = true;
+    this._omdoebArbejdsmapper();
     const fundet = findImportMappe(this.root);
     if (fundet) {
       this.importMappe = fundet;
       this.inkluder = new Set([fundet, 'Approved', 'Candidate', 'Discarded']);
     }
+  }
+
+  // Arbejdsmapperne hed foer Originals og Masters. De omdoebes paa disken
+  // til Original og Master, og stierne i kataloget foelger med, saa
+  // bedoemmelser, serier og tekster bliver hos filerne. Findes den nye mappe
+  // allerede, flyttes filerne over én ad gangen; en fil der allerede findes
+  // dér, bliver liggende i den gamle mappe.
+  _omdoebArbejdsmapper() {
+    const approved = join(this.root, 'Approved');
+    let vaerker;
+    try {
+      vaerker = readdirSync(approved, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name);
+    } catch {
+      return 0;
+    }
+    let antal = 0;
+    for (const work of vaerker) {
+      for (const [gammel, ny] of GAMLE_ARBEJDSMAPPER) {
+        const fra = join(approved, work, gammel);
+        if (!existsSync(fra)) continue;
+        const til = join(approved, work, ny);
+        try {
+          if (!existsSync(til)) {
+            renameSync(fra, til);
+          } else {
+            for (const navn of readdirSync(fra)) {
+              if (!existsSync(join(til, navn))) renameSync(join(fra, navn), join(til, navn));
+            }
+            rmSync(join(fra, '.DS_Store'), { force: true });
+            try { rmdirSync(fra); } catch { /* der ligger stadig noget */ }
+          }
+        } catch {
+          continue;
+        }
+        const praefiks = `Approved/${work}/${gammel}/`;
+        const rows = this.db.all(
+          "SELECT id, rel_path FROM files WHERE rel_path LIKE ? ESCAPE '\\'", `${escapeLike(praefiks)}%`
+        );
+        for (const r of rows) {
+          const nyRel = `Approved/${work}/${ny}/${r.rel_path.slice(praefiks.length)}`;
+          if (!existsSync(this.abs(nyRel))) continue;
+          try {
+            this.db.run('UPDATE files SET rel_path=? WHERE id=?', nyRel, r.id);
+            antal += 1;
+          } catch {
+            // Stien findes allerede i kataloget; skanningen rydder op.
+          }
+        }
+      }
+    }
+    return antal;
   }
 
   _styredeTopmapper() {
@@ -449,7 +503,7 @@ export class Catalog extends EventEmitter {
         const stackImage = this._findStackTarget(n.rel, mappeIndeks);
         if (stackImage) {
           // En ny version arver originalens bedoemmelse. Er den godkendt, er
-          // en fil i Edits "under redigering", og en fil i Masters gør
+          // en fil i Edits "under redigering", og en fil i Master gør
           // billedet "faerdigt" (originalen faar det trin med).
           const arvet = this.db.get(
             'SELECT rating FROM versions WHERE image_id=? AND is_master=1', stackImage.imageId
@@ -539,12 +593,12 @@ export class Catalog extends EventEmitter {
     else indeks.set(dir, [{ id, rel_path: relPath }]);
   }
 
-  // En fil i Edits eller Masters i en arbejdsmappe hoerer til originalen i
-  // samme arbejdsmappes Originals, uanset hvad den hedder.
+  // En fil i Edits eller Master i en arbejdsmappe hoerer til originalen i
+  // samme arbejdsmappes Original, uanset hvad den hedder.
   _arbejdsmappeMaal(rel, indeks) {
     const am = arbejdsmappeFor(rel);
-    if (!am || (am.del !== 'Edits' && am.del !== 'Masters')) return null;
-    const originalDir = `Approved/${am.work}/Originals`;
+    if (!am || (am.del !== 'Edits' && am.del !== 'Master')) return null;
+    const originalDir = `Approved/${am.work}/Original`;
     const kandidater = indeks
       ? (indeks.get(originalDir) || [])
       : this.db.all(
@@ -557,8 +611,8 @@ export class Catalog extends EventEmitter {
       const stem = stemOf(posix.basename(rel));
       const arbejdStem = am.work;
       const rest = stem.startsWith(arbejdStem) ? stem.slice(arbejdStem.length).replace(/^[-_. ()]+|[)]+$/g, '') : '';
-      const versionName = am.del === 'Masters' ? 'Master' : (rest || stem);
-      return { imageId: owner.imageId, versionName, kind: am.del === 'Masters' ? 'master' : 'edit' };
+      const versionName = am.del === 'Master' ? 'Master' : (rest || stem);
+      return { imageId: owner.imageId, versionName, kind: am.del === 'Master' ? 'master' : 'edit' };
     }
     return null;
   }
@@ -704,9 +758,9 @@ export class Catalog extends EventEmitter {
     return ud;
   }
 
-  // Printfilen til en fil i Masters: { rel, bytes } eller null.
+  // Printfilen til en fil i Master: { rel, bytes } eller null.
   _printfilInfo(rel) {
-    const m = /^Approved\/([^/]+)\/Masters\/([^/]+)$/.exec(rel);
+    const m = /^Approved\/([^/]+)\/Master\/([^/]+)$/.exec(rel);
     if (!m) return null;
     const printRel = `Approved/${m[1]}/Print files/${printfilNavn(stemOf(m[2]))}`;
     try {
@@ -716,13 +770,13 @@ export class Catalog extends EventEmitter {
     }
   }
 
-  // Hvad der skal til for at lave printfilen til en fil i Masters.
+  // Hvad der skal til for at lave printfilen til en fil i Master.
   printMaal(versionId) {
     const v = this.getVersion(versionId);
     const f = v ? this.getFile(v.effective_file_id) : null;
     if (!f || !f.present) throw new Error('The file is not available right now');
-    const m = /^Approved\/([^/]+)\/Masters\/([^/]+)$/.exec(f.rel_path);
-    if (!m) throw new Error('Print files are made from files in Masters');
+    const m = /^Approved\/([^/]+)\/Master\/([^/]+)$/.exec(f.rel_path);
+    if (!m) throw new Error('Print files are made from files in Master');
     return {
       kilde: this.abs(f.rel_path),
       mappe: join(this.root, 'Approved', m[1], 'Print files'),
@@ -743,12 +797,12 @@ export class Catalog extends EventEmitter {
   _mastersInfo() {
     const rows = this.db.all(
       `SELECT v.image_id, f.rel_path FROM versions v JOIN files f ON f.id = v.file_id
-       WHERE f.present=1 AND f.rel_path LIKE 'Approved/%/Masters/%'`
+       WHERE f.present=1 AND f.rel_path LIKE 'Approved/%/Master/%'`
     );
     const medMaster = new Set();
     const medBeskaering = new Set();
     for (const r of rows) {
-      if (!/^Approved\/[^/]+\/Masters\//.test(r.rel_path)) continue;
+      if (!/^Approved\/[^/]+\/Master\//.test(r.rel_path)) continue;
       medMaster.add(r.image_id);
       if (beskaeringFraSti(r.rel_path)) medBeskaering.add(r.image_id);
     }
@@ -757,7 +811,7 @@ export class Catalog extends EventEmitter {
 
   _filtrerFase(rows, fase) {
     const { medMaster } = this._mastersInfo();
-    const iMasters = (r) => /^Approved\/[^/]+\/Masters\//.test(r.rel_path);
+    const iMaster = (r) => /^Approved\/[^/]+\/Master\//.test(r.rel_path);
     const godk = (r) => r.rating === 'godkendt';
     switch (fase) {
       case 1: return rows.filter((r) => !godk(r));
@@ -766,15 +820,15 @@ export class Catalog extends EventEmitter {
         // Én flise pr. vaerk: masteren uden et format i navnet, ellers den foerste.
         const valgt = new Map();
         for (const r of rows) {
-          if (!godk(r) || !iMasters(r)) continue;
+          if (!godk(r) || !iMaster(r)) continue;
           const nu = valgt.get(r.image_id);
           if (!nu || (nu.crop && !r.crop)) valgt.set(r.image_id, r);
         }
         const behold = new Set([...valgt.values()].map((r) => r.version_id));
         return rows.filter((r) => behold.has(r.version_id));
       }
-      case 4: return rows.filter((r) => godk(r) && iMasters(r));
-      case 5: return rows.filter((r) => godk(r) && iMasters(r) && r.crop);
+      case 4: return rows.filter((r) => godk(r) && iMaster(r));
+      case 5: return rows.filter((r) => godk(r) && iMaster(r) && r.crop);
       default: return rows;
     }
   }
@@ -802,22 +856,38 @@ export class Catalog extends EventEmitter {
 
   // ---------- Filmstrip ----------
 
-  // De andre filer i samme mappe som filen, i den raekkefoelge de er skudt
-  // (EXIF), og ellers efter filens dato og navn. Optagetidspunktet laeses
-  // foerste gang en mappe vises og gemmes.
+  // Alle billederne i Import, med undermapper, i den raekkefoelge de er
+  // skudt (EXIF), og ellers efter filens dato og navn. Kandidaterne er med,
+  // selv om de er flyttet til Candidate, og de kasserede naar de vises; ellers
+  // ville et skud forsvinde fra rækken i det øjeblik det bedømmes. Uden en
+  // Import-mappe er det filerne i filens egen mappe. Optagetidspunktet laeses foerste gang en fil vises og
+  // gemmes. Returnerer { omfang, billeder }.
   async filmstrip(fileId, { visKasserede = false } = {}) {
     const f = this.getFile(fileId);
-    if (!f) return [];
-    const dir = posix.dirname(f.rel_path);
+    if (!f) return { omfang: null, billeder: [] };
+    const imp = this.importMappe;
+    const iImport = Boolean(this.inkluder) && Boolean(imp);
+    const dir = iImport ? imp : posix.dirname(f.rel_path);
     const prefix = dir === '.' ? '' : `${escapeLike(dir)}/`;
+    let hvor;
+    let params;
+    if (iImport) {
+      const toppe = [imp, 'Candidate', ...(visKasserede ? ['Discarded'] : [])];
+      hvor = `(${toppe.map(() => "f.rel_path LIKE ? ESCAPE '\\'").join(' OR ')})`;
+      params = toppe.map((t) => `${escapeLike(t)}/%`);
+    } else {
+      // Kun mappen selv, ikke dens undermapper.
+      hvor = "f.rel_path LIKE ? ESCAPE '\\' AND f.rel_path NOT LIKE ? ESCAPE '\\'";
+      params = [`${prefix}%`, `${prefix}%/%`];
+    }
     const rows = this.db.all(
       `SELECT v.id AS version_id, v.rating, f.id AS file_id, f.rel_path, f.mtime, f.rotation, f.taken_at
        FROM versions v JOIN images i ON i.id = v.image_id
        JOIN files f ON f.id = COALESCE(v.file_id, i.master_file_id)
        WHERE f.present=1 AND v.is_master=1
-         AND f.rel_path LIKE ? ESCAPE '\\' AND f.rel_path NOT LIKE ? ESCAPE '\\'
+         AND ${hvor}
          ${visKasserede ? '' : "AND v.rating != 'kasseret'"}`,
-      `${prefix}%`, `${prefix}%/%`
+      ...params
     );
     const mangler = rows.filter((r) => r.taken_at === null || r.taken_at === undefined);
     await mapGraense(mangler, 8, async (r) => {
@@ -826,7 +896,8 @@ export class Catalog extends EventEmitter {
       this.db.run('UPDATE files SET taken_at=? WHERE id=?', r.taken_at, r.file_id);
     });
     const tid = (r) => (r.taken_at > 0 ? r.taken_at : r.mtime);
-    return rows.sort((a, b) => tid(a) - tid(b) || daCollator.compare(a.rel_path, b.rel_path));
+    rows.sort((a, b) => tid(a) - tid(b) || daCollator.compare(a.rel_path, b.rel_path));
+    return { omfang: iImport ? 'import' : dir, billeder: rows };
   }
 
   // ---------- Fase 2 ----------
@@ -860,7 +931,7 @@ export class Catalog extends EventEmitter {
   }
 
   // Hvor en master af filen skal ligge, og hvad den skal hedde: vaerkets
-  // Masters, med navnet uden programendelser ("Desert-neo-tp.tif" -> "Desert.tif").
+  // Master, med navnet uden programendelser ("Desert-neo-tp.tif" -> "Desert.tif").
   masterMaal(versionId) {
     const vaerk = this._vaerkFor(versionId);
     if (!vaerk) throw new Error('Only Approved works can get a master');
@@ -868,7 +939,7 @@ export class Catalog extends EventEmitter {
     if (!f || !f.present) throw new Error('The file is not available right now');
     return {
       kilde: this.abs(f.rel_path),
-      mappe: join(this.root, 'Approved', vaerk.work, 'Masters'),
+      mappe: join(this.root, 'Approved', vaerk.work, 'Master'),
       stem: udenEditorSuffiks(stemOf(basename(f.rel_path))),
     };
   }
@@ -881,7 +952,7 @@ export class Catalog extends EventEmitter {
     if (!vaerk) throw new Error('Only Approved works can be discarded here');
     const harMaster = this.db.get(
       `SELECT 1 AS ok FROM versions v JOIN files f ON f.id = v.file_id
-       WHERE v.image_id=? AND f.present=1 AND f.rel_path LIKE 'Approved/%/Masters/%' LIMIT 1`,
+       WHERE v.image_id=? AND f.present=1 AND f.rel_path LIKE 'Approved/%/Master/%' LIMIT 1`,
       vaerk.imageId
     );
     if (harMaster) throw new Error('This work already has a master and is no longer in Edit');
@@ -917,7 +988,7 @@ export class Catalog extends EventEmitter {
     return this.db.get('SELECT * FROM files WHERE id=?', fileId);
   }
 
-  // Arbejdsmappens undermappe (Originals, Edits, Masters, Print files) for et
+  // Arbejdsmappens undermappe (Original, Edits, Master, Print files) for et
   // godkendt billede, eller null hvis billedet ikke har en arbejdsmappe.
   workFolder(versionId, del = null) {
     if (del !== null && !ARBEJDSMAPPER.includes(del)) return null;
@@ -982,7 +1053,7 @@ export class Catalog extends EventEmitter {
       moves.push(...this.moveFiles([f.id], mal));
       if (v.rating === 'godkendt') {
         const arbejd = posix.dirname(mal);
-        for (const del of ['Edits', 'Masters', 'Print files']) {
+        for (const del of ['Edits', 'Master', 'Print files']) {
           mkdirSync(join(this.root, arbejd, del), { recursive: true });
         }
       }
@@ -997,9 +1068,9 @@ export class Catalog extends EventEmitter {
     const topmappe = rel.split('/')[0];
     const styret = rel.includes('/') && this._styredeTopmapper().includes(topmappe);
     if (rating === 'godkendt') {
-      if (arbejdsmappeFor(rel)?.del === 'Originals') return null;
+      if (arbejdsmappeFor(rel)?.del === 'Original') return null;
       const stem = stemOf(posix.basename(rel)).replace(/[/:\\]/g, '-');
-      return `Approved/${stem}/Originals`;
+      return `Approved/${stem}/Original`;
     }
     // En fil der ligger uden for de styrede mapper og ikke er bedoemt, bliver
     // hvor den er. Faar den en bedoemmelse, hentes mappens navn ind foran.
@@ -1021,7 +1092,7 @@ export class Catalog extends EventEmitter {
 
   // Navnet paa den mappe en fil kom fra, uden de styrede topmapper:
   // "Import/Ahl Strand/x.cr2" og "Ahl Strand/x.cr2" giver begge "Ahl Strand",
-  // og "Approved/Desert/Originals/x.cr2" giver vaerkets navn "Desert".
+  // og "Approved/Desert/Original/x.cr2" giver vaerkets navn "Desert".
   _oprindelsesmappe(rel) {
     const am = arbejdsmappeFor(rel);
     if (am) return am.work;
@@ -1107,14 +1178,14 @@ export class Catalog extends EventEmitter {
     return this.db.get('SELECT editor FROM editor_log WHERE image_id=?', imageId)?.editor ?? null;
   }
 
-  // Beskaeringen paa en fil i Masters: den staar i filnavnet, saa at saette den
+  // Beskaeringen paa en fil i Master: den staar i filnavnet, saa at saette den
   // omdoeber filen ("... 2-3.tif"), og null fjerner den. Returnerer den nye sti.
   setBeskaering(versionId, crop) {
     const v = this.getVersion(versionId);
     const f = v ? this.getFile(v.effective_file_id) : null;
     if (!f || !f.present) throw new Error('The file is not available right now');
-    if (!/^Approved\/[^/]+\/Masters\//.test(f.rel_path)) {
-      throw new Error('Only files in the Masters folder have a crop');
+    if (!/^Approved\/[^/]+\/Master\//.test(f.rel_path)) {
+      throw new Error('Only files in the Master folder have a crop');
     }
     const nyt = navnMedBeskaering(basename(f.rel_path), crop ?? null);
     if (nyt === basename(f.rel_path)) return f.rel_path;

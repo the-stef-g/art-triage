@@ -79,6 +79,9 @@ export default function App() {
   // Udgangspunktet for en omraade-markering. Den ligger her og ikke i
   // grid'et, saa Skift+klik og Skift+piletast regner fra det samme sted.
   const ankerRef = useRef(0);
+  // Et billede der skal vaelges naar listen er hentet igen, fx efter et klik
+  // i filmstrimlen paa et billede fra en anden mappe end den man star i.
+  const ventendeValgRef = useRef(null);
 
   const visFejl = useCallback((err) => {
     setFejl(String(err?.message || err));
@@ -108,6 +111,16 @@ export default function App() {
       } else if (!nyAktiv && beholdt.length) {
         // Det aktive billede forsvandt, men resten af markeringen staar.
         nyAktiv = beholdt[0];
+      }
+      const venter = ventendeValgRef.current;
+      // Er billedet heller ikke i hele fase 1 (fx et kasseret billede, mens
+      // de kasserede er skjult), opgives det, saa det ikke dukker op senere.
+      if (venter && !valid.has(venter) && !filterRef.current.folder) ventendeValgRef.current = null;
+      if (venter && valid.has(venter)) {
+        ventendeValgRef.current = null;
+        nyValg = [venter];
+        nyAktiv = venter;
+        ankerRef.current = res.rows.findIndex((r) => r.version_id === venter);
       }
       setSelected(nyValg);
       setActive(nyAktiv);
@@ -751,6 +764,7 @@ export default function App() {
         {/* Midterfeltet baerer baade grid'et og forstoerrelsen, saa den
             store visning holder sig inden for de to kolonner. */}
         <div className="midte">
+          <div className="grid-felt">
           <Grid
             rows={rows}
             selected={selected}
@@ -765,7 +779,15 @@ export default function App() {
             columns={kolonner}
             thumbRev={thumbRev}
           />
-          {/* Fase 1: mappens billeder i den raekkefoelge de er skudt. */}
+          {showPreview && focusedRow && (
+            <PreviewOverlay
+              row={focusedRow}
+              onClose={() => setShowPreview(false)}
+            />
+          )}
+          </div>
+          {/* Fase 1: Import i den raekkefoelge billederne er skudt. Den staar
+              under baade grid'et og den store visning. */}
           {filter.fase === 1 && focusedRow && (
             <Filmstrip
               row={focusedRow}
@@ -773,18 +795,20 @@ export default function App() {
               visKasserede={filter.visKasserede}
               dataRev={dataRev}
               thumbRev={thumbRev}
-              onSelect={(versionId) => {
+              onSelect={(versionId, iGrid) => {
+                if (!iGrid) {
+                  // Billedet er ikke i den visning man star i: vis hele fase 1.
+                  ventendeValgRef.current = versionId;
+                  setFilter((f) => ({
+                    ...f, folder: null, serieId: null, keyword: null, search: '', kunKandidater: false,
+                  }));
+                  return;
+                }
                 const i = rows.findIndex((r) => r.version_id === versionId);
                 if (i >= 0) ankerRef.current = i;
                 setSelected([versionId]);
                 setActive(versionId);
               }}
-            />
-          )}
-          {showPreview && focusedRow && (
-            <PreviewOverlay
-              row={focusedRow}
-              onClose={() => setShowPreview(false)}
             />
           )}
         </div>

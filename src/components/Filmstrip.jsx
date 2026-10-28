@@ -1,25 +1,31 @@
 import { useEffect, useRef, useState } from 'react';
 import { invoke, thumbUrl } from '../api';
 
-// Fase 1: billederne i mappen, i den raekkefoelge de er skudt. Grid'et
-// sorterer efter navn, og det er ikke altid skudrækkefoelgen; her ses
-// serien af skud som de blev taget, saa man kan vaelge det bedste af dem.
+// Fase 1: billederne i Import, i den raekkefoelge de er skudt. Grid'et
+// sorterer efter navn og viser én mappe ad gangen; her ses hele importen
+// som den blev taget, ogsaa i den store visning.
 export default function Filmstrip({ row, rows, visKasserede, dataRev, thumbRev, onSelect }) {
   const [billeder, setBilleder] = useState([]);
   const stripRef = useRef(null);
-  const fileIdRef = useRef(row.file_id);
-  fileIdRef.current = row.file_id;
-  // Hentes kun igen naar man skifter mappe eller kataloget aendres, ikke
-  // ved hvert skridt med pilene.
-  const mappe = row.rel_path.includes('/') ? row.rel_path.slice(0, row.rel_path.lastIndexOf('/')) : '';
+  const hentetRef = useRef({ dataRev: null, visKasserede: null, omfang: null, filer: new Set() });
 
+  // Hentes igen naar kataloget aendres. Uden en Import-mappe ogsaa naar man
+  // staar paa et billede i en anden mappe. Ikke ved hvert skridt med pilene.
   useEffect(() => {
+    const h = hentetRef.current;
+    const samme = h.dataRev === dataRev && h.visKasserede === visKasserede;
+    if (samme && (h.omfang === 'import' || h.filer.has(row.file_id))) return undefined;
     let aktuel = true;
-    invoke('img:filmstrip', { fileId: fileIdRef.current, visKasserede })
-      .then((r) => { if (aktuel) setBilleder(r || []); })
+    invoke('img:filmstrip', { fileId: row.file_id, visKasserede })
+      .then((r) => {
+        if (!aktuel) return;
+        const liste = r?.billeder || [];
+        hentetRef.current = { dataRev, visKasserede, omfang: r?.omfang ?? null, filer: new Set(liste.map((b) => b.file_id)) };
+        setBilleder(liste);
+      })
       .catch(() => { if (aktuel) setBilleder([]); });
     return () => { aktuel = false; };
-  }, [mappe, dataRev, visKasserede]);
+  }, [row.file_id, dataRev, visKasserede]);
 
   // Det aktive billede holdes inde i synsfeltet.
   useEffect(() => {
@@ -39,8 +45,8 @@ export default function Filmstrip({ row, rows, visKasserede, dataRev, thumbRev, 
           <button
             key={b.version_id}
             className={`film-billede ${b.file_id === row.file_id ? 'aktiv' : ''} ${findes ? '' : 'udenfor'} ${b.rating === 'kandidat' ? 'kandidat' : ''} ${b.rating === 'kasseret' ? 'kasseret' : ''}`}
-            title={`${i + 1}. ${navn}${findes ? '' : ' (not in this view)'}`}
-            onClick={() => findes && onSelect(b.version_id)}
+            title={`${i + 1}. ${b.rel_path}`}
+            onClick={() => onSelect(b.version_id, findes)}
           >
             <img
               key={thumbRev}

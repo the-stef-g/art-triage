@@ -99,6 +99,17 @@ try {
     null,
     { timeout: 10000 }
   );
+  // Den bliver staaende under den store visning.
+  await page.keyboard.press(' ');
+  await page.waitForSelector('.forstoerret', { timeout: 10000 });
+  const stripSynlig = await page.evaluate(() => {
+    const stor = document.querySelector('.forstoerret').getBoundingClientRect();
+    const strip = document.querySelector('.filmstrip')?.getBoundingClientRect();
+    return Boolean(strip) && strip.height > 0 && strip.top >= stor.bottom - 1;
+  });
+  if (!stripSynlig) throw new Error('Filmstrimlen forsvandt bag den store visning');
+  await page.keyboard.press(' ');
+  await page.waitForSelector('.forstoerret', { state: 'detached', timeout: 10000 });
 
   // Vaelg foerste billede og godkend med A. Genvejene foelger de engelske
   // ord paa knapperne: A approve, C candidate, X discard, U unrated.
@@ -384,7 +395,7 @@ try {
     { timeout: 10000 }
   );
 
-  // Fase 2: det godkendte billede. Make master laver en kopi i Masters, og
+  // Fase 2: det godkendte billede. Make master laver en kopi i Master, og
   // vaerket gaar videre til fase 3 og 4.
   await page.keyboard.press('Control+2');
   await page.waitForFunction(
@@ -401,7 +412,7 @@ try {
   await page.locator('.fase', { hasText: 'Product' }).click();
   await page.waitForFunction(
     () => document.querySelectorAll('.tile').length === 1
-      && document.querySelector('.tile-navn')?.title.includes('/Masters/'),
+      && document.querySelector('.tile-navn')?.title.includes('/Master/'),
     null,
     { timeout: 10000 }
   );

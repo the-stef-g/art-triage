@@ -214,12 +214,12 @@ export function walkDirs(root, inkluder = null) {
 }
 
 // Beskaeringens plads i filnavnet: et mellemrum (eller _) og formatet, som
-// "Desert Canyon 01 2-3.tif". Kun filer i et vaerks Masters-mappe har en
+// "Desert Canyon 01 2-3.tif". Kun filer i et vaerks Master-mappe har en
 // beskaering. Navnet er sandheden: aendrer man det, foelger etiketten med.
 export const BESKAERING_I_NAVN = { '1-1': '1:1', '2-3': '2:3', '3-2': '3:2', '1-2': '1:2', '2-1': '2:1' };
 
 export function beskaeringFraSti(rel) {
-  if (!/^Approved\/[^/]+\/Masters\//.test(rel)) return null;
+  if (!/^Approved\/[^/]+\/Master\//.test(rel)) return null;
   const stem = stemOf(basename(rel));
   const m = /[ _](1-1|2-3|3-2|1-2|2-1)$/.exec(stem);
   if (m) return BESKAERING_I_NAVN[m[1]];

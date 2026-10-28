@@ -234,15 +234,15 @@ describe('beskaeringer', () => {
 });
 
 describe('beskaeringer fra filnavnene', () => {
-  it('er filerne i Masters med et format i navnet, og de gamle markeringer fylder hullerne', () => {
+  it('er filerne i Master med et format i navnet, og de gamle markeringer fylder hullerne', () => {
     catalog.mappestyring = true;
     skriv('Blue Door 02.cr2');
     catalog.sync();
     const id = imageIdFor('Blue Door 02.cr2');
     catalog.setRating([catalog.listVersions({}).find((r) => r.image_id === id).version_id], 'godkendt');
-    skriv('Approved/Blue Door 02/Masters/Blue Door 02 3-2.tif');
-    skriv('Approved/Blue Door 02/Masters/Blue Door 02 1-1.tif');
-    skriv('Approved/Blue Door 02/Masters/Blue Door 02 uden.tif');
+    skriv('Approved/Blue Door 02/Master/Blue Door 02 3-2.tif');
+    skriv('Approved/Blue Door 02/Master/Blue Door 02 1-1.tif');
+    skriv('Approved/Blue Door 02/Master/Blue Door 02 uden.tif');
     catalog.sync();
     const rows = catalog.listVersions({}).filter((r) => r.image_id === id);
     const vid = (navn) => rows.find((r) => r.rel_path.endsWith(navn)).version_id;

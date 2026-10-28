@@ -548,7 +548,7 @@ export class AppSession {
       return { rel: res.path.slice(catalog.root.length + 1), konverteret: res.konverteret };
     });
 
-    // Fase 5: printfiler til Prodigi, én pr. markeret fil i Masters.
+    // Fase 5: printfiler til Prodigi, én pr. markeret fil i Master.
     handle('print:make', async ({ versionIds }) => {
       const catalog = this.requireCatalog();
       const ids = Array.isArray(versionIds) ? versionIds : [];
@@ -574,22 +574,22 @@ export class AppSession {
       return { edits: filer.length };
     });
 
-    // Beskaeringen paa en fil i Masters. Den staar i filnavnet, saa filen
+    // Beskaeringen paa en fil i Master. Den staar i filnavnet, saa filen
     // omdoebes, og etiketten foelger med.
     handle('img:setCrop', ({ versionId, crop }) => {
       const rel = this.requireCatalog().setBeskaering(versionId, crop ?? null);
       this.log(`crop label: ${rel}`);
       return { rel };
     });
-    // Beskaering. Kun et faerdigt vaerk kan beskaeres, altsaa en fil i Masters,
-    // og resultatet er en ny fil i Masters.
+    // Beskaering. Kun et faerdigt vaerk kan beskaeres, altsaa en fil i Master,
+    // og resultatet er en ny fil i Master.
     handle('crop:save', async ({ versionId, rect, ratio }) => {
       const catalog = this.requireCatalog();
       const v = catalog.getVersion(versionId);
       const f = v ? catalog.getFile(v.effective_file_id) : null;
       if (!f || !f.present) throw new Error('The file is not available right now');
-      if (!/^Approved\/[^/]+\/Masters\//.test(f.rel_path)) {
-        throw new Error('Only finished works can be cropped: the file must be in the Masters folder');
+      if (!/^Approved\/[^/]+\/Master\//.test(f.rel_path)) {
+        throw new Error('Only finished works can be cropped: the file must be in the Master folder');
       }
       if (!rect || ![rect.x, rect.y, rect.w, rect.h].every(Number.isFinite) || rect.w <= 0 || rect.h <= 0) {
         throw new Error('The crop is empty');

@@ -48,6 +48,9 @@ input[type='search'], input[type='text'], .modal input {
   min-width: 0;
 }
 input:focus, select:focus { outline: 1px solid var(--accent); }
+/* Knapper faar ingen fokusramme. Arbejdet foregaar med mus og
+   bogstavgenveje, og rammen blev haengende om den sidst klikkede knap. */
+button:focus, button:focus-visible, [tabindex]:focus, [tabindex]:focus-visible { outline: none; }
 
 .app {
   display: flex;
@@ -240,6 +243,7 @@ input:focus, select:focus { outline: 1px solid var(--accent); }
    det her, ikke oven i hele vinduet, saa serier, noegleord og bedoemmelse
    stadig er synlige mens man kigger stort paa billedet. */
 .midte { flex: 1; min-width: 0; position: relative; display: flex; flex-direction: column; }
+.grid-felt { flex: 1; min-height: 0; position: relative; display: flex; }
 .grid-omraade { flex: 1; min-width: 0; min-height: 0; position: relative; }
 
 /* Fase 1: mappens billeder i skudraekkefoelge, nederst under grid'et. */

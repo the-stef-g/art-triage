@@ -70,23 +70,23 @@ describe('fasen foelger af mapperne', () => {
     catalog.setRating([raekke('Import/Ahl/y.cr2').version_id], 'godkendt');
     catalog.setRating([raekke('Import/Ahl/z.cr2').version_id], 'kandidat');
     skriv('Approved/x/Edits/x-neo.tif', 'e');
-    skriv('Approved/y/Masters/y.tif', 'm');
-    skriv('Approved/y/Masters/y 2-3.tif', 'c');
+    skriv('Approved/y/Master/y.tif', 'm');
+    skriv('Approved/y/Master/y 2-3.tif', 'c');
     catalog.sync();
 
     expect(fase(1)).toEqual(['Candidate/Ahl/z.cr2']);
-    expect(fase(2)).toEqual(['Approved/x/Edits/x-neo.tif', 'Approved/x/Originals/x.cr2']);
-    expect(fase(3)).toEqual(['Approved/y/Masters/y.tif']); // én flise pr. vaerk
-    expect(fase(4)).toEqual(['Approved/y/Masters/y 2-3.tif', 'Approved/y/Masters/y.tif']);
-    expect(fase(5)).toEqual(['Approved/y/Masters/y 2-3.tif']);
+    expect(fase(2)).toEqual(['Approved/x/Edits/x-neo.tif', 'Approved/x/Original/x.cr2']);
+    expect(fase(3)).toEqual(['Approved/y/Master/y.tif']); // én flise pr. vaerk
+    expect(fase(4)).toEqual(['Approved/y/Master/y 2-3.tif', 'Approved/y/Master/y.tif']);
+    expect(fase(5)).toEqual(['Approved/y/Master/y 2-3.tif']);
     expect(catalog.faseTal()).toEqual({ 1: 1, 2: 1, 3: 1, 4: 1, 5: 1 });
   });
 
   it('i Product vises en beskaering, hvis vaerket kun har beskaerne mastere', () => {
     catalog.setRating([raekke('Import/Ahl/x.cr2').version_id], 'godkendt');
-    skriv('Approved/x/Masters/x 1-1.tif', 'c');
+    skriv('Approved/x/Master/x 1-1.tif', 'c');
     catalog.sync();
-    expect(fase(3)).toEqual(['Approved/x/Masters/x 1-1.tif']);
+    expect(fase(3)).toEqual(['Approved/x/Master/x 1-1.tif']);
   });
 });
 
@@ -97,7 +97,7 @@ describe('programmet staar i filnavnet', () => {
     expect(editorFraSti('Approved/w/Edits/a-neo-Edit.jpg')).toBe('Luminar Neo');
     expect(editorFraSti('Approved/w/Edits/a-ps 1.psd')).toBe('Photoshop');
     expect(editorFraSti('Approved/w/Edits/neon.tif')).toBe(null);
-    expect(editorFraSti('Approved/w/Masters/a-neo.tif')).toBe(null);
+    expect(editorFraSti('Approved/w/Master/a-neo.tif')).toBe(null);
     expect(udenEditorSuffiks('Desert-neo-tp')).toBe('Desert');
     expect(udenEditorSuffiks('Desert-neo-Edit')).toBe('Desert-Edit');
   });
@@ -116,7 +116,7 @@ describe('fase 2', () => {
   });
 
   it('en kopi til et program faar endelsen og ligger i Edits', () => {
-    const id = raekke('Approved/x/Originals/x.cr2').version_id;
+    const id = raekke('Approved/x/Original/x.cr2').version_id;
     const a = catalog.kopiTilEdits(id, 'neo');
     expect(a).toBe(join(root, 'Approved/x/Edits/x-neo.cr2'));
     expect(readFileSync(a, 'utf8')).toBe('x');
@@ -135,16 +135,16 @@ describe('fase 2', () => {
     catalog.sync();
     const maal = catalog.masterMaal(raekke('Approved/x/Edits/x-neo-tp.tif').version_id);
     const res = await lavMaster(maal);
-    expect(res.path).toBe(join(root, 'Approved/x/Masters/x.tif'));
+    expect(res.path).toBe(join(root, 'Approved/x/Master/x.tif'));
     expect(res.konverteret).toBe(false);
     catalog.sync();
     expect(fase(2)).toEqual([]);
-    expect(fase(3)).toEqual(['Approved/x/Masters/x.tif']);
-    expect(raekke('Approved/x/Originals/x.cr2').finished).toBe(1);
+    expect(fase(3)).toEqual(['Approved/x/Master/x.tif']);
+    expect(raekke('Approved/x/Original/x.cr2').finished).toBe(1);
   });
 
   it('en RAW kan ikke vaere master, og en PSD kraever macOS', async () => {
-    const raw = catalog.masterMaal(raekke('Approved/x/Originals/x.cr2').version_id);
+    const raw = catalog.masterMaal(raekke('Approved/x/Original/x.cr2').version_id);
     await expect(lavMaster(raw)).rejects.toThrow(/RAW/);
     skriv('Approved/x/Edits/x-ps.psd', 'psd');
     catalog.sync();
@@ -155,7 +155,7 @@ describe('fase 2', () => {
       ...psd, platform: 'darwin',
       runner: async (cmd, args) => { kald.push(args); writeFileSync(args[args.indexOf('--out') + 1], 'tiff'); },
     });
-    expect(res.path).toBe(join(root, 'Approved/x/Masters/x.tif'));
+    expect(res.path).toBe(join(root, 'Approved/x/Master/x.tif'));
     expect(kald[0].slice(0, 3)).toEqual(['-s', 'format', 'tiff']);
   });
 
@@ -172,14 +172,43 @@ describe('fase 2', () => {
   });
 
   it('et vaerk med en master kan ikke kasseres herfra', () => {
-    skriv('Approved/x/Masters/x.tif', 'm');
+    skriv('Approved/x/Master/x.tif', 'm');
     catalog.sync();
-    expect(() => catalog.kasserVaerk(raekke('Approved/x/Masters/x.tif').version_id)).toThrow(/master/);
+    expect(() => catalog.kasserVaerk(raekke('Approved/x/Master/x.tif').version_id)).toThrow(/master/);
+  });
+});
+
+describe('gamle mappenavne', () => {
+  it('omdoeber Originals og Masters til Original og Master og beholder bedoemmelsen', () => {
+    catalog.setRating([raekke('Import/Ahl/x.cr2').version_id], 'godkendt');
+    // Som et bibliotek fra foer 0.16: mapperne hed Originals og Masters.
+    const nu = join(root, 'Approved', 'x');
+    rmSync(join(nu, 'Master'), { recursive: true, force: true });
+    mkdirSync(join(nu, 'Originals'), { recursive: true });
+    writeFileSync(join(nu, 'Originals', 'x.cr2'), readFileSync(join(nu, 'Original', 'x.cr2')));
+    rmSync(join(nu, 'Original'), { recursive: true, force: true });
+    skriv('Approved/x/Masters/x 2-3.tif', 'm');
+    db.run("UPDATE files SET rel_path='Approved/x/Originals/x.cr2' WHERE rel_path='Approved/x/Original/x.cr2'");
+    catalog.sync();
+    expect(raekke('Approved/x/Originals/x.cr2').rating).toBe('godkendt');
+
+    catalog.brugMappestruktur();
+    expect(existsSync(join(nu, 'Originals'))).toBe(false);
+    expect(existsSync(join(nu, 'Masters'))).toBe(false);
+    expect(existsSync(join(nu, 'Original', 'x.cr2'))).toBe(true);
+    expect(existsSync(join(nu, 'Master', 'x 2-3.tif'))).toBe(true);
+    catalog.sync();
+    expect(raekke('Approved/x/Original/x.cr2').rating).toBe('godkendt');
+    expect(raekke('Approved/x/Master/x 2-3.tif').crop).toBe('2:3');
+    expect(alle().some((r) => /Originals|Masters/.test(r.rel_path))).toBe(false);
   });
 });
 
 describe('filmstrip', () => {
-  it('viser mappens skud i den raekkefoelge de er taget', async () => {
+  it('viser hele Import, med kandidaterne, i den raekkefoelge de er taget', async () => {
+    for (const n of ['x', 'y', 'z']) {
+      utimesSync(join(root, `Import/Ahl/${n}.cr2`), new Date('2029-01-01'), new Date('2029-01-01'));
+    }
     skriv('Import/Serie/c.jpg', jpegMedTid('2024:05:01 10:00:00', '200'));
     skriv('Import/Serie/a.jpg', jpegMedTid('2024:05:01 10:00:00', '700'));
     skriv('Import/Serie/b.jpg', jpegMedTid('2024:05:01 09:59:58'));
@@ -187,10 +216,17 @@ describe('filmstrip', () => {
     utimesSync(join(root, 'Import/Serie/uden.jpg'), new Date('2030-01-01'), new Date('2030-01-01'));
     skriv('Import/Serie/under/d.jpg', jpegMedTid('2024:05:01 09:00:00'));
     catalog.sync();
-    const strip = await catalog.filmstrip(raekke('Import/Serie/a.jpg').file_id);
+    catalog.setRating([raekke('Import/Serie/c.jpg').version_id], 'kandidat');
+    catalog.setRating([raekke('Import/Ahl/z.cr2').version_id], 'kasseret');
+    const { omfang, billeder: strip } = await catalog.filmstrip(raekke('Import/Serie/a.jpg').file_id);
+    expect(omfang).toBe('import');
     expect(strip.map((r) => r.rel_path)).toEqual([
-      'Import/Serie/b.jpg', 'Import/Serie/c.jpg', 'Import/Serie/a.jpg', 'Import/Serie/uden.jpg',
+      'Import/Serie/under/d.jpg', 'Import/Serie/b.jpg', 'Candidate/Serie/c.jpg', 'Import/Serie/a.jpg',
+      'Import/Ahl/x.cr2', 'Import/Ahl/y.cr2', 'Import/Serie/uden.jpg',
     ]);
+    // Med de kasserede vist er de ogsaa med.
+    const alle = await catalog.filmstrip(raekke('Import/Serie/a.jpg').file_id, { visKasserede: true });
+    expect(alle.billeder.map((r) => r.rel_path)).toContain('Discarded/Ahl/z.cr2');
     // Tidspunktet gemmes, saa det kun laeses én gang.
     expect(catalog.getFile(raekke('Import/Serie/b.jpg').file_id).taken_at).toBeGreaterThan(0);
     expect(catalog.getFile(raekke('Import/Serie/uden.jpg').file_id).taken_at).toBe(-1);

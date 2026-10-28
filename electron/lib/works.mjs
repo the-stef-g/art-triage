@@ -137,7 +137,7 @@ export class Works {
     ) || null;
   }
 
-  // Beskaeringerne til shoppen er filerne i Masters hvis navn har et format
+  // Beskaeringerne til shoppen er filerne i Master hvis navn har et format
   // ("... 2-3.tif"). Den foerste fil pr. format vinder. Aeldre markeringer
   // lavet i haanden (work_crops) gaelder stadig for de formater, ingen fil har.
   cropsFor(imageId) {

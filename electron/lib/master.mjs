@@ -1,5 +1,5 @@
 // Den sidste ting i fase 2: den faerdige redigering bliver vaerkets master i
-// Masters. TIFF, JPEG og PNG kopieres som de er. Andre formater, fx en PSD,
+// Master. TIFF, JPEG og PNG kopieres som de er. Andre formater, fx en PSD,
 // laves om til en flad TIFF med sips (macOS), som bevarer bitdybde og
 // farveprofil. En RAW-fil er ikke redigeret og kan ikke vaere en master.
 import { execFile } from 'node:child_process';

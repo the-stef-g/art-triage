@@ -78,10 +78,10 @@ describe('lavPrintfil', () => {
 
 describe('printfiler i kataloget', () => {
   it('fase 5 viser om en beskaering har en printfil, og printMaal peger paa Print files', async () => {
-    await p3Tiff(join(root, 'Approved', 'Desert', 'Masters', 'Desert 2-3.tif'));
+    await p3Tiff(join(root, 'Approved', 'Desert', 'Master', 'Desert 2-3.tif'));
     catalog.sync();
     let r = catalog.listVersions({ fase: 5 })[0];
-    expect(r.rel_path).toBe('Approved/Desert/Masters/Desert 2-3.tif');
+    expect(r.rel_path).toBe('Approved/Desert/Master/Desert 2-3.tif');
     expect(r.printfil).toBe(null);
 
     const maal = catalog.printMaal(r.version_id);
@@ -97,8 +97,8 @@ describe('printfiler i kataloget', () => {
     expect(alle().some((x) => x.rel_path.includes('Print files'))).toBe(false);
   });
 
-  it('kun filer i Masters kan blive til en printfil', () => {
-    const orig = alle().find((x) => x.rel_path.startsWith('Approved/Desert/Originals/'));
-    expect(() => catalog.printMaal(orig.version_id)).toThrow(/Masters/);
+  it('kun filer i Master kan blive til en printfil', () => {
+    const orig = alle().find((x) => x.rel_path.startsWith('Approved/Desert/Original/'));
+    expect(() => catalog.printMaal(orig.version_id)).toThrow(/Master/);
   });
 });

@@ -64,11 +64,11 @@ export default function Inspector({
   }
 
   // Det der kan beskaeres er værkets master: den valgte fil hvis den ligger i
-  // Masters, ellers den foerste fil i Masters. Uden en er vaerket ikke faerdigt.
-  const iMasters = (rel) => /^Approved\/[^/]+\/Masters\//.test(rel);
-  const masterVersion = iMasters(row.rel_path)
+  // Master, ellers den foerste fil i Master. Uden en er vaerket ikke faerdigt.
+  const iMaster = (rel) => /^Approved\/[^/]+\/Master\//.test(rel);
+  const masterVersion = iMaster(row.rel_path)
     ? row
-    : versions.find((v) => iMasters(v.rel_path));
+    : versions.find((v) => iMaster(v.rel_path));
   const master = masterVersion ? {
     version_id: masterVersion.version_id ?? masterVersion.id,
     file_id: masterVersion.file_id ?? masterVersion.effective_file_id,
@@ -205,7 +205,7 @@ export default function Inspector({
           <h4>Master</h4>
           <p className="tom">The last step here: make the finished edit the work&apos;s master. The work then moves on to Product.</p>
           <div className="knapraekke">
-            <button onClick={act.makeMaster} title="Copies the selected file to Masters, named after the work">Make master</button>
+            <button onClick={act.makeMaster} title="Copies the selected file to Master, named after the work">Make master</button>
           </div>
 
           <h4>Discard</h4>
@@ -290,17 +290,17 @@ export default function Inspector({
               <button
                 key={f}
                 className={row.crop === f ? 'aktiv-beskaering' : ''}
-                disabled={!iMasters(row.rel_path)}
+                disabled={!iMaster(row.rel_path)}
                 onClick={() => invoke('img:setCrop', { versionId: row.version_id, crop: row.crop === f ? null : f }).catch(onError)}
-                title={iMasters(row.rel_path)
+                title={iMaster(row.rel_path)
                   ? 'Gives the file this crop, in its name and as a label. Click again to remove it.'
-                  : 'Crops apply to files in the Masters folder.'}
+                  : 'Crops apply to files in the Master folder.'}
               >
                 {f}
               </button>
             ))}
             <button
-              disabled={!iMasters(row.rel_path) || !row.crop}
+              disabled={!iMaster(row.rel_path) || !row.crop}
               onClick={() => invoke('img:setCrop', { versionId: row.version_id, crop: null }).catch(onError)}
               title="Remove the crop from the file name"
             >
@@ -313,14 +313,14 @@ export default function Inspector({
               disabled={!master}
               onClick={() => setBeskaer(true)}
               title={master
-                ? `Crop ${master.rel_path.split('/').pop()}. The crop is saved as a new file in Masters.`
-                : 'Only finished works can be cropped: put the master in the Masters folder first.'}
+                ? `Crop ${master.rel_path.split('/').pop()}. The crop is saved as a new file in Master.`
+                : 'Only finished works can be cropped: put the master in the Master folder first.'}
             >
               Crop master …
             </button>
           </div>
           {!master && (
-            <p className="tom">Only finished works can be cropped. Put the master in the Masters folder.</p>
+            <p className="tom">Only finished works can be cropped. Put the master in the Master folder.</p>
           )}
           {beskaer && master && (
             <CropModal
@@ -366,7 +366,7 @@ export default function Inspector({
           <button
             className="lille"
             onClick={() => invoke('img:openWorkFolder', { versionId: row.version_id }).catch(onError)}
-            title="Open the work's folder with Originals, Edits, Masters and Print files"
+            title="Open the work's folder with Original, Edits, Master and Print files"
           >
             Show in Finder
           </button>
