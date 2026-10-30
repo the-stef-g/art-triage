@@ -340,6 +340,12 @@ describe('attributter', () => {
     expect(ud.map((a) => a.position)).toEqual([0, 1, 2]);
   });
 
+  it('fjerner attributter appen ikke kender', () => {
+    const fremmed = { id: 9, name: 'Colour', visible: true, variation: false, options: ['Red'] };
+    const ud = mergeAttributes([...eksisterende, fremmed], work());
+    expect(ud.map((a) => a.name)).toEqual(['Year', 'Technique', 'Format', 'Material', 'Frame', 'Size']);
+  });
+
   it('fjerner en ejet attribut der er blevet tom, og kun den', () => {
     const ud = mergeAttributes(eksisterende, work({ technique: null }));
     expect(ud.map((a) => a.name)).not.toContain('Technique');
@@ -590,12 +596,13 @@ describe('send til shop', () => {
     expect(nye.map((k) => JSON.parse(k.body).name)).toEqual(['beach']);
   });
 
-  it('roerer ikke tags i shoppen, naar vaerket ingen soegeord har', async () => {
+  it('toemmer tags og upsells i shoppen, naar vaerket ingen soegeord eller serie har', async () => {
     const { id } = klartVaerk('a.png');
     const { kald, fetchImpl } = attrapShop();
     await (await sync(fetchImpl)).send(id);
     const post = kald.find((k) => k.method === 'POST' && k.sti === '/wc/v3/products');
-    expect(JSON.parse(post.body).tags).toBeUndefined();
+    expect(JSON.parse(post.body).tags).toEqual([]);
+    expect(JSON.parse(post.body).upsell_ids).toEqual([]);
   });
 
   it('giver produktet en SKU som variant-SKU erne, og en anden hvis den er taget', async () => {

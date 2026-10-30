@@ -82,9 +82,10 @@ export default function Inspector({
   // Det der kan beskaeres er værkets master: den valgte fil hvis den ligger i
   // Master, ellers den foerste fil i Master. Uden en er vaerket ikke faerdigt.
   const iMaster = (rel) => /^Approved\/[^/]+\/Master\//.test(rel);
-  const masterVersion = iMaster(row.rel_path)
+  const iMappen = versions.filter((v) => v.present !== 0 && iMaster(v.rel_path));
+  const masterVersion = iMaster(row.rel_path) && !row.crop
     ? row
-    : versions.find((v) => iMaster(v.rel_path));
+    : iMappen.find((v) => !v.crop) || (iMaster(row.rel_path) ? row : iMappen[0]);
   const master = masterVersion ? {
     version_id: masterVersion.version_id ?? masterVersion.id,
     file_id: masterVersion.file_id ?? masterVersion.effective_file_id,
@@ -92,6 +93,31 @@ export default function Inspector({
     rotation: masterVersion.rotation || 0,
     rel_path: masterVersion.rel_path,
   } : null;
+  // Beskaeringerne af masteren. En beskaering lavet foer masteren sidst blev
+  // aendret, er foraeldet (samme graense som kataloget: 2 sekunder).
+  const crops = iMappen
+    .filter((v) => v.crop && v.crop !== 'free' && (v.effective_file_id ?? v.file_id) !== master?.file_id)
+    .map((v) => ({
+      format: v.crop,
+      versionId: v.id,
+      rel: v.rel_path,
+      foraeldet: Boolean(master && master.mtime > v.mtime + 2000),
+    }));
+  const sletCrop = async (c) => {
+    const ok = window.confirm(
+      `Remove the ${c.format} crop «${fileName(c.rel)}»? It goes to the Trash. `
+      + 'An enlargement or print file made from it stays where it is.'
+    );
+    if (!ok) return;
+    try {
+      await invoke('crop:delete', { versionId: c.versionId });
+      onError(`Removed ${fileName(c.rel)}`);
+    } catch (err) {
+      onError(err);
+    }
+  };
+  const meta = `${formatBytes(masterVersion?.size ?? row.size)} · Last edit ${formatDate(master?.mtime ?? row.mtime)}`
+    + `${row.series_name ? ` · Series: ${row.series_name}` : ''}`;
 
   const iArbejde = row.rel_path.startsWith('Approved/');
   const iEdits = /^Approved\/[^/]+\/Edits\//.test(row.rel_path);
@@ -321,44 +347,29 @@ export default function Inspector({
 
       {/* En beskaering lavet af en gammel udgave af masteren, en
           forstoerrelse af en gammel beskaering eller en gammel printfil. */}
-      {(fase === 3 || fase === 4) && foraeldetTekster(row.foraeldet).length > 0 && (
+      {fase === 4 && foraeldetTekster(row.foraeldet).length > 0 && (
         <ul className="foraeldet-liste">
           {foraeldetTekster(row.foraeldet).map((t) => <li key={t}>{t}</li>)}
         </ul>
       )}
 
-      {fase === 3 && (
-        <>
-          <h4>Crops</h4>
-          <div className="knapraekke">
-            {['1:1', '2:3', '3:2', '1:2', '2:1'].map((f) => (
-              <button
-                key={f}
-                className={row.crop === f ? 'aktiv-beskaering' : ''}
-                disabled={!iMaster(row.rel_path)}
-                onClick={() => invoke('img:setCrop', { versionId: row.version_id, crop: row.crop === f ? null : f }).catch(onError)}
-                title={iMaster(row.rel_path)
-                  ? 'Gives the file this crop, in its name and as a label. Click again to remove it.'
-                  : 'Crops apply to files in the Master folder.'}
-              >
-                {f}
-              </button>
-            ))}
-            <button
-              disabled={!iMaster(row.rel_path) || !row.crop}
-              onClick={() => invoke('img:setCrop', { versionId: row.version_id, crop: null }).catch(onError)}
-              title="Remove the crop from the file name"
-            >
-              Clear
-            </button>
-          </div>
-        </>
-      )}
-
       {/* Crop: beskaeringen staar midt i vinduet, for vaerkets master. */}
       {fase === 3 && cropNode && createPortal(
         master
-          ? <CropModal key={master.file_id} inline row={master} onClose={() => {}} onDone={onError} onError={onError} />
+          ? (
+            <CropModal
+              key={master.file_id}
+              inline
+              row={master}
+              crops={crops}
+              meta={meta}
+              onFinder={() => invoke('img:openWorkFolder', { versionId: master.version_id }).catch(onError)}
+              onSletCrop={sletCrop}
+              onClose={() => {}}
+              onDone={onError}
+              onError={onError}
+            />
+          )
           : <p className="tom crop-tom">Select a work to crop its master.</p>,
         cropNode
       )}

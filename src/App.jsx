@@ -7,6 +7,7 @@ import Grid from './components/Grid';
 import Inspector from './components/Inspector';
 import StatusBar, { MIN_KOLONNER, MAX_KOLONNER } from './components/StatusBar';
 import Filmstrip from './components/Filmstrip';
+import CropStrip from './components/CropStrip';
 import PrintList from './components/PrintList';
 import { PreviewOverlay, NameModal } from './components/Overlay';
 import { FASEFARVE } from './faser';
@@ -106,6 +107,28 @@ export default function App() {
       const gammeltIdx = gamleRows.findIndex((r) => r.version_id === activeRef.current);
       // I Print staar forstoerrelserne paa beskaeringens linje, ikke for sig.
       if (filterRef.current.fase === 4) res.rows = res.rows.filter((r) => !r.giga);
+      // I Crop er der én pr. vaerk, masteren. Beskaeringerne staar paa
+      // formatknapperne, og her taelles de til filmstriben.
+      if (filterRef.current.fase === 3) {
+        const crops = new Map();
+        const harMaster = new Set();
+        for (const r of res.rows) {
+          if (r.crop) {
+            const c = crops.get(r.image_id) || { antal: 0, foraeldet: false };
+            c.antal += 1;
+            c.foraeldet ||= Boolean(r.foraeldet);
+            crops.set(r.image_id, c);
+          } else harMaster.add(r.image_id);
+        }
+        const sete = new Set();
+        res.rows = res.rows
+          .filter((r) => {
+            if (sete.has(r.image_id) || (r.crop && harMaster.has(r.image_id))) return false;
+            sete.add(r.image_id);
+            return true;
+          })
+          .map((r) => ({ ...r, crops: crops.get(r.image_id) || { antal: 0, foraeldet: false } }));
+      }
       setRows(res.rows);
       setCounts(res.counts);
       setFaseTal(res.faseTal || null);
@@ -370,6 +393,10 @@ export default function App() {
   // Crop: vaerkerne smalt til venstre og beskaeringen i midten.
   const cropLayout = filter.fase === 3;
   const [cropNode, setCropNode] = useState(null);
+  // Filmstriben i Crop er én raekke: op og ned flytter ogsaa ét vaerk.
+  useEffect(() => {
+    if (cropLayout) columnsRef.current = 1;
+  }, [cropLayout]);
 
   // Slaar det aktive billede op via refs, saa tastaturgenvejene
   // (registreret en gang) altid ser den aktuelle tilstand.
@@ -827,7 +854,18 @@ export default function App() {
             store visning holder sig inden for de to kolonner. */}
         <div className="midte">
           <div className="grid-felt">
-          {filter.fase === 4 ? (
+          {cropLayout ? (
+            <CropStrip
+              rows={rows}
+              active={active}
+              thumbRev={thumbRev}
+              onSelect={(versionId, i) => {
+                ankerRef.current = i;
+                setSelected([versionId]);
+                setActive(versionId);
+              }}
+            />
+          ) : filter.fase === 4 ? (
             <PrintList
               rows={rows}
               selected={selected}

@@ -351,8 +351,9 @@ export function compareFormat(product) {
   return problems;
 }
 
-// Det Stef G Art ejer af attributterne. Alle andre (Format, Material,
-// Frame, Size og hvad der ellers kommer) er printvarianternes og roeres ikke.
+// Det Stef G Art ejer af attributterne. Format, Material, Frame og Size er
+// printvarianternes. Alt andet kender appen ikke, og det fjernes: appen
+// overruler shoppen.
 const EJEDE_ATTRIBUTTER = ['Year', 'Technique', 'Dimensions'];
 
 function ejedeVaerdier(work) {
@@ -367,19 +368,20 @@ function ejedeVaerdier(work) {
 const VARIANT_ATTRIBUTTER = ['Format', 'Material', 'Frame', 'Size'];
 
 // Flette de ejede attributter ind i dem produktet har. Woo erstatter hele
-// listen ved en opdatering, saa det der ikke er vores skal sendes med
-// uroert. Gives varianterne med, erstatter de Format, Material, Frame og
-// Size; ellers bliver de staaende som de er.
+// listen ved en opdatering. Gives varianterne med, erstatter de Format,
+// Material, Frame og Size; ellers bliver de staaende som de er. En
+// attribut appen ikke kender, kommer ikke med og forsvinder fra produktet.
 export function mergeAttributes(existing, work, varianter = null) {
   const ejede = ejedeVaerdier(work);
   const ud = [];
   const set = new Set();
   for (const attr of existing || []) {
     if (varianter && VARIANT_ATTRIBUTTER.includes(attr.name)) continue;
-    if (!EJEDE_ATTRIBUTTER.includes(attr.name)) {
+    if (VARIANT_ATTRIBUTTER.includes(attr.name)) {
       ud.push(attr);
       continue;
     }
+    if (!EJEDE_ATTRIBUTTER.includes(attr.name)) continue;
     set.add(attr.name);
     if (ejede[attr.name]) ud.push({ ...attr, options: [ejede[attr.name]] });
   }
@@ -427,8 +429,9 @@ export function buildProduct(work, media, {
     tax_class: work.category === 'Sculptures' ? 'reduced-rate' : '',
   };
   if (categoryId) produkt.categories = [{ id: categoryId }];
-  // Soegeordene som tags. Uden ord roeres tags i shoppen ikke.
-  if (tagIds?.length) produkt.tags = tagIds.map((id) => ({ id }));
+  // Soegeordene som tags. Uden ord har produktet ingen tags: appen
+  // overruler shoppen.
+  if (Array.isArray(tagIds)) produkt.tags = tagIds.map((id) => ({ id }));
   if (work.unique && work.price) produkt.regular_price = work.price;
   if (create) {
     produkt.type = work.unique ? 'simple' : 'variable';
@@ -628,11 +631,12 @@ export class ShopSync {
     // SKU'en saettes kun, naar produktet ikke har én: en Stef har givet det
     // i Woo, eller som varianterne bygger paa, roeres ikke.
     if (!eksisterende?.sku) body.sku = vaerkSku(work);
-    // Seriens andre vaerker som upsells ("You may also like").
-    if (work.seriesId) {
-      body.upsell_ids = this.works.serieProdukter(work.seriesId)
-        .filter((p) => p.imageId !== imageId).map((p) => p.productId);
-    }
+    // Seriens andre vaerker som upsells ("You may also like"). Uden en
+    // serie ingen upsells, heller ikke nogen der er sat i Woo.
+    body.upsell_ids = work.seriesId
+      ? this.works.serieProdukter(work.seriesId)
+        .filter((p) => p.imageId !== imageId).map((p) => p.productId)
+      : [];
     const gem = () => (create
       ? this.client.wc('POST', '/products', body)
       : this.client.wc('PUT', `/products/${work.wooProductId}`, body));

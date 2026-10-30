@@ -58,14 +58,19 @@ try {
   await page.locator('button', { hasText: 'Scan again' }).click();
   await page.waitForFunction(() => document.querySelectorAll('.tile').length === 0, null, { timeout: 20000 });
   await page.locator('.fase', { hasText: 'Crop' }).click();
-  await page.waitForSelector('.tile-navn[title*="/Master/"]', { timeout: 20000 });
-  if (await page.locator('.tile-navn[title*="/Original/"]').count() !== 0) {
-    throw new Error('Originalen staar i fase 3');
+  // Crop: vaerkerne i en filmstribe under beskaeringen, én pr. vaerk.
+  await page.waitForSelector('.crop-strip .film-billede', { timeout: 20000 });
+  if (await page.locator('.crop-strip .film-billede').count() !== 1) {
+    throw new Error('Filmstriben i Crop har ikke praecis ét vaerk');
   }
+  if (await page.locator('.hoved.beskaer > .inspector').isVisible()) throw new Error('Hoejre kolonne vises i Crop');
 
   // Beskaer masteren til 1:1. Beskaeringen staar midt i vinduet.
-  await page.locator('.tile', { has: page.locator('.tile-navn[title*="/Master/"]') }).click();
+  await page.locator('.crop-strip .film-billede').first().click();
   await page.waitForSelector('.crop-midte .crop-inline .crop-vindue', { timeout: 10000 });
+  // Metadata ved titlen og Show in Finder i hjoernet.
+  await page.waitForSelector('.crop-top .crop-meta >> text=/Last edit/', { timeout: 10000 });
+  await page.waitForSelector('.crop-top button:has-text("Show in Finder")', { timeout: 10000 });
   await page.waitForFunction(() => document.querySelector('.crop-flade img')?.naturalWidth > 0, null, { timeout: 10000 });
   // Masteren er 400 × 200, saa beskaeringen starter i 2:1.
   await page.waitForSelector('.crop-formater button.primaer:has-text("2:1")', { timeout: 10000 });
@@ -103,7 +108,10 @@ try {
   // Genvejene maa ikke ramme billederne (X kasserer ikke i Crop).
   await page.keyboard.press('x');
   await page.locator('button', { hasText: 'Save crop' }).click();
-  await page.waitForSelector('.tile-navn[title$="blaa master 1-1.png"]', { timeout: 20000 });
+  // Formatet er nu beskaaret: knappen kan ikke vaelges igen, og vaerket i
+  // filmstriben har en beskaering.
+  await page.waitForSelector('.crop-format.findes button:disabled:has-text("1:1")', { timeout: 20000 });
+  await page.waitForSelector('.crop-strip .crop-antal:has-text("1")', { timeout: 10000 });
 
   const filer = readdirSync(join(lib, 'Approved', 'blaa', 'Master'));
   if (!filer.includes('blaa master 1-1.png') || !filer.includes('blaa master.png')) {
@@ -116,28 +124,23 @@ try {
   if (hjoerne[3] !== 255) throw new Error(`Den drejede beskaering har et tomt hjoerne (alpha ${hjoerne[3]})`);
   if (await page.locator('.badge.kasseret').count() !== 0) throw new Error('X ramte et billede bag beskaeringsvinduet');
 
-  // Beskaeringen er en etiket paa filen, ligesom Master.
-  const flise = (suffiks) => page.locator('.tile', { has: page.locator(`.tile-navn[title$="${suffiks}"]`) });
-  await page.waitForFunction(
-    () => [...document.querySelectorAll('.tile')].some((t) => t.querySelector('.tile-navn')?.title.endsWith('blaa master 1-1.png') && t.querySelector('.badge.beskaering')?.textContent === '1:1' && t.querySelector('.badge.kopi')?.textContent === 'Master'),
-    null,
-    { timeout: 10000 }
-  );
-
-  // Et klik paa et andet format omdoeber filen, og etiketten foelger med.
-  await flise('blaa master 1-1.png').click();
-  await page.locator('.inspector button', { hasText: /^2:3$/ }).click();
-  await page.waitForSelector('.tile-navn[title$="blaa master 2-3.png"]', { timeout: 15000 });
-  if (!existsSync(join(lib, 'Approved', 'blaa', 'Master', 'blaa master 2-3.png'))) throw new Error('Filen blev ikke omdoebt');
+  // Valget er gaaet videre til et ledigt format (2:1, som ligner billedet
+  // mest). Den beskaering fjernes igen med minus paa knappen.
+  await page.waitForSelector('.crop-formater button.primaer:has-text("2:1")', { timeout: 10000 });
+  await page.locator('button', { hasText: 'Save crop' }).click();
+  await page.waitForSelector('.crop-format.findes:has-text("2:1") .crop-minus', { timeout: 20000 });
+  page.once('dialog', (d) => d.accept());
+  await page.locator('.crop-format.findes:has-text("2:1") .crop-minus').click();
+  await page.waitForSelector('.crop-format:not(.findes) button:has-text("2:1")', { timeout: 20000 });
+  if (existsSync(join(lib, 'Approved', 'blaa', 'Master', 'blaa master 2-1.png'))) throw new Error('Minus fjernede ikke beskaeringen');
+  if (!existsSync(join(lib, 'Approved', 'blaa', 'Master', 'blaa master 1-1.png'))) throw new Error('Minus fjernede den forkerte beskaering');
 
   // Omdoeber man den selv i Finder, foelger appen med efter en genscanning.
-  renameSync(join(lib, 'Approved', 'blaa', 'Master', 'blaa master 2-3.png'), join(lib, 'Approved', 'blaa', 'Master', 'blaa master 3-2.png'));
+  renameSync(join(lib, 'Approved', 'blaa', 'Master', 'blaa master 1-1.png'), join(lib, 'Approved', 'blaa', 'Master', 'blaa master 3-2.png'));
   await page.locator('button', { hasText: 'Scan again' }).click();
-  await page.waitForFunction(
-    () => [...document.querySelectorAll('.tile')].some((t) => t.querySelector('.tile-navn')?.title.endsWith('blaa master 3-2.png') && t.querySelector('.badge.beskaering')?.textContent === '3:2'),
-    null,
-    { timeout: 20000 }
-  );
+  await page.waitForSelector('.crop-format.findes button:has-text("3:2")', { timeout: 20000 });
+  await page.waitForSelector('.crop-format:not(.findes) button:has-text("1:1")', { timeout: 20000 });
+  await page.screenshot({ path: join(projectRoot, 'smoke-crop-knapper.png') });
 
   // Fase 4 (Print) er en liste: én linje pr. beskaering.
   await page.locator('.fase', { hasText: 'Print' }).click();

@@ -24,9 +24,12 @@ function stoerste(forhold, A) {
 const klem = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
 // Det format der ligner billedet mest, saa beskaeringen starter der.
-function naermeste(A) {
-  let bedst = FORMATER[0];
-  for (const f of FORMATER) {
+// Formater der allerede er beskaaret, springes over, hvis der er andre.
+function naermeste(A, optaget = new Set()) {
+  const frie = FORMATER.filter(([f]) => !optaget.has(f));
+  const kandidater = frie.length ? frie : FORMATER;
+  let bedst = kandidater[0];
+  for (const f of kandidater) {
     if (Math.abs(Math.log(f[1] / A)) < Math.abs(Math.log(bedst[1] / A))) bedst = f;
   }
   return bedst[0];
@@ -65,7 +68,12 @@ function krymp(r, vinkel, A, ax, ay) {
 // inline: beskaeringen staar midt i vinduet i Crop i stedet for oven paa
 // det. Saa fanger den ikke tasterne, og den bliver staaende efter Gem, saa
 // den naeste beskaering kan laves med det samme.
-export default function CropModal({ row, onClose, onDone, onError, inline = false }) {
+// crops: vaerkets beskaeringer, { format, versionId, foraeldet }. Et format
+// der allerede er beskaaret, kan ikke vaelges igen; minus i hjoernet af
+// knappen fjerner beskaeringen. meta og onFinder staar i toppen.
+export default function CropModal({
+  row, onClose, onDone, onError, inline = false, crops = [], meta = null, onFinder = null, onSletCrop = null,
+}) {
   const [A, setA] = useState(1.5);
   const [format, setFormat] = useState('3:2');
   const [rect, setRect] = useState(() => stoerste(1.5, 1.5));
@@ -85,12 +93,9 @@ export default function CropModal({ row, onClose, onDone, onError, inline = fals
   const [traekker, setTraekker] = useState(false);
   const trak = useRef(null);
   const forhold = FORMATER.find(([f]) => f === format)[1];
-  // Samme navn som crop.mjs giver filen: "Mur 2 3-2.tif".
-  const kildeNavn = fileName(row.rel_path);
-  const punkt = kildeNavn.lastIndexOf('.');
-  const nytNavn = punkt > 0
-    ? `${kildeNavn.slice(0, punkt)} ${format.replace(':', '-')}${kildeNavn.slice(punkt)}`
-    : `${kildeNavn} ${format.replace(':', '-')}`;
+  const findes = new Map(crops.map((c) => [c.format, c]));
+  const ledig = (f) => !findes.has(f);
+  const alleLavet = FORMATER.every(([f]) => findes.has(f));
 
   useEffect(() => {
     const maal = () => {
@@ -116,6 +121,14 @@ export default function CropModal({ row, onClose, onDone, onError, inline = fals
       window.removeEventListener('blur', stop);
     };
   }, []);
+
+  // Er formatet lige blevet beskaaret, gaar valget videre til det naeste
+  // ledige, saa den naeste beskaering kan laves med det samme.
+  const cropNoegle = crops.map((c) => c.format).sort().join(',');
+  useEffect(() => {
+    if (findes.has(format) && !alleLavet) vaelgFormat(naermeste(A, new Set(findes.keys())));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cropNoegle]);
 
   // Escape lukker, og ingen anden genvej maa ramme billederne bag vinduet.
   useEffect(() => {
@@ -256,48 +269,8 @@ export default function CropModal({ row, onClose, onDone, onError, inline = fals
       <div className="crop-vindue" onClick={(e) => e.stopPropagation()}>
         <div className="crop-top">
           <strong title={row.rel_path}>Crop {fileName(row.rel_path)}</strong>
-          <span className="crop-formater">
-            {FORMATER.map(([f]) => (
-              <button
-                key={f}
-                className={f === format ? 'primaer' : ''}
-                onClick={() => vaelgFormat(f)}
-              >
-                {f === 'free' ? 'Free' : f}
-              </button>
-            ))}
-          </span>
-        </div>
-        <div className="crop-drej">
-          <label htmlFor="crop-vinkel">Straighten</label>
-          <input
-            id="crop-vinkel"
-            type="range"
-            min="-45"
-            max="45"
-            step="0.1"
-            value={vinkel}
-            onChange={(e) => drej(e.target.value)}
-          />
-          <input
-            className="crop-vinkel-tal"
-            type="number"
-            min="-45"
-            max="45"
-            step="0.1"
-            value={vinkel}
-            onChange={(e) => drej(e.target.value)}
-            aria-label="Angle in degrees"
-          />
-          <span>°</span>
-          {vinkel !== 0 && <button className="lille" onClick={() => drej(0)}>Reset</button>}
-          <label className="crop-indenfor">
-            <input type="checkbox" checked={indenfor} onChange={(e) => skiftIndenfor(e.target.checked)} />
-            Keep inside the picture
-          </label>
-          {!indenfor && vinkel !== 0 && (
-            <span className="tom">Blank corners are transparent, ready to fill in Photoshop.</span>
-          )}
+          {meta && <span className="detaljer crop-meta">{meta}</span>}
+          {onFinder && <button className="crop-finder" onClick={onFinder}>Show in Finder</button>}
         </div>
         {/* Uden for rammen drejes billedet; rammen flyttes, og grebene
             aendrer stoerrelsen. */}
@@ -324,7 +297,7 @@ export default function CropModal({ row, onClose, onDone, onError, inline = fals
                 }}
                 onLoad={(e) => {
                   const nyA = e.currentTarget.naturalWidth / e.currentTarget.naturalHeight;
-                  const f = naermeste(nyA);
+                  const f = naermeste(nyA, new Set(findes.keys()));
                   setA(nyA);
                   setFormat(f);
                   setRect(stoersteInde(f, nyA));
@@ -356,13 +329,68 @@ export default function CropModal({ row, onClose, onDone, onError, inline = fals
             </div>
           </div>
         </div>
+        {/* Bunden: drejningen til venstre, formaterne og Gem til hoejre,
+            saa musen ikke skal op og ned. */}
         <div className="crop-bund">
-          <span className="tom">
-            Saved in Master as «{nytNavn}», exactly {format}. Under Print it is
-            enlarged in Gigapixel and becomes the print file.
+          <div className="crop-drej">
+            <label htmlFor="crop-vinkel">Straighten</label>
+            <input
+              id="crop-vinkel"
+              type="range"
+              min="-45"
+              max="45"
+              step="0.1"
+              value={vinkel}
+              onChange={(e) => drej(e.target.value)}
+            />
+            <input
+              className="crop-vinkel-tal"
+              type="number"
+              min="-45"
+              max="45"
+              step="0.1"
+              value={vinkel}
+              onChange={(e) => drej(e.target.value)}
+              aria-label="Angle in degrees"
+            />
+            <span>°</span>
+            {vinkel !== 0 && <button className="lille" onClick={() => drej(0)}>Reset</button>}
+            <label className="crop-indenfor" title={!indenfor && vinkel !== 0 ? 'Blank corners are transparent, ready to fill in Photoshop.' : undefined}>
+              <input type="checkbox" checked={indenfor} onChange={(e) => skiftIndenfor(e.target.checked)} />
+              Keep inside the picture
+            </label>
+          </div>
+          <span className="crop-formater">
+            {FORMATER.map(([f]) => {
+              const c = findes.get(f);
+              return (
+                <span key={f} className={`crop-format ${c ? 'findes' : ''} ${c?.foraeldet ? 'foraeldet' : ''}`}>
+                  <button
+                    className={!c && f === format ? 'primaer' : ''}
+                    disabled={Boolean(c)}
+                    onClick={() => vaelgFormat(f)}
+                    title={c
+                      ? (c.foraeldet ? `${f} is cropped, but from an older master. Remove it and crop again.` : `${f} is cropped`)
+                      : `Crop ${f}`}
+                  >
+                    {c ? `✓ ${f}` : f}
+                  </button>
+                  {c && onSletCrop && (
+                    <button
+                      className="crop-minus"
+                      onClick={() => onSletCrop(c)}
+                      title={`Remove the ${f} crop (to the Trash)`}
+                      aria-label={`Remove the ${f} crop`}
+                    >
+                      −
+                    </button>
+                  )}
+                </span>
+              );
+            })}
           </span>
           {!inline && <button onClick={onClose}>Cancel</button>}
-          <button className="primaer" disabled={gemmer} onClick={gem}>{gemmer ? 'Saving …' : 'Save crop'}</button>
+          <button className="primaer" disabled={gemmer || findes.has(format)} onClick={gem}>{gemmer ? 'Saving …' : 'Save crop'}</button>
         </div>
       </div>
     </div>

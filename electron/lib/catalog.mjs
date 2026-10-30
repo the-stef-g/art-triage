@@ -1514,7 +1514,7 @@ export class Catalog extends EventEmitter {
   listVersionsForImage(imageId) {
     return this.db.all(
       `SELECT v.*, COALESCE(v.file_id, i.master_file_id) AS effective_file_id,
-              f.rel_path, f.mtime, f.rotation
+              f.rel_path, f.mtime, f.rotation, f.size, f.present
        FROM versions v
        JOIN images i ON i.id = v.image_id
        JOIN files f ON f.id = COALESCE(v.file_id, i.master_file_id)

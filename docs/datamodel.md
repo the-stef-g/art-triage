@@ -79,3 +79,4 @@ Printværker er variable produkter i Woo med en variant pr. kombination af besk�
 - Variant-SKU: `DC04-2X3-CANVAS-NO-40X60` (værk, format, materiale, ramme, mål). Prodigis varenummer står i metafeltet `prodigi_sku`, så den manuelle bestilling er nem.
 - Første CSV: woo/desert-canyon-04-varianter.csv (102 varianter).
 - Fra version 0.35.0 laver Stef G Art varianterne selv ud fra prislisten (`electron/lib/prisliste.json`). Material er *Fine art paper* eller *Canvas*; canvas med ramme er *Canvas* med Frame *Black* eller *White*. Variant-SKU som `DC04-2X3-CANVAS-BLACK-40X60`. Metafelter: `prodigi_sku`, `prodigi_options` (JSON) og `hide_in_countries` (fx `US,JP`).
+- Fra version 0.36.0 overruler appen shoppen: et værk uden søgeord sendes med tomme tags, et værk uden serie med tomme upsells, og attributter ud over Year, Technique, Dimensions, Format, Material, Frame og Size fjernes. Lager, ordrer og status røres ikke.

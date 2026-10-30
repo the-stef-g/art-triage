@@ -4,13 +4,7 @@ Det der venter. Stef siger "byg", før noget herfra bliver lavet.
 
 ## Venter på "byg"
 
-- **Product: formularen i to kolonner, med Texts i den højre**, så det hele kan ses uden at scrolle.
-- **Crop: formaterne nederst til venstre for Save crop**, så musen ikke skal op og ned. Et format der allerede er beskåret, kan ikke vælges igen, og det kan ses på knappen.
-- **Crop: linjen "Saved in Master as …" fjernes, og Straighten flyttes ned i bunden**, så billedet får mere plads foroven.
-- **Statuslinjen: skyderen med antal billeder i bredden flyttes helt til venstre**, så den ikke hopper, når teksten i statuslinjen ændrer sig. Resten af statuslinjen bliver som den er.
-- **Værktøjslinjen: mere luft mellem fanerne og søgefeltet**, evt. søgefeltet i midten.
-- **Shop: knappen Crop master … fjernes.** Beskæringer laves kun i Crop.
-- **Appen overruler Woo.** Værkdata der ikke er i appen, skal ikke være i shoppen: tags og upsells tømmes, når værket ingen søgeord eller serie har, og attributter appen ikke kender, fjernes. Lager, ordrer og status er ikke værkdata og røres ikke.
+Intet lige nu.
 
 ## Venter på en afklaring
 

@@ -44,6 +44,18 @@ export default function StatusBar({
 
   return (
     <footer className="statusbar">
+      {/* Skyderen staar yderst til venstre, saa den ikke flytter sig, naar
+          teksten i statuslinjen skifter. */}
+      <label className="kolonnevalg" title="How many images across the grid">
+        <input
+          type="range"
+          min={MIN_KOLONNER}
+          max={MAX_KOLONNER}
+          value={kolonner}
+          onChange={(e) => setKolonner(Number(e.target.value))}
+        />
+        <span className="antal">{kolonner}</span>
+      </label>
       {version && <span className="version">Stef G Art {version}</span>}
       <span className="bibliotek" title={library?.root}>{library?.root?.split('/').pop()}</span>
       {counts && (
@@ -59,16 +71,6 @@ export default function StatusBar({
         <span className="soegeinfo">{searchInfo.matched} results</span>
       )}
       <span className="spacer" />
-      <label className="kolonnevalg" title="How many images across the grid">
-        <input
-          type="range"
-          min={MIN_KOLONNER}
-          max={MAX_KOLONNER}
-          value={kolonner}
-          onChange={(e) => setKolonner(Number(e.target.value))}
-        />
-        <span className="antal">{kolonner}</span>
-      </label>
       {drevMangler && (
         <span className="drev-mangler" title="The catalogue is untouched. Connect the drive and click Scan again.">
           Drive not connected

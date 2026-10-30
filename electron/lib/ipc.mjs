@@ -12,7 +12,7 @@ import { Catalog } from './catalog.mjs';
 import { Thumbnailer } from './thumbs.mjs';
 import { watchLibrary } from './watcher.mjs';
 import { detectEditors, openInApp, statusNavne } from './editors.mjs';
-import { EDITOR_SUFFIKS } from './util.mjs';
+import { EDITOR_SUFFIKS, beskaeringFraSti } from './util.mjs';
 import { SearchIndex, normalize } from './searchIndex.mjs';
 import { Indexer, MODEL_ID } from './indexer.mjs';
 import {
@@ -56,6 +56,7 @@ const ARBEJDE = {
   'shop:updateAllPrints': 'updating all prints in the shop',
   'print:make': 'making print files',
   'crop:save': 'saving a crop',
+  'crop:delete': 'removing a crop',
   'edit:makeMaster': 'making a master',
   'edit:send': 'copying to an editor',
   'work:writeTexts': 'writing texts with Claude',
@@ -902,6 +903,21 @@ export class AppSession {
       // Den nye fil bliver en version af vaerket med det samme.
       await this.runSync('beskaering');
       return { rel: res.path.slice(catalog.root.length + 1), bit8: res.bit8 };
+    });
+    // Minus paa formatknappen i Crop: beskaeringen i Master i papirkurven.
+    // Forstoerrelsen og printfilen bliver liggende.
+    handle('crop:delete', async ({ versionId }) => {
+      const catalog = this.requireCatalog();
+      const v = catalog.getVersion(versionId);
+      const f = v ? catalog.getFile(v.effective_file_id) : null;
+      if (!f || !f.present) throw new Error('The crop is not available right now');
+      if (!/^Approved\/[^/]+\/Master\//.test(f.rel_path) || !beskaeringFraSti(f.rel_path)) {
+        throw new Error('Only crops in the Master folder can be removed here');
+      }
+      await shell.trashItem(catalog.abs(f.rel_path));
+      this.log(`crop: ${f.rel_path} to the Trash`);
+      await this.runSync('beskaering');
+      return { rel: f.rel_path };
     });
     // Aabner en af arbejdsmappens undermapper i Finder.
     handle('img:openWorkFolder', async ({ versionId, del = null }) => {
