@@ -4,7 +4,8 @@ Det der venter. Stef siger "byg", før noget herfra bliver lavet.
 
 ## Venter på "byg"
 
-Intet lige nu.
+- **Datoen under filnavnet: "Last edit" foran.** Det er filens ændringsdato, ikke optagelsesdatoen.
+- **Sikring: masteren er ændret efter beskæringerne og printfilerne.** Følg kæden master → beskæring → -giga → printfil. Er et led nyere end det næste, står det tydeligt i Crop og Print, fx "The master was changed after this crop was made (28. okt.). Crop again.", og linjen i Print bliver markeret. Printfilen laves allerede selv igen, når -giga-filen er nyere.
 
 ## Venter på en afklaring
 
