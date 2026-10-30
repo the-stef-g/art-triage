@@ -4,7 +4,7 @@ Det der venter. Stef siger "byg", før noget herfra bliver lavet.
 
 ## Venter på "byg"
 
-Intet lige nu.
+- **Crop: beskæringerne skal kunne ses i filmstriben**, lige efter den master de er lavet af (master, så dens beskæringer i rækkefølgen 1:1, 2:3, 3:2, 1:2, 2:1, så næste master). En beskæring har sit format som mærke, rødt hvis den er ældre end masteren. Klik på en beskæring viser den stort i midten, uden ramme og greb, med navn, format, størrelse og Last edit, og Show in Finder. Formatknapperne og Save crop gælder masteren, så de er der ikke, mens en beskæring vises; klik på masteren for at beskære igen.
 
 ## Venter på en afklaring
 
