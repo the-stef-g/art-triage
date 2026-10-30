@@ -39,7 +39,9 @@ export function printVarianter(formater, sku, liste = PRISLISTE) {
       for (const [noegle, mat] of Object.entries(liste.materials)) {
         const pris = r[noegle];
         if (pris == null) continue;
-        const skjul = (liste.hide_for_shipping_countries || []).find((x) => x.format === grund
+        // De store canvas er for store til en almindelig pakke og saelges kun
+        // til landene i europe_only.
+        const kunEuropa = (liste.europe_only?.sizes || []).some((x) => x.format === grund
           && x.size_cm === r.size_cm && x.materials.includes(noegle));
         for (const ramme of mat.frames) {
           ud.push({
@@ -51,7 +53,7 @@ export function printVarianter(formater, sku, liste = PRISLISTE) {
             sku: `${sku}-${format.replace(':', 'X')}-${MATERIALE_KODE[noegle]}-${RAMME_KODE[ramme]}-${b}X${h}`,
             prodigi: `${mat.prodigi_sku_prefix}-${r.prodigi_size}`,
             prodigiValg: { ...(mat.prodigi_options || {}), ...(noegle === 'canvas_framed' ? { color: ramme.toLowerCase() } : {}) },
-            skjulILande: skjul ? skjul.countries : [],
+            kunTilLande: kunEuropa ? liste.europe_only.countries : [],
           });
         }
       }

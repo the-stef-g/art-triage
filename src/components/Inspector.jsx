@@ -362,7 +362,13 @@ export default function Inspector({
 
       {/* Crop: beskaeringen staar midt i vinduet, for vaerkets master. */}
       {fase === 3 && cropNode && createPortal(
-        master
+        iMaster(row.rel_path) && row.crop ? (
+          <CropVisning
+            row={row}
+            crop={crops.find((c) => c.versionId === row.version_id)}
+            onFinder={() => invoke('img:openWorkFolder', { versionId: row.version_id }).catch(onError)}
+          />
+        ) : master
           ? (
             <CropModal
               key={master.file_id}
@@ -518,6 +524,35 @@ function SletCropDialog({ slet, onCancel, onOk }) {
           <button onClick={onCancel}>Cancel</button>
           <button className="fare" onClick={onOk}>Move to Trash</button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// Crop: en beskaering valgt i filmstriben vises stort, uden ramme og greb.
+// Formaterne og Save crop hoerer til masteren.
+function CropVisning({ row, crop, onFinder }) {
+  return (
+    <div className="crop-inline crop-visning">
+      <div className="crop-vindue">
+        <div className="crop-top">
+          <strong title={row.rel_path}>{fileName(row.rel_path)}</strong>
+          <span className={`badge beskaering ${crop?.foraeldet ? 'foraeldet' : ''}`}>{row.crop}</span>
+          <span className="detaljer crop-meta">
+            {formatBytes(row.size)} · Last edit {formatDate(row.mtime)}
+            {row.series_name ? ` · Series: ${row.series_name}` : ''}
+          </span>
+          <button className="crop-finder" onClick={onFinder}>Show in Finder</button>
+        </div>
+        {crop?.foraeldet && (
+          <p className="crop-visning-advarsel">
+            This crop is older than the master. Remove it with the minus on the master&apos;s {row.crop} button and crop it again.
+          </p>
+        )}
+        <div className="crop-scene crop-visning-scene">
+          <img src={thumbUrl(row.file_id, row.mtime, 2048, row.rotation)} alt={fileName(row.rel_path)} draggable={false} />
+        </div>
+        <p className="tom crop-visning-hjaelp">Select the master in the filmstrip to crop again.</p>
       </div>
     </div>
   );

@@ -210,6 +210,7 @@ export default function Sidebar({
       {(fase === 5 || fase === 6) && (
       <>
       <PrisSektion />
+      <TekstSektion />
       <section>
         <h3>Series</h3>
         {series.length === 0 && <p className="tom">No series yet</p>}
@@ -305,6 +306,42 @@ function PrisSektion() {
       </p>
       <div className="knapraekke">
         <button disabled={status?.igang} onClick={opdater}>Update all prints</button>
+      </div>
+      {status && (
+        <p className={`shop-fremdrift ${status.igang ? 'igang' : status.ok ? 'ok' : 'fejl'}`} role="status">
+          {status.igang ? `${status.tekst} …` : `${status.ok ? '✓' : '✕'} ${status.tekst}`}
+        </p>
+      )}
+    </section>
+  );
+}
+
+// Shoppens faste tekster: betingelser, privatlivspolitik, teksten i kassen
+// og i ordremailen. De staar i appen og sendes herfra.
+function TekstSektion() {
+  const [status, setStatus] = useState(null);
+  useEffect(() => onEvent((evt) => {
+    if (evt.type === 'shopFremdrift') setStatus((s) => (s?.igang ? { igang: true, tekst: evt.tekst } : s));
+  }), []);
+  const opdater = async () => {
+    setStatus({ igang: true, tekst: 'Starting' });
+    try {
+      const res = await invoke('shop:updateTexts');
+      const advarsel = res.advarsler?.length ? ` Not set: ${res.advarsler.join('; ')}` : '';
+      setStatus({ igang: false, ok: !res.advarsler?.length, tekst: `Terms, privacy policy, checkout and order email updated (${res.dato}).${advarsel}` });
+    } catch (err) {
+      setStatus({ igang: false, ok: false, tekst: `Not updated: ${String(err?.message || err).replace(/^Error: /, '')}` });
+    }
+  };
+  return (
+    <section>
+      <h3>Shop texts</h3>
+      <p className="tom">
+        The terms and conditions, the privacy policy, the text above the order button and the order email
+        are kept in the app. Update shop texts puts them in the shop and publishes the two pages.
+      </p>
+      <div className="knapraekke">
+        <button disabled={status?.igang} onClick={opdater}>Update shop texts</button>
       </div>
       {status && (
         <p className={`shop-fremdrift ${status.igang ? 'igang' : status.ok ? 'ok' : 'fejl'}`} role="status">

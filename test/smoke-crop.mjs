@@ -112,6 +112,20 @@ try {
   // filmstriben har en beskaering.
   await page.waitForSelector('.crop-format.findes button:disabled:has-text("1:1")', { timeout: 20000 });
   await page.waitForSelector('.crop-strip .crop-antal:has-text("1")', { timeout: 10000 });
+  // Beskaeringen staar i filmstriben lige efter masteren, med sit format.
+  await page.waitForFunction(() => {
+    const b = [...document.querySelectorAll('.crop-strip .film-billede')];
+    return b.length === 2 && b[0].classList.contains('master-film') && b[1].querySelector('.crop-antal')?.textContent === '1:1';
+  }, null, { timeout: 10000 });
+  // Et klik paa den viser den stort, uden formater og Save crop.
+  await page.locator('.crop-strip .crop-film').first().click();
+  await page.waitForSelector('.crop-visning .crop-top >> text=blaa master 1-1.png', { timeout: 10000 });
+  if (await page.locator('button', { hasText: 'Save crop' }).count()) throw new Error('Save crop vises paa en beskaering');
+  await page.screenshot({ path: join(projectRoot, 'smoke-crop-visning.png') });
+  // Tilbage paa masteren kan der beskaeres igen.
+  await page.locator('.crop-strip .master-film').first().click();
+  await page.waitForSelector('button:has-text("Save crop")', { timeout: 10000 });
+  await page.waitForFunction(() => document.querySelector('.crop-flade img')?.naturalWidth > 0, null, { timeout: 10000 });
 
   const filer = readdirSync(join(lib, 'Approved', 'blaa', 'Master'));
   if (!filer.includes('blaa master 1-1.png') || !filer.includes('blaa master.png')) {

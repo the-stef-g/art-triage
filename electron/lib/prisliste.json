@@ -1,5 +1,5 @@
 {
- "version": "3.0",
+ "version": "3.1",
  "date": "2026-10-30",
  "currency": "DKK",
  "prices_include": "25% Danish VAT and free shipping; same price in every country",
@@ -32,7 +32,14 @@
   ]
  },
  "rotated_formats": { "3:2": "2:3", "2:1": "1:2" },
- "hide_for_shipping_countries": [
-  { "format": "1:1", "size_cm": "120x120", "materials": ["canvas", "canvas_framed"], "countries": ["US", "JP"] }
- ]
+ "europe_only": {
+  "why": "Too large for an ordinary parcel, so only sold where a return can be arranged. Return shipping is estimated at most approximately EUR 400.",
+  "countries": ["AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", "GR", "HU", "IE", "IT", "LV", "LT", "LU", "MT", "NL", "PL", "PT", "RO", "SK", "SI", "ES", "SE", "NO", "IS", "LI", "CH", "GB", "AD", "MC", "SM", "VA"],
+  "sizes": [
+   { "format": "1:1", "size_cm": "100x100", "materials": ["canvas", "canvas_framed"] },
+   { "format": "1:1", "size_cm": "120x120", "materials": ["canvas", "canvas_framed"] },
+   { "format": "2:3", "size_cm": "80x120", "materials": ["canvas", "canvas_framed"] },
+   { "format": "2:3", "size_cm": "100x150", "materials": ["canvas", "canvas_framed"] }
+  ]
+ }
 }

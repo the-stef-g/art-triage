@@ -54,6 +54,7 @@ const ARBEJDE = {
   'shop:publish': 'publishing in the shop',
   'shop:remove': 'taking a product off the shop',
   'shop:updateAllPrints': 'updating all prints in the shop',
+  'shop:updateTexts': 'updating the shop texts',
   'print:make': 'making print files',
   'crop:save': 'saving a crop',
   'crop:delete': 'removing a crop',
@@ -1057,6 +1058,7 @@ export class AppSession {
       this.broadcast('changed');
       return res;
     });
+    handle('shop:updateTexts', () => this._shopCall((shop) => shop.opdaterTekster()));
     handle('shop:remove', async ({ imageId }) => {
       const res = await this._shopCall((shop) => shop.fjern(imageId));
       this.broadcast('changed');

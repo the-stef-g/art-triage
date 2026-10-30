@@ -106,6 +106,19 @@ function attrapShop(opts = {}) {
     if (init.method === 'PUT' && sti.startsWith('/wc/v3/products/')) {
       return svar(200, { id: Number(sti.split('/').pop()), status: JSON.parse(init.body).status || 'draft' });
     }
+    if (init.method === 'GET' && sti.startsWith('/wp/v2/pages?')) {
+      const slug = new URLSearchParams(u.search).get('slug');
+      return svar(200, (opts.sider || []).filter((x) => x.slug === slug));
+    }
+    if (init.method === 'POST' && /^\/wp\/v2\/pages(\/\d+)?$/.test(sti)) {
+      const krop = JSON.parse(init.body);
+      const pid = Number(sti.split('/').pop()) || 3000 + kald.length;
+      return svar(201, { id: pid, link: `https://shop.stefg.art/${krop.slug}/`, status: krop.status });
+    }
+    if (init.method === 'PUT' && sti.startsWith('/wc/v3/settings/')) {
+      if (opts.ukendteIndstillinger?.some((x) => sti.endsWith(x))) return svar(400, { code: 'rest_setting_setting_invalid', message: 'Invalid setting.' });
+      return svar(200, { id: sti.split('/').pop(), value: JSON.parse(init.body).value });
+    }
     return svar(404, { message: 'no route' });
   };
   return { kald, fetchImpl };
@@ -514,7 +527,7 @@ describe('send til shop', () => {
     ]);
   });
 
-  it('vendte formater, 120 x 120 skjult for USA og Japan, og Update all prints', async () => {
+  it('vendte formater, de store canvas kun til Europa, og Update all prints', async () => {
     const { id, vid } = klartVaerk('Sand 1.png');
     works.setCrop(id, catalog.createVirtualCopy(vid), '3:2');
     works.setCrop(id, catalog.createVirtualCopy(vid), '1:1');
@@ -526,7 +539,20 @@ describe('send til shop', () => {
     expect(batch.some((v) => v.attributes[3].option === '45 × 30 cm' && v.attributes[0].option === 'Landscape 3:2')).toBe(true);
     const stor = batch.filter((v) => v.attributes[3].option === '120 × 120 cm');
     expect(stor).toHaveLength(3); // ikke paa papir
-    for (const v of stor) expect(v.meta_data.find((m) => m.key === 'hide_in_countries').value).toBe('US,JP');
+    const meta = (v, k) => v.meta_data.find((m) => m.key === k).value;
+    for (const v of stor) {
+      expect(meta(v, 'ship_only_to').split(',')).toEqual(expect.arrayContaining(['DK', 'DE', 'GB', 'CH', 'NO']));
+      expect(meta(v, 'ship_only_to')).not.toMatch(/US|JP/);
+      expect(meta(v, 'hide_in_countries')).toBe('');
+    }
+    // 75 x 75 kan sendes som almindelig pakke og saelges overalt; 45 x 30 ogsaa.
+    const lille = batch.filter((v) => ['75 × 75 cm', '45 × 30 cm'].includes(v.attributes[3].option));
+    expect(lille.length).toBeGreaterThan(0);
+    for (const v of lille) expect(meta(v, 'ship_only_to')).toBe('');
+    // 3:2 vendt: 120 x 80 og 150 x 100 er ogsaa kun Europa.
+    const vendt = batch.filter((v) => ['120 × 80 cm', '150 × 100 cm'].includes(v.attributes[3].option) && v.attributes[1].option === 'Canvas');
+    expect(vendt.length).toBeGreaterThan(0);
+    for (const v of vendt) expect(meta(v, 'ship_only_to')).toContain('DK');
     // Update all prints roerer ikke tekster og billeder.
     expect(kald.some((k) => sti(k) === 'POST /wp/v2/media')).toBe(false);
     const put = JSON.parse(kald.find((k) => sti(k) === 'PUT /wc/v3/products/500').body);
@@ -760,5 +786,29 @@ describe('serier', () => {
     const { kald, fetchImpl } = attrapShop();
     await (await sync(fetchImpl)).send(id);
     expect(kald.some((k) => k.sti.startsWith('/wp/v2/series') || k.sti.startsWith('/wp/v2/product/'))).toBe(false);
+  });
+
+  it('Update shop texts: genbruger WordPress\' privatlivsside, laver betingelserne og saetter kassen og mailen', async () => {
+    const { kald, fetchImpl } = attrapShop({
+      sider: [{ id: 3, slug: 'privacy-policy', status: 'draft' }],
+      ukendteIndstillinger: ['woocommerce_enable_signup_and_login_from_checkout'],
+    });
+    const res = await (await sync(fetchImpl)).opdaterTekster();
+    const privat = kald.find((k) => sti(k) === 'POST /wp/v2/pages/3');
+    expect(JSON.parse(privat.body)).toMatchObject({ status: 'publish', title: 'Privacy policy' });
+    expect(JSON.parse(privat.body).content).toContain('Datatilsynet');
+    const vilkaar = JSON.parse(kald.find((k) => sti(k) === 'POST /wp/v2/pages').body);
+    expect(vilkaar.slug).toBe('terms-and-conditions');
+    expect(vilkaar.content).toContain('DK21935891');
+    expect(vilkaar.content).toContain('EUR 400');
+    expect(vilkaar.content).toContain('href="https://shop.stefg.art/privacy-policy/"');
+    const indstilling = (id) => JSON.parse(kald.find((k) => k.method === 'PUT' && k.sti.endsWith(`/${id}`)).body).value;
+    expect(Number(indstilling('woocommerce_terms_page_id'))).toBeGreaterThan(0);
+    expect(indstilling('woocommerce_checkout_privacy_policy_text')).toMatch(/reserved on your card/);
+    expect(indstilling('additional_content')).toMatch(/Model withdrawal form/);
+    expect(indstilling('woocommerce_enable_guest_checkout')).toBe('yes');
+    // En indstilling shoppen ikke kender, stopper ikke resten.
+    expect(res.advarsler).toHaveLength(1);
+    expect(res.betingelser).toBe('https://shop.stefg.art/terms-and-conditions/');
   });
 });

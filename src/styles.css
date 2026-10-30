@@ -820,3 +820,11 @@ button.stor {
 .dialog-filer li { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dialog-knapper { justify-content: flex-end; margin-top: 16px; }
 button.fare { background: var(--kasseret); border-color: var(--kasseret); color: #fff; }
+
+/* Crop: en beskaering vist stort, naar den er valgt i filmstriben. */
+.crop-visning-scene { display: flex; align-items: center; justify-content: center; cursor: default; }
+.crop-visning-scene img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
+.crop-visning-advarsel { color: var(--kasseret); font-size: 13px; margin: 6px 0 0; }
+.crop-visning-hjaelp { margin: 6px 0 0; }
+.badge.beskaering.foraeldet { background: var(--kasseret); color: #fff; }
+.crop-strip .crop-film { width: 128px; }

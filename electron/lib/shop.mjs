@@ -14,6 +14,7 @@ import { promisify } from 'node:util';
 import { extOf, RASTER_EXTS } from './util.mjs';
 import { CROP_FORMATS } from './works.mjs';
 import { PRISLISTE, printVarianter, variantAttributter } from './prisliste.mjs';
+import { betingelser, privatlivspolitik, KASSE_TEKST, MAIL_TEKST, TEKST_DATO } from './shoptekster.mjs';
 
 const run = promisify(execFile);
 
@@ -698,7 +699,10 @@ export class ShopSync {
       meta_data: [
         { key: 'prodigi_sku', value: v.prodigi },
         { key: 'prodigi_options', value: JSON.stringify(v.prodigiValg) },
-        { key: 'hide_in_countries', value: v.skjulILande.join(',') },
+        // Tom liste: kan saelges overalt. hide_in_countries fra prisliste 3.0
+        // toemmes, saa sitet og shoppen kun skal kende ship_only_to.
+        { key: 'ship_only_to', value: v.kunTilLande.join(',') },
+        { key: 'hide_in_countries', value: '' },
       ],
     });
     const create = [];
@@ -726,6 +730,42 @@ export class ShopSync {
       await this.client.wc('POST', `/products/${productId}/variations/batch`, hold);
     }
     return { oprettet: create.length, opdateret: update.length, slettet: del.length };
+  }
+
+  // Update shop texts: handelsbetingelserne og privatlivspolitikken som sider
+  // i WordPress, teksten over koebsknappen og teksten i ordremailen, fra
+  // shoptekster.mjs. Siderne findes paa deres adresse (WordPress' egen kladde
+  // til privacy-policy genbruges) og udgives. Koeb som gaest slaas til og
+  // oprettelse af konto i kassen fra. En indstilling shoppen ikke kender,
+  // stopper ikke resten; den kommer med som en advarsel.
+  async opdaterTekster() {
+    const advarsler = [];
+    const side = async (slug, title, content) => {
+      const fundne = await this.client.wpApi('GET', `/pages?slug=${slug}&status=any&context=edit`);
+      const findes = Array.isArray(fundne) ? fundne[0] : null;
+      const body = { title, content, status: 'publish', slug };
+      return findes
+        ? this.client.wpApi('POST', `/pages/${findes.id}`, body)
+        : this.client.wpApi('POST', '/pages', body);
+    };
+    const indstilling = async (gruppe, id, value) => {
+      try {
+        await this.client.wc('PUT', `/settings/${gruppe}/${id}`, { value });
+      } catch (err) {
+        advarsler.push(`${id}: ${err.message}`);
+      }
+    };
+    this.status('Saving the privacy policy');
+    const privatliv = await side('privacy-policy', 'Privacy policy', privatlivspolitik());
+    this.status('Saving the terms and conditions');
+    const vilkaar = await side('terms-and-conditions', 'Terms and conditions', betingelser(privatliv.link));
+    this.status('Saving the checkout and the order email');
+    await indstilling('advanced', 'woocommerce_terms_page_id', String(vilkaar.id));
+    await indstilling('account', 'woocommerce_checkout_privacy_policy_text', KASSE_TEKST);
+    await indstilling('account', 'woocommerce_enable_guest_checkout', 'yes');
+    await indstilling('account', 'woocommerce_enable_signup_and_login_from_checkout', 'no');
+    await indstilling('email_customer_processing_order', 'additional_content', MAIL_TEKST);
+    return { betingelser: vilkaar.link, privatliv: privatliv.link, dato: TEKST_DATO, advarsler };
   }
 
   // Update all prints: varianter og priser paa alle printprodukter i

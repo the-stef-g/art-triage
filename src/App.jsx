@@ -107,27 +107,27 @@ export default function App() {
       const gammeltIdx = gamleRows.findIndex((r) => r.version_id === activeRef.current);
       // I Print staar forstoerrelserne paa beskaeringens linje, ikke for sig.
       if (filterRef.current.fase === 4) res.rows = res.rows.filter((r) => !r.giga);
-      // I Crop er der én pr. vaerk, masteren. Beskaeringerne staar paa
-      // formatknapperne, og her taelles de til filmstriben.
+      // I Crop staar hver master i filmstriben med sine beskaeringer lige
+      // efter sig, i formaternes raekkefoelge. Masteren viser, hvor mange den
+      // har, og om en af dem er aeldre end den.
       if (filterRef.current.fase === 3) {
-        const crops = new Map();
-        const harMaster = new Set();
+        const ORDEN = ['1:1', '2:3', '3:2', '1:2', '2:1'];
+        const grupper = new Map();
         for (const r of res.rows) {
-          if (r.crop) {
-            const c = crops.get(r.image_id) || { antal: 0, foraeldet: false };
-            c.antal += 1;
-            c.foraeldet ||= Boolean(r.foraeldet);
-            crops.set(r.image_id, c);
-          } else harMaster.add(r.image_id);
+          const g = grupper.get(r.image_id) || { master: null, crops: [] };
+          if (r.crop) g.crops.push(r);
+          else if (!g.master) g.master = r;
+          grupper.set(r.image_id, g);
         }
-        const sete = new Set();
-        res.rows = res.rows
-          .filter((r) => {
-            if (sete.has(r.image_id) || (r.crop && harMaster.has(r.image_id))) return false;
-            sete.add(r.image_id);
-            return true;
-          })
-          .map((r) => ({ ...r, crops: crops.get(r.image_id) || { antal: 0, foraeldet: false } }));
+        const ud = [];
+        for (const g of grupper.values()) {
+          g.crops.sort((x, y) => ORDEN.indexOf(x.crop) - ORDEN.indexOf(y.crop));
+          if (g.master) {
+            ud.push({ ...g.master, crops: { antal: g.crops.length, foraeldet: g.crops.some((c) => c.foraeldet) } });
+          }
+          ud.push(...g.crops);
+        }
+        res.rows = ud;
       }
       setRows(res.rows);
       setCounts(res.counts);
