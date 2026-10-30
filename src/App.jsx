@@ -645,6 +645,14 @@ export default function App() {
         setShowPreview(false);
         return;
       }
+      // Cmd+1 til Cmd+5 skifter fase, ogsaa inde i et tekstfelt. Feltet
+      // forlades foerst, saa det der er skrevet, bliver gemt.
+      if ((e.metaKey || e.ctrlKey) && /^[1-5]$/.test(e.key)) {
+        e.preventDefault();
+        if (iFelt) document.activeElement?.blur();
+        act.setFase(Number(e.key));
+        return;
+      }
       if (iFelt) return;
       const rs = rowsRef.current;
       const sel = selectedRef.current;
@@ -692,12 +700,6 @@ export default function App() {
         setSelected([rs[next].version_id]);
         setActive(rs[next].version_id);
       };
-      // Cmd+1 til Cmd+5 skifter fase.
-      if ((e.metaKey || e.ctrlKey) && /^[1-5]$/.test(e.key)) {
-        e.preventDefault();
-        act.setFase(Number(e.key));
-        return;
-      }
       const fase = filterRef.current.fase;
       // Bogstaverne foelger de engelske ord paa knapperne: A approve,
       // C candidate, X discard, U unrated. Bedoemmelsen hoerer til fase 1;
