@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { invoke } from '../api';
+import { invoke, onEvent } from '../api';
 
 const CATEGORIES = ['Graphic Design', 'Photography', 'Paintings', 'Sculptures'];
 
@@ -19,6 +19,13 @@ export default function WorkPanel({ row, versions, tekstRev = 0, hasKey, shop, o
   const [draft, setDraft] = useState({});
   const [busy, setBusy] = useState(false);
   const [warnings, setWarnings] = useState([]);
+  // Hvad der sker i shoppen lige nu, og hvordan det endte.
+  const [fremdrift, setFremdrift] = useState(null);
+  useEffect(() => onEvent((evt) => {
+    if (evt.type === 'shopFremdrift') setFremdrift({ tekst: evt.tekst, igang: true });
+  }), []);
+  useEffect(() => { setFremdrift(null); }, [imageId]);
+  const klokken = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
   const adopt = (w) => {
     setWork(w);
@@ -126,19 +133,24 @@ export default function WorkPanel({ row, versions, tekstRev = 0, hasKey, shop, o
   // det, der skal opdateres. Saa bliver der ikke lavet en dublet.
   const sendToShop = async (valg = {}) => {
     setBusy(true);
+    setFremdrift({ tekst: 'Starting', igang: true });
     try {
       const res = await invoke('shop:send', { imageId, ...valg });
       if (res.needsConfirm) {
         setBusy(false);
         const e = res.existing;
+        setFremdrift(null);
         if (window.confirm(`The shop already has a product called «${e.name}» (product ${e.id}, ${e.status}). Update that product from the app? Its texts and images are replaced by the ones here.\n\nCancel sends nothing.`)) {
           await sendToShop({ kobl: e.id });
         }
         return;
       }
       adopt(await invoke('work:get', { imageId }));
-      onShop(res.created ? `Created draft product ${res.productId} in the shop` : `Updated product ${res.productId} in the shop`);
+      const besked = res.created ? `Created draft product ${res.productId} in the shop` : `Updated product ${res.productId} in the shop`;
+      setFremdrift({ tekst: `${besked} at ${klokken()}`, igang: false, ok: true });
+      onShop(besked);
     } catch (err) {
+      setFremdrift({ tekst: `Not sent: ${String(err?.message || err).replace(/^Error: /, '')}`, igang: false, ok: false });
       onError(err);
     }
     setBusy(false);
@@ -367,7 +379,12 @@ export default function WorkPanel({ row, versions, tekstRev = 0, hasKey, shop, o
           <button disabled={busy} onClick={remove} title="Take the product off the site. It becomes a draft again.">Remove from shop</button>
         )}
       </div>
-      <div className="knapraekke">
+      {fremdrift && (
+        <p className={`shop-fremdrift ${fremdrift.igang ? 'igang' : fremdrift.ok ? 'ok' : 'fejl'}`} role="status">
+          {fremdrift.igang ? `${fremdrift.tekst} …` : `${fremdrift.ok ? '✓' : '✕'} ${fremdrift.tekst}`}
+        </p>
+      )}
+      <div className="knapraekke finder-knap">
         <button
           onClick={() => invoke('img:openWorkFolder', { versionId: row.version_id }).catch(onError)}
           title="Open the work's folder with Original, Edits, Master and Print files"

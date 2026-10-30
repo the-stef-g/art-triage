@@ -1,7 +1,7 @@
 // Stef G Art: hovedproces. Ejer vinduerne, de to custom-protokoller
 // (app:// til bundtede filer, thumb:// til previews) og AI-vinduet.
 import {
-  app, BrowserWindow, Menu, protocol, ipcMain, net, nativeTheme, screen, shell,
+  app, BrowserWindow, Menu, protocol, ipcMain, net, nativeTheme, screen, shell, dialog,
   session as electronSession,
 } from 'electron';
 import {
@@ -234,6 +234,9 @@ function createMainWindow() {
   mainWin.on('move', gemBounds);
   mainWin.once('ready-to-show', () => mainWin.show());
   mainWin.loadURL(pageUrl('index.html'));
+  mainWin.on('close', (e) => {
+    if (!app.isQuitting && !maaLukke()) e.preventDefault();
+  });
   mainWin.on('closed', () => {
     mainWin = null;
     // AI-vinduet er usynligt, saa appen skal lukkes naar hovedvinduet gaar.
@@ -501,7 +504,31 @@ app.whenReady().then(() => {
   });
 });
 
-app.on('before-quit', () => {
+// Er noget i gang, der ikke maa afbrydes halvvejs (afsendelse til shoppen,
+// en printfil, en beskaering, tekster fra Claude ...), spoerger appen foer
+// den lukker. Wait er standard, saa et hurtigt Cmd+Q ikke afbryder noget.
+function maaLukke() {
+  if (app.lukAlligevel) return true;
+  const igang = session?.igangListe?.() || [];
+  if (!igang.length) return true;
+  const valg = dialog.showMessageBoxSync(mainWin && !mainWin.isDestroyed() ? mainWin : undefined, {
+    type: 'warning',
+    buttons: ['Wait', 'Quit anyway'],
+    defaultId: 0,
+    cancelId: 0,
+    message: 'Stef G Art is still working',
+    detail: `Not finished yet: ${igang.join(', ')}. Quitting now can leave it half done.`,
+  });
+  if (valg !== 1) return false;
+  app.lukAlligevel = true;
+  return true;
+}
+
+app.on('before-quit', (e) => {
+  if (!maaLukke()) {
+    e.preventDefault();
+    return;
+  }
   app.isQuitting = true;
 });
 

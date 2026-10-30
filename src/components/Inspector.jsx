@@ -300,6 +300,11 @@ export default function Inspector({
               ))}
               {keywords.length === 0 && <span className="tom">No keywords yet</span>}
             </div>
+            {keywords.length > 0 && (
+              <p className="tom kw-forklaring">
+                <span className="chip-farve manuel">Coloured</span> words are your own; the others come from Claude.
+              </p>
+            )}
             <div className="knapraekke">
               <input
                 value={nytOrd}

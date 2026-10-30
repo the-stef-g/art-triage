@@ -584,6 +584,18 @@ describe('send til shop', () => {
     expect(works.get(id).wooAftryk).not.toBe(aftryk());
   });
 
+  it('fortaeller hvert skridt i en afsendelse', async () => {
+    const { id } = klartVaerk('a.png');
+    const { fetchImpl } = attrapShop();
+    const trin = [];
+    const shop = new ShopSync({ catalog, works, client: klient(fetchImpl), exporter, status: (t) => trin.push(t) });
+    await shop.send(id);
+    expect(trin[0]).toBe('Uploading the main picture');
+    expect(trin).toContain('Creating the product');
+    await shop.send(id);
+    expect(trin.at(-1)).toBe('Saving the product');
+  });
+
   it('Remove from shop goer produktet til en kladde, uden at slette det', async () => {
     const { id } = klartVaerk('a.png');
     const { kald, fetchImpl } = attrapShop();

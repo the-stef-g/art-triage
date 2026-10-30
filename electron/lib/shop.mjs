@@ -453,10 +453,13 @@ function serieMeta(serie) {
 }
 
 export class ShopSync {
-  constructor({ catalog, works, client, exporter }) {
+  // status faar en kort tekst for hvert skridt i en afsendelse, saa Stef kan
+  // se hvad der sker, og hvornaar det er faerdigt.
+  constructor({ catalog, works, client, exporter, status = () => {} }) {
     this.catalog = catalog;
     this.works = works;
     this.client = client;
+    this.status = status;
     this.media = new MediaSync({ catalog, client, exporter });
     this.categoryIds = new Map();
   }
@@ -539,8 +542,10 @@ export class ShopSync {
     const mainFile = this.works.imageFile(imageId);
     if (!mainFile) throw new ShopError('The image file is not available right now');
     const alt = work.altText || '';
+    this.status('Uploading the main picture');
     const media = { main: await this.media.ensure(imageId, 'main', mainFile, alt), crops: {}, video: null };
-    for (const crop of work.crops) {
+    for (const [i, crop] of work.crops.entries()) {
+      this.status(`Uploading the ${crop.format} crop (${i + 1} of ${work.crops.length})`);
       const file = this.catalog.getFile(this.catalog.getVersion(crop.versionId).effective_file_id);
       if (!file?.present) throw new ShopError(`The ${crop.format} crop file is not available right now`);
       media.crops[crop.format] = await this.media.ensure(imageId, crop.format, file, alt);
@@ -592,13 +597,16 @@ export class ShopSync {
       }
     }
     const media = await this._mediaFor(work);
+    if (work.video) this.status('Uploading the video');
     await this._videoFor(work, media);
+    this.status('Finding the category and the series');
     const categoryId = await this.categoryId(work.category);
     const termId = work.series ? await this.seriesTermId(work.series) : null;
 
     const eksisterende = work.wooProductId ? await this._existing(work.wooProductId) : null;
     if (work.wooProductId && !eksisterende) this.works.setWooProductId(imageId, null);
     const create = !eksisterende;
+    this.status('Finding the tags');
     const tagIds = await this.tagIds(this.ordFor(imageId));
     const body = buildProduct(work, media, {
       categoryId, create, existingAttributes: eksisterende?.attributes || [], tagIds,
@@ -614,6 +622,7 @@ export class ShopSync {
     const gem = () => (create
       ? this.client.wc('POST', '/products', body)
       : this.client.wc('PUT', `/products/${work.wooProductId}`, body));
+    this.status(create ? 'Creating the product' : 'Saving the product');
     let produkt;
     try {
       produkt = await gem();
@@ -628,10 +637,16 @@ export class ShopSync {
     this.works.setWooStatus(imageId, produkt.status);
     this.works.setWooAftryk(imageId, this.aftryk(imageId));
     // De andre vaerker i serien faar det nye med som upsell.
-    if (work.seriesId) await this._serieUpsells(work.seriesId, imageId);
+    if (work.seriesId) {
+      this.status('Linking the works in the series');
+      await this._serieUpsells(work.seriesId, imageId);
+    }
     // Serien saettes ikke via wc/v3 men via WP REST paa selve produktet.
     // Uden en serie i appen roeres den i Woo ikke.
-    if (termId) await this.client.wpApi('POST', `/product/${produkt.id}`, { series: [termId] });
+    if (termId) {
+      this.status('Setting the series');
+      await this.client.wpApi('POST', `/product/${produkt.id}`, { series: [termId] });
+    }
     return { productId: produkt.id, status: produkt.status, link: produkt.permalink ?? null, created: create };
   }
 

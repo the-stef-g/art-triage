@@ -46,6 +46,19 @@ const KUNDEORD = 'kundeord_v1';
 // En -giga-fil skal have ligget stille saa laenge, foer appen laver
 // printfilen af den: Gigapixel kan vaere ved at skrive den.
 const AUTO_PRINT_RO_MS = 5000;
+// Det der ikke maa afbrydes halvvejs. Lukkes appen, mens noget af det er i
+// gang, spoerger den foerst.
+const ARBEJDE = {
+  'shop:send': 'sending to the shop',
+  'shop:publish': 'publishing in the shop',
+  'shop:remove': 'taking a product off the shop',
+  'print:make': 'making print files',
+  'crop:save': 'saving a crop',
+  'edit:makeMaster': 'making a master',
+  'edit:send': 'copying to an editor',
+  'work:writeTexts': 'writing texts with Claude',
+  'work:auto': 'writing texts with Claude',
+};
 
 export class AppSession {
   constructor({ settings, ai, rasterizeSvg, log = () => {} }) {
@@ -71,6 +84,8 @@ export class AppSession {
     // der ikke er forstoerret, eller som ikke kunne bruges, ikke proeves
     // igen foer den aendres.
     this.autoPrintSet = new Set();
+    // Det der er i gang lige nu (navn -> antal), til spoergsmaalet ved Quit.
+    this.igang = new Map();
     this.autoPrintKoerer = false;
     this.autoPrintTimer = null;
 
@@ -141,6 +156,25 @@ export class AppSession {
     return { ...res, skipped: false, reason, varighed: this.lastScanMs };
   }
 
+  // Holder styr paa det der er i gang, saa Quit kan spoerge foerst.
+  async _arbejde(navn, fn) {
+    this.igang.set(navn, (this.igang.get(navn) || 0) + 1);
+    try {
+      return await fn();
+    } finally {
+      const n = (this.igang.get(navn) || 1) - 1;
+      if (n > 0) this.igang.set(navn, n);
+      else this.igang.delete(navn);
+    }
+  }
+
+  // Det der ikke er faerdigt, i ord til spoergsmaalet ved Quit.
+  igangListe() {
+    const l = [...this.igang.keys()];
+    if (this.kwRunner?.running) l.push('writing keywords with Claude');
+    return [...new Set(l)];
+  }
+
   // Er vaerket aendret i appen, siden det sidst blev sendt til shoppen?
   // shopAendret er null for et vaerk, der ikke er sendt.
   _medShop(work) {
@@ -191,7 +225,7 @@ export class AppSession {
         if (maal.beskaering && areal <= await pixelAreal(maal.beskaering)) continue;
         const navn = k.rel.split('/').pop();
         try {
-          const res = await lavPrintfil(maal);
+          const res = await this._arbejde('making print files', () => lavPrintfil(maal));
           const rel = res.path.slice(catalog.root.length + 1);
           this.log(`auto print: ${rel} from ${navn}`);
           this.broadcast('besked', { tekst: `Print file made from ${navn}: ${rel.split('/').pop()} (${res.bredde} × ${res.hoejde} px)` });
@@ -452,7 +486,7 @@ export class AppSession {
       try {
         const work = this.requireWorks().get(imageId);
         if (!work.eligible || work.description || work.shortText || work.altText) return;
-        await this.writeWorkTexts({ imageId });
+        await this._arbejde('writing texts with Claude', () => this.writeWorkTexts({ imageId }));
         this.log(`texts written for new work: ${work.effective.title}`);
         this.broadcast('besked', { tekst: `Texts written for ${work.effective.title}` });
         this.broadcast('changed');
@@ -543,6 +577,7 @@ export class AppSession {
         baseUrl: d.shopUrl || DEFAULT_SHOP_URL,
         wooKey: d.wooKey, wooSecret: d.wooSecret, wpUser: d.wpUser, wpPassword: d.wpPassword,
       }),
+      status: (tekst) => this.broadcast('shopFremdrift', { tekst }),
     });
   }
 
@@ -646,7 +681,9 @@ export class AppSession {
 
   registerIpc() {
     const handle = (channel, fn) => {
-      ipcMain.handle(channel, async (_event, payload) => fn(payload ?? {}));
+      ipcMain.handle(channel, async (_event, payload) => (ARBEJDE[channel]
+        ? this._arbejde(ARBEJDE[channel], () => fn(payload ?? {}))
+        : fn(payload ?? {})));
     };
 
     handle('lib:choose', async () => {

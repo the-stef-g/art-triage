@@ -263,8 +263,8 @@ button:focus, button:focus-visible, [tabindex]:focus, [tabindex]:focus-visible {
 }
 .film-billede {
   flex: none;
-  width: 84px;
-  height: 64px;
+  width: 168px;
+  height: 128px;
   padding: 0;
   border: 2px solid transparent;
   border-radius: 4px;
@@ -478,7 +478,7 @@ button:focus, button:focus-visible, [tabindex]:focus, [tabindex]:focus-visible {
 .vaerk label { display: flex; flex-direction: column; gap: 3px; margin: 6px 0; font-size: 11px; color: var(--tekst-svag); }
 .vaerk input, .vaerk select, .vaerk textarea { font-size: 12px; width: 100%; box-sizing: border-box; }
 .vaerk textarea {
-  resize: vertical; font-family: inherit; line-height: 1.4;
+  resize: vertical; font-family: inherit; line-height: 1.5; font-size: 14px !important;
   background: var(--bg-panel); color: var(--tekst); border: 1px solid var(--kant); border-radius: 6px; padding: 6px 8px;
 }
 .vaerk textarea:focus { outline: 1px solid var(--accent); }
@@ -634,21 +634,23 @@ button.stor {
   background: repeating-conic-gradient(#2a2a2e 0% 25%, #1c1c1f 0% 50%) 0 0 / 16px 16px;
 }
 .crop-flade img { max-width: 86vw; max-height: 70vh; display: block; transform-origin: 50% 50%; }
+/* Rammen og nettet er 50 % graa, som ses paa baade lyse og moerke
+   billeder. Stregen ligger i laget med grebene, saa den aldrig skaeres af,
+   heller ikke paa billedets kant. */
 .crop-ramme {
   position: absolute;
-  outline: 1.5px solid #fff;
   box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.55);
   cursor: move;
 }
 .crop-greb-lag { position: absolute; inset: 0; pointer-events: none; }
-.crop-greb-ramme { position: absolute; }
+.crop-greb-ramme { position: absolute; outline: 1.5px solid #808080; }
 /* Firkantede greb med midten paa hjoernet, ogsaa naar de stikker ud over
    billedet. */
 .crop-greb {
   position: absolute;
   width: 12px;
   height: 12px;
-  background: #fff;
+  background: #808080;
   border: 1px solid #000;
   box-sizing: border-box;
   transform: translate(-50%, -50%);
@@ -745,5 +747,22 @@ button.stor {
 /* Nettet i beskaeringsrammen, mens den traekkes. */
 .crop-net { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 .crop-net line { vector-effect: non-scaling-stroke; }
-.crop-net .fin line { stroke: rgba(255, 255, 255, 0.22); stroke-width: 1; stroke-dasharray: 3 3; }
-.crop-net .tredjedel line { stroke: rgba(255, 255, 255, 0.55); stroke-width: 1; }
+.crop-net .fin line { stroke: #808080; stroke-opacity: 0.55; stroke-width: 1; stroke-dasharray: 3 3; }
+.crop-net .tredjedel line { stroke: #808080; stroke-width: 1; }
+
+/* Hvad der sker, naar et vaerk sendes til shoppen. */
+.shop-fremdrift { font-size: 12px; margin: 6px 0; display: flex; align-items: center; gap: 6px; }
+.shop-fremdrift.igang { color: var(--tekst); }
+.shop-fremdrift.igang::before {
+  content: ''; width: 10px; height: 10px; border-radius: 50%; flex: none;
+  border: 2px solid var(--accent); border-right-color: transparent; animation: drej 0.8s linear infinite;
+}
+.shop-fremdrift.ok { color: var(--godkendt); }
+.shop-fremdrift.fejl { color: var(--kasseret); }
+@keyframes drej { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .shop-fremdrift.igang::before { animation: none; } }
+/* Show in Finder staar for sig, et godt stykke under shopknapperne. */
+.finder-knap { margin-top: 24px; }
+
+.kw-forklaring { font-size: 11px; margin: 4px 0; }
+.chip-farve.manuel { color: var(--accent); }
