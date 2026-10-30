@@ -7,7 +7,8 @@ import { tmpdir } from 'node:os';
 import sharp from 'sharp';
 import { openDatabase } from '../electron/lib/db.mjs';
 import { Catalog } from '../electron/lib/catalog.mjs';
-import { lavPrintfil } from '../electron/lib/printfil.mjs';
+import { lavPrintfil, gigapixelMaal } from '../electron/lib/printfil.mjs';
+import { gigapixelMaal as gigapixelMaalUI } from '../src/printmaal.js';
 
 let root;
 let db;
@@ -158,6 +159,26 @@ describe('printfiler i kataloget', () => {
     expect(k.map((x) => x.rel)).toEqual(['Approved/Desert/Edits/Desert 3-2-giga.tif']);
     await lavPrintfil(catalog.printMaal(k[0].versionId));
     expect(catalog.autoPrintKandidater()).toEqual([]);
+  });
+
+  it('pixeltallet til Gigapixel: den lange side i cm ved 300 DPI, og formatet', () => {
+    expect(gigapixelMaal('2-3', 100)).toEqual({ bredde: 7874, hoejde: 11811 });
+    expect(gigapixelMaal('3-2', 100)).toEqual({ bredde: 11811, hoejde: 7874 });
+    expect(gigapixelMaal('1-1', 50)).toEqual({ bredde: 5906, hoejde: 5906 });
+    expect(gigapixelMaal('2-1', 120)).toEqual({ bredde: 14173, hoejde: 7087 });
+    expect(gigapixelMaal('2-3', null)).toBe(null);
+    // Brugerfladen regner det samme.
+    for (const t of ['1-1', '2-3', '3-2', '1-2', '2-1']) expect(gigapixelMaalUI(t, 87)).toEqual(gigapixelMaal(t, 87));
+  });
+
+  it('printfilen til en beskaering laves af dens stoerste -giga-fil', async () => {
+    await p3Tiff(join(root, 'Approved', 'Desert', 'Master', 'Desert 3-2.tif'), 60, 40);
+    await p3Tiff(join(root, 'Approved', 'Desert', 'Edits', 'Desert 3-2-giga.tif'), 240, 160);
+    catalog.sync();
+    const krop = catalog.listVersions({ fase: 4 }).find((r) => !r.giga);
+    expect(krop.giga_fil.rel).toBe('Approved/Desert/Edits/Desert 3-2-giga.tif');
+    const maal = catalog.printMaal(krop.version_id);
+    expect(maal.kilde).toBe(join(root, 'Approved', 'Desert', 'Edits', 'Desert 3-2-giga.tif'));
   });
 
   it('kun en -giga-fil kan blive til en printfil', () => {

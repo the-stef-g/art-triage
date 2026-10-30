@@ -7,6 +7,7 @@ import Grid from './components/Grid';
 import Inspector from './components/Inspector';
 import StatusBar, { MIN_KOLONNER, MAX_KOLONNER } from './components/StatusBar';
 import Filmstrip from './components/Filmstrip';
+import PrintList from './components/PrintList';
 import { PreviewOverlay, NameModal } from './components/Overlay';
 import { FASEFARVE } from './faser';
 
@@ -101,6 +102,8 @@ export default function App() {
       // plads i den nye liste, altsaa det naeste foto.
       const gamleRows = rowsRef.current;
       const gammeltIdx = gamleRows.findIndex((r) => r.version_id === activeRef.current);
+      // I Print staar forstoerrelserne paa beskaeringens linje, ikke for sig.
+      if (filterRef.current.fase === 4) res.rows = res.rows.filter((r) => !r.giga);
       setRows(res.rows);
       setCounts(res.counts);
       setFaseTal(res.faseTal || null);
@@ -807,6 +810,18 @@ export default function App() {
             store visning holder sig inden for de to kolonner. */}
         <div className="midte">
           <div className="grid-felt">
+          {filter.fase === 4 ? (
+            <PrintList
+              rows={rows}
+              selected={selected}
+              active={active}
+              setSelected={setSelected}
+              setActive={setActive}
+              ankerRef={ankerRef}
+              thumbRev={thumbRev}
+              dataRev={dataRev}
+            />
+          ) : (
           <Grid
             rows={rows}
             selected={selected}
@@ -821,6 +836,7 @@ export default function App() {
             columns={kolonner}
             thumbRev={thumbRev}
           />
+          )}
           {showPreview && focusedRow && (
             <PreviewOverlay
               row={focusedRow}

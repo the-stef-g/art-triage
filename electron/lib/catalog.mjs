@@ -828,6 +828,9 @@ export class Catalog extends EventEmitter {
         // Kopien til Gigapixel ligger ogsaa i Edits, men er ikke stoerre.
         const st = r.giga ? null : this._printDele(r.rel_path)?.forstoerrelser[0];
         r.forstoerrelse = st && st.size > r.size ? st.rel_path : null;
+        // Den nyeste -giga-fil, ogsaa naar den endnu ikke er stoerre (kopien
+        // der er sendt til Gigapixel): listen viser dens maal.
+        r.giga_fil = st ? { id: st.id, rel: st.rel_path, mtime: st.mtime } : null;
       }
     }
     return ud;
@@ -847,7 +850,7 @@ export class Catalog extends EventEmitter {
     if (token) {
       const start = `${base} ${token}`.toLowerCase();
       forstoerrelser = this.db.all(
-        "SELECT rel_path, size FROM files WHERE present=1 AND rel_path LIKE ? ESCAPE '\\'",
+        "SELECT id, rel_path, size, mtime FROM files WHERE present=1 AND rel_path LIKE ? ESCAPE '\\'",
         `Approved/${escapeLike(m[1])}/Edits/%`
       ).filter((f) => {
         const stem = stemOf(posix.basename(f.rel_path)).toLowerCase();
@@ -916,8 +919,15 @@ export class Catalog extends EventEmitter {
         beskaering: krop ? this.abs(krop.rel_path) : null,
       };
     }
-    if (this._printDele(f.rel_path)?.token) {
-      throw new Error('Select the enlargement in Edits (the file with -giga in its name). The print file is made from it, not from the crop.');
+    // En beskaering i Master: printfilen laves af dens stoerste -giga-fil,
+    // aldrig af beskaeringen selv.
+    const d = this._printDele(f.rel_path);
+    if (d?.token) {
+      const giga = d.forstoerrelser[0];
+      if (!giga) throw new Error('Not enlarged yet. Enlarge the crop in Gigapixel first; the print file is made from the -giga file.');
+      const v2 = this.db.get('SELECT id FROM versions WHERE file_id=?', giga.id);
+      if (v2) return this.printMaal(v2.id);
+      throw new Error('The -giga file is not in the catalogue yet. Scan again.');
     }
     throw new Error('Print files are made from the enlargement in Edits (the file with -giga in its name)');
   }

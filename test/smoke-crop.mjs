@@ -104,58 +104,62 @@ try {
     { timeout: 20000 }
   );
 
-  // Fase 4 (Print) viser beskaeringerne.
+  // Fase 4 (Print) er en liste: én linje pr. beskaering.
   await page.locator('.fase', { hasText: 'Print' }).click();
   await page.waitForFunction(
-    () => document.querySelectorAll('.tile').length === 1
-      && document.querySelector('.tile-navn')?.title.endsWith('blaa master 3-2.png'),
+    () => {
+      const l = [...document.querySelectorAll('.print-linje:not(.hoved)')];
+      return l.length === 1 && l[0].querySelector('.navn')?.title.endsWith('blaa master 3-2.png');
+    },
     null,
     { timeout: 10000 }
   );
+  // Det stoerste print giver pixeltallet til Gigapixel: 100 cm ved 300 DPI.
+  await page.fill('#print-langside', '100');
+  await page.locator('#print-langside').press('Enter');
+  await page.waitForSelector('.print-linje:not(.hoved) >> text=11811 × 7874', { timeout: 10000 });
 
-  // Paa beskaeringen selv er der ingen printknap: printfilen laves af
-  // forstoerrelsen fra Gigapixel i Edits.
-  await page.locator('.tile').first().click();
+  // Paa beskaeringen er der ingen printknap foer den er forstoerret.
+  await page.locator('.print-linje:not(.hoved)').first().click();
   await page.waitForSelector('button:has-text("Enlarge in Gigapixel")', { timeout: 10000 });
+  await page.waitForSelector('.gigapixel-maal >> text=11811 px', { timeout: 10000 });
   if (await page.locator('button', { hasText: 'Make print file' }).count()) {
-    throw new Error('Beskaeringen har en printknap');
+    throw new Error('Beskaeringen har en printknap foer den er forstoerret');
   }
 
-  // "Forstoerrelsen" er en kopi i Edits med -giga i navnet. Den kommer med i
-  // fase 4 ved siden af beskaeringen.
+  // "Forstoerrelsen" er en -giga-fil i Edits, dobbelt saa stor. Filen er
+  // kvadratisk (den blev beskaaret 1:1 og saa omdoebt), og en printfil skal
+  // vaere praecis i sit format: appen proever selv og siger nej.
   const edits = join(lib, 'Approved', 'blaa', 'Edits');
   mkdirSync(edits, { recursive: true });
-  copyFileSync(join(lib, 'Approved', 'blaa', 'Master', 'blaa master 3-2.png'), join(edits, 'blaa master 3-2-giga.png'));
+  const kilde = join(lib, 'Approved', 'blaa', 'Master', 'blaa master 3-2.png');
+  const km = await sharp(kilde).metadata();
+  await sharp(kilde).resize(km.width * 2, km.height * 2).png().toFile(join(edits, 'blaa master 3-2-giga.png'));
+  const foer = new Date(Date.now() - 10_000);
+  utimesSync(join(edits, 'blaa master 3-2-giga.png'), foer, foer);
   await page.locator('button', { hasText: 'Scan again' }).click();
-  await page.waitForSelector('.tile-navn[title$="blaa master 3-2-giga.png"]', { timeout: 20000 });
-  if (await page.locator('.tile').count() !== 2) throw new Error('Fase 4 viser ikke beskaeringen og -giga-filen');
-
-  // Filen er kvadratisk (den blev beskaaret 1:1 og saa omdoebt), og en
-  // printfil skal vaere praecis i sit format: den afvises.
-  await page.locator('.tile', { has: page.locator('.tile-navn[title$="3-2-giga.png"]') }).click();
-  await page.locator('button', { hasText: 'Make print file' }).click();
-  await page.waitForSelector('text=/is not 3:2/', { timeout: 20000 });
+  await page.waitForSelector('text=/is not 3:2/', { timeout: 30000 });
+  if (await page.locator('.print-linje:not(.hoved)').count() !== 1) throw new Error('-giga-filen staar paa sin egen linje');
   if (existsSync(join(lib, 'Approved', 'blaa', 'Print files', 'blaa master 3-2.png'))) {
     throw new Error('Der blev lavet en printfil i et forkert format');
   }
 
-  // Med det rigtige format i navnet gaar det.
-  renameSync(join(lib, 'Approved', 'blaa', 'Master', 'blaa master 3-2.png'), join(lib, 'Approved', 'blaa', 'Master', 'blaa master 1-1.png'));
+  // Med det rigtige format i navnet laver appen selv printfilen.
+  renameSync(kilde, join(lib, 'Approved', 'blaa', 'Master', 'blaa master 1-1.png'));
   renameSync(join(edits, 'blaa master 3-2-giga.png'), join(edits, 'blaa master 1-1-giga.png'));
   await page.locator('button', { hasText: 'Scan again' }).click();
-  await page.waitForSelector('.tile-navn[title$="blaa master 1-1-giga.png"]', { timeout: 20000 });
-
-  // Printfilen: en PNG i vaerkets Print files, og flisen faar en Print-etiket.
-  await page.locator('.tile', { has: page.locator('.tile-navn[title$="1-1-giga.png"]') }).click();
-  await page.locator('button', { hasText: 'Make print file' }).click();
-  await page.waitForSelector('.tile .badge.print', { timeout: 20000 });
-  // Kun paa -giga-flisen, ikke paa beskaeringen i Master.
-  const medPrint = await page.$$eval('.tile', (ts) => ts.filter((t) => t.querySelector('.badge.print')).map((t) => t.querySelector('.tile-navn').title));
-  if (medPrint.length !== 1 || !medPrint[0].endsWith('1-1-giga.png')) throw new Error(`Print file-maerket sidder paa ${medPrint.join(', ')}`);
   const printfil = join(lib, 'Approved', 'blaa', 'Print files', 'blaa master 1-1.png');
+  const t0 = Date.now() + 30_000;
+  while (!existsSync(printfil) && Date.now() < t0) await page.waitForTimeout(250);
   if (!existsSync(printfil)) throw new Error('Printfilen blev ikke lavet');
   const pm = await sharp(printfil).metadata();
   if (pm.format !== 'png' || pm.density !== 300) throw new Error(`Printfilen er ${pm.format} paa ${pm.density} DPI`);
+  await page.waitForSelector('.print-linje:not(.hoved) >> text=✓ blaa master 1-1.png', { timeout: 20000 });
+  // Og den kan laves igen i haanden fra beskaeringens linje.
+  await page.locator('.print-linje:not(.hoved)').first().click();
+  await page.locator('button', { hasText: 'Make print file again' }).click();
+  await page.waitForSelector('text=/Print file saved as/', { timeout: 20000 });
+  await page.screenshot({ path: join(projectRoot, 'smoke-print.png') });
 
   // Gemmer Gigapixel en stoerre fil oven i -giga-filen, laver appen selv
   // printfilen, naar filen har ligget stille et ojeblik.

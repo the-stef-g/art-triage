@@ -24,6 +24,30 @@ async function vistStoerrelse(sharp, fil, rotation = 0) {
   return { b, h };
 }
 
+// Hvor stor en forstoerrelse skal vaere i pixels, for at formatet kan
+// printes i det stoerste maal ved 300 DPI. langsideCm er den lange side af
+// det stoerste print. Det er tallet, der skrives ind i Gigapixel.
+export function gigapixelMaal(token, langsideCm, dpi = PRINT_DPI) {
+  const forhold = PRINTFORMATER[token];
+  const cm = Number(langsideCm);
+  if (!forhold || !(cm > 0)) return null;
+  const lang = Math.round((cm / 2.54) * dpi);
+  return forhold >= 1
+    ? { bredde: lang, hoejde: Math.round(lang / forhold) }
+    : { bredde: Math.round(lang * forhold), hoejde: lang };
+}
+
+// Billedets maal i pixels som det vises (EXIF-retning med), eller null.
+export async function pixelMaal(fil) {
+  try {
+    const sharp = (await import('sharp')).default;
+    const m = await sharp(fil, { failOn: 'none', limitInputPixels: false }).metadata();
+    return m.orientation >= 5 ? { bredde: m.height, hoejde: m.width } : { bredde: m.width, hoejde: m.height };
+  } catch {
+    return null;
+  }
+}
+
 // Antal pixels i en fil, eller 0 hvis den ikke kan laeses.
 export async function pixelAreal(fil) {
   try {

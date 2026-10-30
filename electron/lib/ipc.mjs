@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { existsSync, statSync } from 'node:fs';
 import { cropMaster } from './crop.mjs';
 import { lavMaster } from './master.mjs';
-import { lavPrintfil, pixelAreal } from './printfil.mjs';
+import { lavPrintfil, pixelAreal, pixelMaal } from './printfil.mjs';
 import { openDatabase } from './db.mjs';
 import { Catalog } from './catalog.mjs';
 import { Thumbnailer } from './thumbs.mjs';
@@ -769,6 +769,33 @@ export class AppSession {
     });
 
     // Fase 4: printfiler til Prodigi, én pr. markeret forstoerrelse i Edits.
+    // Det stoerste print, maalt paa den lange side i cm. Ud fra det regnes
+    // pixeltallet til Gigapixel for hvert format.
+    handle('print:settings', () => ({ langsideCm: this.settings.data.printLangsideCm ?? null }));
+    handle('print:setLangside', ({ cm }) => {
+      const tal = Number(cm);
+      this.settings.data.printLangsideCm = tal > 0 ? tal : null;
+      this.settings.save();
+      // Listen og panelet til hoejre regner pixeltallene om.
+      this.broadcast('changed');
+      return { langsideCm: this.settings.data.printLangsideCm };
+    });
+    // Maalene paa filerne i pixels, og hvad Gigapixel skal forstoerre til.
+    // Gemmes pr. fil og mtime, saa listen ikke laeser filerne hver gang.
+    handle('print:maal', async ({ filer = [] }) => {
+      const catalog = this.requireCatalog();
+      this.maalCache ??= new Map();
+      const ud = {};
+      for (const { id, mtime } of filer) {
+        const noegle = `${id}|${mtime}`;
+        if (!this.maalCache.has(noegle)) {
+          const f = catalog.getFile(id);
+          this.maalCache.set(noegle, f ? await pixelMaal(catalog.abs(f.rel_path)) : null);
+        }
+        ud[id] = this.maalCache.get(noegle);
+      }
+      return { maal: ud, langsideCm: this.settings.data.printLangsideCm ?? null };
+    });
     handle('print:make', async ({ versionIds }) => {
       const catalog = this.requireCatalog();
       const ids = Array.isArray(versionIds) ? versionIds : [];

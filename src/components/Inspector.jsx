@@ -3,6 +3,7 @@ import { invoke, thumbUrl } from '../api';
 import { formatBytes, formatDate, fileName } from '../util';
 import WorkPanel from './WorkPanel';
 import CropModal from './CropModal';
+import { gigapixelMaal } from '../printmaal';
 
 // dataRev taeller op hver gang kataloget melder en aendring. Uden den
 // blev noegleordene kun hentet naar man skiftede billede, saa ord Claude
@@ -361,9 +362,12 @@ export default function Inspector({
         </>
       )}
 
-      {fase === 4 && !row.giga && (
+      {/* Fase 4: én linje pr. beskaering. Forstoerrelsen (-giga) hoerer til
+          beskaeringen, og printfilen laves af den, af sig selv. */}
+      {fase === 4 && (
         <>
           <h4>Enlargement</h4>
+          <GigapixelMaal row={row} dataRev={dataRev} />
           <p className="tom">
             {row.forstoerrelse
               ? `${row.forstoerrelse.split('/').pop()} in Edits.`
@@ -380,31 +384,23 @@ export default function Inspector({
               {selectedCount > 1 ? 'Enlarge the selected in Gigapixel' : 'Enlarge in Gigapixel'}
             </button>
           </div>
-          {row.printfil && (
-            <>
-              <h4>Print file</h4>
-              <p className="tom">{`${row.printfil.rel.split('/').pop()} · ${formatBytes(row.printfil.bytes)}`}</p>
-            </>
-          )}
-        </>
-      )}
 
-      {fase === 4 && row.giga && (
-        <>
           <h4>Print file</h4>
           <p className="tom">
             {row.printfil
               ? `${row.printfil.rel.split('/').pop()} · ${formatBytes(row.printfil.bytes)}`
-              : 'No print file yet.'}
+              : 'Made by itself when the enlargement is saved.'}
           </p>
-          <p className="tom">Made from this enlargement: a PNG in sRGB at full size, marked 300 DPI, in the work&apos;s Print files folder. The format is always in its name (Desert 3-2.png), and the file is exactly that format. Prodigi&apos;s ICC profiles are for proofing and are not put in the file.</p>
+          <p className="tom">A PNG in sRGB at full size, marked 300 DPI, in the work&apos;s Print files folder, made from the largest -giga file. The format is always in its name (Desert 3-2.png), and the file is exactly that format. Prodigi&apos;s ICC profiles are for proofing and are not put in the file.</p>
           <div className="knapraekke">
-            <button
-              onClick={act.makePrintFiles}
-              title="Make the print file from this enlargement. An old print file with the same name is replaced."
-            >
-              {selectedCount > 1 ? `Make print files (${selectedCount})` : row.printfil ? 'Make print file again' : 'Make print file'}
-            </button>
+            {row.forstoerrelse && (
+              <button
+                onClick={act.makePrintFiles}
+                title="Make the print file again from the enlargement. An old print file with the same name is replaced."
+              >
+                {selectedCount > 1 ? `Make print files (${selectedCount})` : row.printfil ? 'Make print file again' : 'Make print file'}
+              </button>
+            )}
             {row.printfil && (
               <button
                 className="lille"
@@ -431,5 +427,30 @@ export default function Inspector({
         )}
       </div>
     </aside>
+  );
+}
+
+// Det tal der skal skrives ind i Gigapixel: bredden i pixels, og hvor mange
+// gange beskaeringen skal forstoerres, for det stoerste print ved 300 DPI.
+function GigapixelMaal({ row, dataRev }) {
+  const [info, setInfo] = useState(null);
+  useEffect(() => {
+    let aktuel = true;
+    invoke('print:maal', { filer: [{ id: row.file_id, mtime: row.mtime }] })
+      .then((res) => { if (aktuel) setInfo({ krop: res.maal?.[row.file_id], cm: res.langsideCm }); })
+      .catch(() => {});
+    return () => { aktuel = false; };
+  }, [row.file_id, row.mtime, dataRev]);
+  if (!info) return null;
+  const maal = gigapixelMaal(row.crop ? row.crop.replace(':', '-') : null, info.cm);
+  if (!maal) {
+    return <p className="tom">Fill in the largest print size above the list to see what to enlarge to.</p>;
+  }
+  const gange = info.krop ? maal.bredde / info.krop.bredde : null;
+  return (
+    <p className="gigapixel-maal">
+      Set the width to <b>{maal.bredde} px</b> ({maal.bredde} × {maal.hoejde}
+      {gange ? `, ×${gange.toFixed(2)}` : ''}) for {info.cm} cm on the long side at 300 DPI.
+    </p>
   );
 }
