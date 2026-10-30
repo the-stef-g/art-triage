@@ -89,6 +89,24 @@ describe('beskaering', () => {
     expect(data[0]).toBeGreaterThan(200); // roed i hjoernet
   });
 
+  it('en fri drejning: billedet drejes om midten, og det uden for bliver gennemsigtigt', async () => {
+    const fil = await master('D.png');
+    // Hele feltet i 2:1, drejet 10 grader: hjoernerne falder uden for billedet.
+    const res = await cropMaster({ kilde: fil, rect: { x: 0, y: 0, w: 1, h: 1 }, ratio: '2:1', vinkel: 10, platform: 'linux' });
+    const { data, info } = await sharp(res.path).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    expect([info.width, info.height]).toEqual([400, 200]);
+    expect(data[3]).toBe(0); // gennemsigtigt hjoerne
+    const midt = ((100 * info.width) + 200) * info.channels;
+    expect(data[midt + 3]).toBe(255);
+    expect(data[midt]).toBeGreaterThan(100); // graat i midten
+    // En JPEG kan ikke vaere gennemsigtig: dér bliver det hvidt.
+    const jpg = join(dir, 'E.jpg');
+    await sharp(fil).jpeg().toFile(jpg);
+    const r2 = await cropMaster({ kilde: jpg, rect: { x: 0, y: 0, w: 1, h: 1 }, ratio: '2:1', vinkel: 10, platform: 'linux' });
+    const px = await sharp(r2.path).extract({ left: 0, top: 0, width: 1, height: 1 }).raw().toBuffer();
+    expect(Math.min(...px)).toBeGreaterThan(240);
+  });
+
   it('afviser et ukendt format og en fil der ikke findes', async () => {
     const fil = await master('D.png');
     await expect(cropMaster({ kilde: fil, rect: { x: 0, y: 0, w: 1, h: 1 }, ratio: '5:7', platform: 'linux' })).rejects.toThrow(/Unknown crop format/);

@@ -90,7 +90,7 @@ export default function Toolbar({
             title={`${navn} (Cmd+${nr})`}
             style={{ '--fasefarve': FASEFARVE[nr] }}
           >
-            <span className="fase-farve" />
+            <span className="fase-nr">⌘{nr}</span>
             {navn}
             {faseTal && faseTal[nr] > 0 && <span className="antal">{faseTal[nr]}</span>}
           </button>

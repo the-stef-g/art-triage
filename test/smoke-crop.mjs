@@ -66,7 +66,18 @@ try {
   await page.locator('.tile', { has: page.locator('.tile-navn[title*="/Master/"]') }).click();
   await page.waitForSelector('.crop-midte .crop-inline .crop-vindue', { timeout: 10000 });
   await page.waitForFunction(() => document.querySelector('.crop-flade img')?.naturalWidth > 0, null, { timeout: 10000 });
+  // Masteren er 400 × 200, saa beskaeringen starter i 2:1.
+  await page.waitForSelector('.crop-formater button.primaer:has-text("2:1")', { timeout: 10000 });
   await page.locator('.crop-formater button', { hasText: '1:1' }).click();
+  // Drejet 5 grader og holdt inde i billedet: rammen bliver mindre end
+  // billedets hoejde, og der kommer ingen tomme hjoerner i filen.
+  const hoejdeFoer = await page.locator('.crop-ramme').evaluate((el) => el.getBoundingClientRect().height);
+  await page.fill('.crop-vinkel-tal', '5');
+  await page.waitForFunction(
+    (h) => document.querySelector('.crop-ramme').getBoundingClientRect().height < h - 2,
+    hoejdeFoer,
+    { timeout: 5000 }
+  );
   await page.screenshot({ path: join(projectRoot, 'smoke-crop.png') });
   // Genvejene maa ikke ramme billederne (X kasserer ikke i Crop).
   await page.keyboard.press('x');
@@ -79,6 +90,9 @@ try {
   }
   const m = await sharp(join(lib, 'Approved', 'blaa', 'Master', 'blaa master 1-1.png')).metadata();
   if (m.width !== m.height) throw new Error(`Beskaeringen er ikke kvadratisk: ${m.width} x ${m.height}`);
+  const hjoerne = await sharp(join(lib, 'Approved', 'blaa', 'Master', 'blaa master 1-1.png'))
+    .ensureAlpha().extract({ left: 0, top: 0, width: 1, height: 1 }).raw().toBuffer();
+  if (hjoerne[3] !== 255) throw new Error(`Den drejede beskaering har et tomt hjoerne (alpha ${hjoerne[3]})`);
   if (await page.locator('.badge.kasseret').count() !== 0) throw new Error('X ramte et billede bag beskaeringsvinduet');
 
   // Beskaeringen er en etiket paa filen, ligesom Master.

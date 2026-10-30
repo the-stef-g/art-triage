@@ -11,7 +11,7 @@ import { gigapixelMaal } from '../printmaal';
 // lige havde skrevet foerst dukkede op hvis man gik væk og tilbage igen.
 export default function Inspector({
   row, fase = 1, selectedCount, activeKeyword, editors, statusNavne = [], series, act, dataRev, tekstRev = 0, hasKey, shop, onShop, onError,
-  shopNode = null, cropNode = null, storVisning = false,
+  shopNode = null, cropNode = null,
 }) {
   const [versions, setVersions] = useState([]);
   const [keywords, setKeywords] = useState([]);
@@ -143,8 +143,8 @@ export default function Inspector({
           forhaandsvisning nok. */}
       {/* I Product staar forhaandsvisningen i hoejre kolonne, ved shoppen. */}
       {!shopNode && (
-      <div className={fase === 1 && !storVisning ? 'stor-preview' : 'stor-preview lille-preview'}>
-        <img src={thumbUrl(row.file_id, row.mtime, fase === 1 && !storVisning ? 2048 : 512, row.rotation)} alt={fileName(row.rel_path)} />
+      <div className={fase === 1 ? 'stor-preview' : 'stor-preview lille-preview'}>
+        <img src={thumbUrl(row.file_id, row.mtime, fase === 1 ? 2048 : 512, row.rotation)} alt={fileName(row.rel_path)} />
       </div>
       )}
       {/* Drejningen hoerer til Sort og Edit. L og R virker stadig overalt. */}
@@ -228,14 +228,20 @@ export default function Inspector({
           </div>
 
           <h4>Master</h4>
-          <p className="tom">The last step here: make the finished edit the work&apos;s master. The work then moves on to Crops.</p>
+          <p className="tom">The last step here: make the finished edit the work&apos;s master. The work then moves on to Crop.</p>
           <div className="knapraekke">
-            <button onClick={act.makeMaster} title="Copies the selected file to Master, named after the work">Make master</button>
+            <button className="primaer" onClick={act.makeMaster} title="Copies the selected file to Master, named after the work">Make master</button>
           </div>
 
           <h4>Discard</h4>
           <div className="knapraekke">
             <button onClick={act.discardWork} title="The original goes to Discarded, and the edits go to the Trash (shortcut X)">Discard work</button>
+            <button
+              onClick={() => invoke('img:openWorkFolder', { versionId: row.version_id }).catch(onError)}
+              title="Open the work's folder with Original, Edits, Master and Print files"
+            >
+              Show in Finder
+            </button>
           </div>
         </>
       )}
@@ -389,6 +395,7 @@ export default function Inspector({
           </p>
           <div className="knapraekke">
             <button
+              className="primaer"
               disabled={!installeret.has('Topaz Gigapixel')}
               onClick={() => act.sendToEditor('Topaz Gigapixel')}
               title={installeret.has('Topaz Gigapixel')
@@ -417,7 +424,6 @@ export default function Inspector({
             )}
             {row.printfil && (
               <button
-                className="lille"
                 onClick={() => invoke('img:openWorkFolder', { versionId: row.version_id, del: 'Print files' }).catch(onError)}
               >
                 Open Print files
@@ -427,19 +433,21 @@ export default function Inspector({
         </>
       )}
 
+      {/* I Edit staar Show in Finder ved Discard work. */}
+      {fase !== 2 && (
       <div className="knapraekke">
         {iArbejde ? (
           <button
-            className="lille"
             onClick={() => invoke('img:openWorkFolder', { versionId: row.version_id }).catch(onError)}
             title="Open the work's folder with Original, Edits, Master and Print files"
           >
             Show in Finder
           </button>
         ) : (
-          <button className="lille" onClick={act.reveal}>Show in Finder</button>
+          <button onClick={act.reveal}>Show in Finder</button>
         )}
       </div>
+      )}
     </aside>
   );
 }

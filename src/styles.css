@@ -43,6 +43,10 @@ button, select, input {
 button { cursor: pointer; }
 button:hover { background: var(--bg-aktiv); }
 button.lille { padding: 2px 8px; font-size: 12px; }
+/* Den vigtigste knap i fasen, i fasens farve. */
+button.primaer { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.primaer:hover { background: color-mix(in srgb, var(--accent) 85%, #fff); }
+button.primaer:disabled { background: var(--bg-hover); border-color: var(--kant); color: var(--tekst-svag); }
 input[type='search'], input[type='text'], .modal input {
   background: var(--bg);
   min-width: 0;
@@ -309,8 +313,19 @@ button:focus, button:focus-visible, [tabindex]:focus, [tabindex]:focus-visible {
 .fase.aktiv .antal { background: rgba(255, 255, 255, 0.25); color: #fff; }
 /* Hver fase sin farve, fra varm i Sort til koelig i Shop. Den saetter
    accenten, saa fanen, markeringen og knapperne foelger med. */
-.fase-farve { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--fasefarve); }
-.fase.aktiv .fase-farve { background: #fff; }
+/* Genvejen som en lille label i fasens farve, kvadratisk som de andre
+   labels og samme stoerrelse som tallet. */
+.fase-nr {
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 15px;
+  padding: 0 4px;
+  border-radius: 4px;
+  background: var(--fasefarve);
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+.fase.aktiv .fase-nr { background: #fff; color: var(--fasefarve); }
 .inspector h4, .sidebar h3 { color: var(--accent); }
 .celle { padding: 8px; }
 .tile {
@@ -599,38 +614,48 @@ button.stor {
 .crop-top strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 40vw; }
 .crop-formater { display: flex; gap: 6px; }
 .crop-scene { display: flex; justify-content: center; min-height: 0; }
+.crop-stage { position: relative; line-height: 0; touch-action: none; user-select: none; }
+/* Billedet klippes af feltet, saa et drejet billede viser tomme hjoerner som
+   et skakternet, ligesom i Photoshop. */
 .crop-flade {
   position: relative;
-  line-height: 0;
   overflow: hidden;
-  touch-action: none;
-  user-select: none;
+  background: repeating-conic-gradient(#2a2a2e 0% 25%, #1c1c1f 0% 50%) 0 0 / 16px 16px;
 }
-.crop-flade img { max-width: 86vw; max-height: 70vh; display: block; }
+.crop-flade img { max-width: 86vw; max-height: 70vh; display: block; transform-origin: 50% 50%; }
 .crop-ramme {
   position: absolute;
-  border: 1.5px solid #fff;
+  outline: 1.5px solid #fff;
   box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.55);
   cursor: move;
-  box-sizing: border-box;
 }
+.crop-greb-lag { position: absolute; inset: 0; pointer-events: none; }
+.crop-greb-ramme { position: absolute; }
+/* Firkantede greb med midten paa hjoernet, ogsaa naar de stikker ud over
+   billedet. */
 .crop-greb {
   position: absolute;
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
   background: #fff;
   border: 1px solid #000;
   box-sizing: border-box;
+  transform: translate(-50%, -50%);
+  pointer-events: auto;
 }
-.crop-greb.nw { left: -7px; top: -7px; cursor: nwse-resize; }
-.crop-greb.ne { right: -7px; top: -7px; cursor: nesw-resize; }
-.crop-greb.sw { left: -7px; bottom: -7px; cursor: nesw-resize; }
-.crop-greb.se { right: -7px; bottom: -7px; cursor: nwse-resize; }
+.crop-greb.nw { left: 0; top: 0; cursor: nwse-resize; }
+.crop-greb.ne { left: 100%; top: 0; cursor: nesw-resize; }
+.crop-greb.sw { left: 0; top: 100%; cursor: nesw-resize; }
+.crop-greb.se { left: 100%; top: 100%; cursor: nwse-resize; }
+.crop-drej { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12px; }
+.crop-drej input[type='range'] { width: 220px; accent-color: var(--accent); padding: 0; }
+.crop-vinkel-tal { width: 64px; }
+.crop-indenfor { display: inline-flex; align-items: center; gap: 6px; margin-left: 8px; }
 .crop-bund { display: flex; align-items: center; justify-content: flex-end; gap: 10px; }
 .crop-bund .tom { margin-right: auto; }
 
 /* Fase 4: listen over beskaeringerne, én linje hver. */
-.print-liste { height: 100%; overflow-y: auto; padding: 8px 12px 16px; }
+.print-liste { flex: 1; min-width: 0; height: 100%; overflow-y: auto; padding: 12px 20px 20px; }
 .print-indstilling {
   display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
   padding: 8px 0 12px; border-bottom: 1px solid var(--kant); margin-bottom: 4px; font-size: 12px;
@@ -638,16 +663,16 @@ button.stor {
 .print-indstilling input { width: 70px; }
 .print-linje {
   display: grid;
-  grid-template-columns: 56px minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1.1fr) minmax(0, 1.1fr) minmax(0, 1.4fr);
-  gap: 10px;
+  grid-template-columns: 96px minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1.1fr) minmax(0, 1.1fr) minmax(0, 1.4fr);
+  gap: 16px;
   align-items: center;
-  padding: 6px 8px;
+  padding: 8px 10px;
   border-radius: var(--radius);
   border: 1px solid transparent;
-  font-size: 12px;
+  font-size: 13px;
   cursor: default;
 }
-.print-linje img { width: 56px; height: 40px; object-fit: contain; background: #101012; border-radius: 3px; }
+.print-linje img { width: 96px; height: 68px; object-fit: contain; background: #101012; border-radius: 3px; }
 .print-linje.hoved { color: var(--tekst-svag); font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; }
 .print-linje:not(.hoved):hover { background: var(--bg-hover); }
 .print-linje.valgt { border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
@@ -695,3 +720,6 @@ button.stor {
 .crop-inline .crop-vindue { flex: 1; min-width: 0; max-width: none; max-height: none; box-shadow: none; background: transparent; }
 .crop-inline .crop-flade img { max-width: 100%; max-height: calc(100vh - 230px); }
 .crop-tom { margin: auto; }
+
+/* Print: listen faar hele bredden; forklaringen staar over den. */
+.hoved.print > .sidebar { display: none; }

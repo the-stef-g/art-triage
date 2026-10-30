@@ -800,7 +800,7 @@ export default function App() {
         act={act}
         harValg={selected.length > 0}
       />
-      <div className={produktLayout ? 'hoved produkt' : cropLayout ? 'hoved beskaer' : 'hoved'}>
+      <div className={produktLayout ? 'hoved produkt' : cropLayout ? 'hoved beskaer' : filter.fase === 4 ? 'hoved print' : 'hoved'}>
         <Sidebar
           tree={tree}
           series={series}
@@ -898,7 +898,6 @@ export default function App() {
             invoke('shop:status').then(setShop).catch(() => {});
           }}
           onError={visFejl}
-          storVisning={showPreview}
           shopNode={produktLayout ? shopNode : null}
           cropNode={cropLayout ? cropNode : null}
         />

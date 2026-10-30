@@ -73,8 +73,13 @@ function filnavn(kilde, ratio, rect) {
 
 // rect er normaliseret (0 til 1) i det billede brugeren ser, med den drejning
 // der er lagt paa det. Returnerer { path, bit8 }.
+// vinkel er en fri drejning af beskaeringen i grader (positiv er med uret),
+// fx for at rette horisonten op. Billedet drejes om sin midte, og rect er i
+// det oprindelige billedfelt; det der falder uden for det drejede billede,
+// bliver gennemsigtigt (hvidt i en JPEG), saa det kan fyldes ud i fx
+// Photoshop.
 export async function cropMaster({
-  kilde, rect, rotation = 0, ratio, platform = process.platform, runner = run,
+  kilde, rect, rotation = 0, ratio, vinkel = 0, platform = process.platform, runner = run,
 }) {
   if (!existsSync(kilde)) throw new Error('The master file is not on disk');
   // Beskaeringerne er til print, og et print har et fast format: ingen fri.
@@ -82,6 +87,8 @@ export async function cropMaster({
   const sharp = (await import('sharp')).default;
   const meta = await sharp(kilde, { failOn: 'none' }).metadata();
   if (!meta.width || !meta.height) throw new Error('Could not read the size of the master');
+  const v = Number(vinkel) || 0;
+  if (Math.abs(v) > 0.01) return cropDrejet({ sharp, kilde, meta, rect, rotation, ratio, vinkel: v });
   const raa = tilRaaPixel(rect, meta.width, meta.height, rotation, ratio);
   const ud = uniquePath(join(dirname(kilde), filnavn(kilde, ratio, raa)));
   const tmp = `${ud}.tmp${extname(ud)}`;
@@ -130,6 +137,50 @@ export async function cropMaster({
   await img.withMetadata().toFile(tmp);
   renameSync(tmp, ud);
   return { path: ud, bit8: ext === '.tif' || ext === '.tiff' };
+}
+
+async function cropDrejet({ sharp, kilde, meta, rect, rotation, ratio, vinkel }) {
+  const r = ((Number(rotation) || 0) % 360 + 360) % 360;
+  const harRetning = Boolean(meta.orientation && meta.orientation > 1);
+  const seksten = meta.depth === 'ushort';
+  let buf = sharp(kilde, { failOn: 'none', limitInputPixels: false });
+  if (harRetning) buf = buf.rotate();
+  if (r) buf = sharp(await buf.toBuffer(), { limitInputPixels: false }).rotate(r);
+  // Det viste billedfelt, foer den frie drejning.
+  let bredde = meta.width;
+  let hoejde = meta.height;
+  if (harRetning && meta.orientation >= 5) [bredde, hoejde] = [hoejde, bredde];
+  if (r === 90 || r === 270) [bredde, hoejde] = [hoejde, bredde];
+  const ext = extname(kilde).toLowerCase();
+  const jpeg = ext === '.jpg' || ext === '.jpeg';
+  // Mellemresultatet er en ukomprimeret TIFF: tabsfri, og 16 bit holder.
+  const drejet = await sharp(await buf.ensureAlpha().tiff({ compression: 'none' }).toBuffer(), { limitInputPixels: false })
+    .rotate(vinkel, { background: jpeg ? { r: 255, g: 255, b: 255, alpha: 1 } : { r: 0, g: 0, b: 0, alpha: 0 } })
+    .tiff({ compression: 'none' })
+    .toBuffer();
+  const dm = await sharp(drejet, { limitInputPixels: false }).metadata();
+  // Lærredet er vokset til det drejede billedes ramme; midten er den samme.
+  const ox = (dm.width - bredde) / 2;
+  const oy = (dm.height - hoejde) / 2;
+  const felt = tilVist({ x: rect.x, y: rect.y, w: rect.w, h: rect.h }, { width: bredde, height: hoejde }, false, 0, ratio);
+  const ud = uniquePath(join(dirname(kilde), filnavn(kilde, ratio, felt)));
+  const tmp = `${ud}.tmp${extname(ud)}`;
+  const left = Math.max(0, Math.min(dm.width - felt.width, Math.round(felt.left + ox)));
+  const top = Math.max(0, Math.min(dm.height - felt.height, Math.round(felt.top + oy)));
+  let img = sharp(drejet, { limitInputPixels: false }).extract({ left, top, width: felt.width, height: felt.height });
+  if (seksten && !jpeg) img = img.toColourspace('rgb16');
+  if (ext === '.tif' || ext === '.tiff') img = img.tiff({ compression: 'lzw' });
+  else if (ext === '.png') img = img.png();
+  else img = img.flatten({ background: '#ffffff' }).jpeg({ quality: 95 });
+  try {
+    await img.withMetadata().toFile(tmp);
+    renameSync(tmp, ud);
+  } catch (err) {
+    rmSync(tmp, { force: true });
+    throw err;
+  }
+  const m = await sharp(ud).metadata();
+  return { path: ud, bit8: seksten && m.depth !== 'ushort' };
 }
 
 // Pixelrektangel i det viste billede (efter retning og drejning).

@@ -840,7 +840,7 @@ export class AppSession {
     });
     // Beskaering. Kun et faerdigt vaerk kan beskaeres, altsaa en fil i Master,
     // og resultatet er en ny fil i Master.
-    handle('crop:save', async ({ versionId, rect, ratio }) => {
+    handle('crop:save', async ({ versionId, rect, ratio, vinkel = 0 }) => {
       const catalog = this.requireCatalog();
       const v = catalog.getVersion(versionId);
       const f = v ? catalog.getFile(v.effective_file_id) : null;
@@ -852,7 +852,7 @@ export class AppSession {
         throw new Error('The crop is empty');
       }
       const res = await cropMaster({
-        kilde: catalog.abs(f.rel_path), rect, rotation: f.rotation || 0, ratio,
+        kilde: catalog.abs(f.rel_path), rect, rotation: f.rotation || 0, ratio, vinkel: Number(vinkel) || 0,
       });
       this.log(`crop: ${f.rel_path} -> ${res.path.slice(catalog.root.length + 1)}${res.bit8 ? ' (8 bit)' : ''}`);
       // Den nye fil bliver en version af vaerket med det samme.
