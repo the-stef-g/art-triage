@@ -13,6 +13,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { extOf, RASTER_EXTS } from './util.mjs';
 import { CROP_FORMATS } from './works.mjs';
+import { PRISLISTE, printVarianter, variantAttributter } from './prisliste.mjs';
 
 const run = promisify(execFile);
 
@@ -199,7 +200,7 @@ export function vaerkAftryk(work, { works, catalog, ord = [] }) {
     video: work.video, prints: work.prints, maal: work.dimensions, pris: work.price,
     beskrivelse: work.description, kort: work.shortText, alt: work.altText,
     serie: work.series ? [work.series.id, work.series.name, work.series.intro, work.series.template, work.series.colour] : null,
-    hoved: fil(works.imageFile(work.imageId)), crops, ord,
+    hoved: fil(works.imageFile(work.imageId)), crops, ord, priser: PRISLISTE.version,
   };
   return createHash('sha1').update(JSON.stringify(data)).digest('hex');
 }
@@ -362,14 +363,19 @@ function ejedeVaerdier(work) {
   };
 }
 
+// Variationsattributterne ejer appen ogsaa, naar den laver varianterne.
+const VARIANT_ATTRIBUTTER = ['Format', 'Material', 'Frame', 'Size'];
+
 // Flette de ejede attributter ind i dem produktet har. Woo erstatter hele
 // listen ved en opdatering, saa det der ikke er vores skal sendes med
-// uroert, ellers forsvinder printvarianternes Format, Material, Frame og Size.
-export function mergeAttributes(existing, work) {
+// uroert. Gives varianterne med, erstatter de Format, Material, Frame og
+// Size; ellers bliver de staaende som de er.
+export function mergeAttributes(existing, work, varianter = null) {
   const ejede = ejedeVaerdier(work);
   const ud = [];
   const set = new Set();
   for (const attr of existing || []) {
+    if (varianter && VARIANT_ATTRIBUTTER.includes(attr.name)) continue;
     if (!EJEDE_ATTRIBUTTER.includes(attr.name)) {
       ud.push(attr);
       continue;
@@ -382,7 +388,10 @@ export function mergeAttributes(existing, work) {
   const nye = EJEDE_ATTRIBUTTER
     .filter((n) => ejede[n] && !set.has(n))
     .map((n) => ({ name: n, visible: true, variation: false, options: [ejede[n]] }));
-  return [...nye, ...ud].map((a, i) => ({ ...a, position: i }));
+  const variant = varianter?.length
+    ? variantAttributter(varianter).map((a) => ({ ...a, visible: true, variation: true }))
+    : [];
+  return [...nye, ...ud, ...variant].map((a, i) => ({ ...a, position: i }));
 }
 
 // Vaerkets SKU, som i variant-SKU'erne: forbogstaverne i titlen og
@@ -401,18 +410,18 @@ export function vaerkSku(work) {
   return `${bogstaver.toUpperCase() || 'W'}${nummer}`;
 }
 
-// Produktet som Stef G Art ejer det. Lager, ordrer og printvarianter
-// roeres ikke. Et unikt vaerk er et simpelt produkt med 1 paa lager; alle
-// andre er variable, som produkt 20, og faar deres varianter fra CSV'en.
+// Produktet som Stef G Art ejer det. Lager og ordrer roeres ikke. Et unikt
+// vaerk er et simpelt produkt med 1 paa lager; alle andre er variable, som
+// produkt 20, med varianterne fra prislisten (varianter).
 export function buildProduct(work, media, {
-  categoryId = null, create = true, existingAttributes = [], tagIds = null,
+  categoryId = null, create = true, existingAttributes = [], tagIds = null, varianter = null,
 } = {}) {
   const produkt = {
     name: work.effective.title,
     description: work.description || '',
     short_description: work.shortText || '',
     images: [{ id: media.main.id }],
-    attributes: mergeAttributes(existingAttributes, work),
+    attributes: mergeAttributes(existingAttributes, work, work.unique ? null : varianter),
     meta_data: acptMeta(work, media),
     // Skulpturer: Reduced rate. Alt andet: Standard (tom).
     tax_class: work.category === 'Sculptures' ? 'reduced-rate' : '',
@@ -608,8 +617,13 @@ export class ShopSync {
     const create = !eksisterende;
     this.status('Finding the tags');
     const tagIds = await this.tagIds(this.ordFor(imageId));
+    // Printvarianterne for de formater vaerket har beskaeringer i. Uden
+    // beskaeringer roeres varianterne ikke.
+    const formater = (work.crops || []).map((c) => c.format);
+    const medVarianter = !work.unique && formater.length > 0;
+    const varianter = medVarianter ? printVarianter(formater, 'X') : null;
     const body = buildProduct(work, media, {
-      categoryId, create, existingAttributes: eksisterende?.attributes || [], tagIds,
+      categoryId, create, existingAttributes: eksisterende?.attributes || [], tagIds, varianter,
     });
     // SKU'en saettes kun, naar produktet ikke har én: en Stef har givet det
     // i Woo, eller som varianterne bygger paa, roeres ikke.
@@ -635,6 +649,10 @@ export class ShopSync {
     }
     if (create) this.works.setWooProductId(imageId, produkt.id);
     this.works.setWooStatus(imageId, produkt.status);
+    if (medVarianter) {
+      const sku = produkt.sku || body.sku || eksisterende?.sku || vaerkSku(work);
+      await this._synkVarianter(produkt.id, printVarianter(formater, sku));
+    }
     this.works.setWooAftryk(imageId, this.aftryk(imageId));
     // De andre vaerker i serien faar det nye med som upsell.
     if (work.seriesId) {
@@ -648,6 +666,82 @@ export class ShopSync {
       await this.client.wpApi('POST', `/product/${produkt.id}`, { series: [termId] });
     }
     return { productId: produkt.id, status: produkt.status, link: produkt.permalink ?? null, created: create };
+  }
+
+  // Varianterne i shoppen, saa de svarer til prislisten: de manglende
+  // oprettes, de der findes (samme SKU) faar pris og felter, og resten
+  // slettes (fx Framed paper fra den gamle CSV). Alt i hold paa 100.
+  async _synkVarianter(productId, varianter) {
+    const findes = [];
+    for (let side = 1; ; side += 1) {
+      const svar = await this.client.wc('GET', `/products/${productId}/variations?per_page=100&page=${side}`);
+      const liste = Array.isArray(svar) ? svar : [];
+      findes.push(...liste);
+      if (liste.length < 100) break;
+    }
+    const efterSku = new Map(findes.map((v) => [v.sku, v]));
+    const felter = (v) => ({
+      sku: v.sku,
+      regular_price: String(v.pris),
+      manage_stock: false,
+      stock_status: 'instock',
+      attributes: [
+        { name: 'Format', option: v.format },
+        { name: 'Material', option: v.materiale },
+        { name: 'Frame', option: v.ramme },
+        { name: 'Size', option: v.stoerrelse },
+      ],
+      meta_data: [
+        { key: 'prodigi_sku', value: v.prodigi },
+        { key: 'prodigi_options', value: JSON.stringify(v.prodigiValg) },
+        { key: 'hide_in_countries', value: v.skjulILande.join(',') },
+      ],
+    });
+    const create = [];
+    const update = [];
+    const beholdt = new Set();
+    for (const v of varianter) {
+      const gammel = efterSku.get(v.sku);
+      if (gammel) {
+        beholdt.add(gammel.id);
+        update.push({ id: gammel.id, ...felter(v) });
+      } else {
+        create.push(felter(v));
+      }
+    }
+    const del = findes.filter((v) => !beholdt.has(v.id)).map((v) => v.id);
+    this.status(`Updating the print variants (${varianter.length})`);
+    const ops = [
+      ...del.map((id) => ['delete', id]),
+      ...update.map((x) => ['update', x]),
+      ...create.map((x) => ['create', x]),
+    ];
+    for (let i = 0; i < ops.length; i += 100) {
+      const hold = { create: [], update: [], delete: [] };
+      for (const [art, x] of ops.slice(i, i + 100)) hold[art].push(x);
+      await this.client.wc('POST', `/products/${productId}/variations/batch`, hold);
+    }
+    return { oprettet: create.length, opdateret: update.length, slettet: del.length };
+  }
+
+  // Update all prints: varianter og priser paa alle printprodukter i
+  // shoppen, efter prislisten. Tekster og billeder roeres ikke.
+  async opdaterAlleVarianter() {
+    let antal = 0;
+    for (const { imageId, productId } of this.works.medProdukt()) {
+      const work = this.works.get(imageId);
+      const formater = (work.crops || []).map((c) => c.format);
+      if (work.unique || !formater.length) continue;
+      const produkt = await this._existing(productId);
+      if (!produkt) continue;
+      this.status(`Updating ${work.effective.title}`);
+      await this.client.wc('PUT', `/products/${productId}`, {
+        attributes: mergeAttributes(produkt.attributes || [], work, printVarianter(formater, 'X')),
+      });
+      await this._synkVarianter(productId, printVarianter(formater, produkt.sku || vaerkSku(work)));
+      antal += 1;
+    }
+    return { antal, version: PRISLISTE.version };
   }
 
   // Seriens andre produkter linker til hele serien, undtagen sig selv.

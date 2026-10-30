@@ -83,6 +83,14 @@ function attrapShop(opts = {}) {
       return svar(200, ids.filter((pid) => !opts.slettetProdukter?.includes(pid))
         .map((pid) => ({ id: pid, status: opts.status?.[pid] ?? 'draft' })));
     }
+    if (init.method === 'GET' && /^\/wc\/v3\/products\/\d+\/variations\?/.test(sti)) {
+      const pid = Number(sti.split('/')[4]);
+      const side = Number(new URLSearchParams(u.search).get('page') || 1);
+      return svar(200, side === 1 ? (opts.varianter?.[pid] || []) : []);
+    }
+    if (init.method === 'POST' && /^\/wc\/v3\/products\/\d+\/variations\/batch$/.test(sti)) {
+      return svar(200, {});
+    }
     if (init.method === 'GET' && /^\/wc\/v3\/products\/\d+$/.test(sti)) {
       const pid = Number(sti.split('/').pop());
       if (opts.slettetProdukter?.includes(pid)) return svar(404, { message: 'Invalid ID' });
@@ -467,6 +475,56 @@ describe('send til shop', () => {
     expect(v('work_crop_2x3_attachment_id')).toBe('101');
     expect(v('work_crop_2x3')).toBe('https://shop.stefg.art/m/101.jpg');
     expect(v('work_crop_2x3_type')).toBe('Image');
+  });
+
+  it('opretter printvarianterne fra prislisten, og retter og sletter de gamle', async () => {
+    const { id, vid } = klartVaerk('Desert Canyon 04.png');
+    works.setCrop(id, catalog.createVirtualCopy(vid), '2:3');
+    // Produkt 500 findes med en gammel variant der er i listen, og én der ikke er.
+    works.setWooProductId(id, 500);
+    const gamle = [{ id: 9001, sku: 'DC04-2X3-CANVAS-NO-40X60' }, { id: 9002, sku: 'DC04-2X3-FRAMEDPAPER-BLACK-40X60' }];
+    const { kald, fetchImpl } = attrapShop({ varianter: { 500: gamle } });
+    // Fake-produktet har ingen SKU, saa appen bruger sin egen (DC04).
+    await (await sync(fetchImpl)).send(id);
+    const put = JSON.parse(kald.find((k) => sti(k) === 'PUT /wc/v3/products/500').body);
+    const navne = put.attributes.filter((a) => a.variation).map((a) => a.name);
+    expect(navne).toEqual(['Format', 'Material', 'Frame', 'Size']);
+    expect(put.attributes.find((a) => a.name === 'Format').options).toEqual(['Portrait 2:3']);
+    const batch = kald.filter((k) => sti(k) === 'POST /wc/v3/products/500/variations/batch').map((k) => JSON.parse(k.body));
+    const alle = { create: batch.flatMap((b) => b.create), update: batch.flatMap((b) => b.update), delete: batch.flatMap((b) => b.delete) };
+    // 2:3 har 6 stoerrelser: papir, canvas og canvas med sort og hvid ramme.
+    expect(alle.create.length + alle.update.length).toBe(24);
+    expect(alle.delete).toEqual([9002]);
+    const opdateret = alle.update.find((v) => v.id === 9001);
+    expect(opdateret.regular_price).toBe('1900');
+    expect(opdateret.manage_stock).toBe(false);
+    expect(opdateret.stock_status).toBe('instock');
+    expect(opdateret.meta_data.find((m) => m.key === 'prodigi_sku').value).toBe('GLOBAL-CAN-16X24');
+    const sort = alle.create.find((v) => v.sku === 'DC04-2X3-CANVAS-BLACK-100X150');
+    expect(sort.regular_price).toBe('6600');
+    expect(sort.attributes).toEqual([
+      { name: 'Format', option: 'Portrait 2:3' }, { name: 'Material', option: 'Canvas' },
+      { name: 'Frame', option: 'Black' }, { name: 'Size', option: '100 × 150 cm' },
+    ]);
+  });
+
+  it('vendte formater, 120 x 120 skjult for USA og Japan, og Update all prints', async () => {
+    const { id, vid } = klartVaerk('Sand 1.png');
+    works.setCrop(id, catalog.createVirtualCopy(vid), '3:2');
+    works.setCrop(id, catalog.createVirtualCopy(vid), '1:1');
+    works.setWooProductId(id, 500);
+    const { kald, fetchImpl } = attrapShop();
+    const res = await (await sync(fetchImpl)).opdaterAlleVarianter();
+    expect(res.antal).toBe(1);
+    const batch = kald.filter((k) => sti(k) === 'POST /wc/v3/products/500/variations/batch').flatMap((k) => JSON.parse(k.body).create);
+    expect(batch.some((v) => v.attributes[3].option === '45 × 30 cm' && v.attributes[0].option === 'Landscape 3:2')).toBe(true);
+    const stor = batch.filter((v) => v.attributes[3].option === '120 × 120 cm');
+    expect(stor).toHaveLength(3); // ikke paa papir
+    for (const v of stor) expect(v.meta_data.find((m) => m.key === 'hide_in_countries').value).toBe('US,JP');
+    // Update all prints roerer ikke tekster og billeder.
+    expect(kald.some((k) => sti(k) === 'POST /wp/v2/media')).toBe(false);
+    const put = JSON.parse(kald.find((k) => sti(k) === 'PUT /wc/v3/products/500').body);
+    expect(Object.keys(put)).toEqual(['attributes']);
   });
 
   it('nægter at sende et vaerk der ikke er klart, uden at kalde nettet', async () => {

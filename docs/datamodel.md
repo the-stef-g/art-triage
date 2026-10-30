@@ -78,3 +78,4 @@ Printværker er variable produkter i Woo med en variant pr. kombination af besk�
 - Printvarianterne har fire attributter: **Format** (Square 1:1, Portrait 2:3, Landscape 3:2, Tall 1:2, Wide 2:1), **Material** (Fine art paper, Canvas, Framed canvas, Framed paper), **Frame** (None, Black, White) og **Size** ("40 × 60 cm", bredde først).
 - Variant-SKU: `DC04-2X3-CANVAS-NO-40X60` (værk, format, materiale, ramme, mål). Prodigis varenummer står i metafeltet `prodigi_sku`, så den manuelle bestilling er nem.
 - Første CSV: woo/desert-canyon-04-varianter.csv (102 varianter).
+- Fra version 0.35.0 laver Stef G Art varianterne selv ud fra prislisten (`electron/lib/prisliste.json`). Material er *Fine art paper* eller *Canvas*; canvas med ramme er *Canvas* med Frame *Black* eller *White*. Variant-SKU som `DC04-2X3-CANVAS-BLACK-40X60`. Metafelter: `prodigi_sku`, `prodigi_options` (JSON) og `hide_in_countries` (fx `US,JP`).

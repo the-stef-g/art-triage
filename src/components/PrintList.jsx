@@ -11,8 +11,8 @@ const px = (m) => (m ? `${m.bredde} × ${m.hoejde}` : '…');
 // grid'et: klik, Cmd+klik og Skift+klik.
 export default function PrintList({ rows, selected, active, setSelected, setActive, ankerRef, thumbRev, dataRev }) {
   const [maal, setMaal] = useState({});
-  const [langsideCm, setLangsideCm] = useState(null);
-  const [udkast, setUdkast] = useState('');
+  // Den lange side af det stoerste print i hvert format, fra prislisten.
+  const [langsider, setLangsider] = useState({});
   const listeRef = useRef(null);
 
   // Maalene paa beskaeringerne og deres -giga-filer, i pixels.
@@ -27,8 +27,7 @@ export default function PrintList({ rows, selected, active, setSelected, setActi
       .then((res) => {
         if (!aktuel) return;
         setMaal(res.maal || {});
-        setLangsideCm(res.langsideCm);
-        setUdkast(res.langsideCm ? String(res.langsideCm) : '');
+        setLangsider(res.langsider || {});
       })
       .catch(() => {});
     return () => { aktuel = false; };
@@ -37,13 +36,6 @@ export default function PrintList({ rows, selected, active, setSelected, setActi
   useEffect(() => {
     listeRef.current?.querySelector('.print-linje.aktiv')?.scrollIntoView({ block: 'nearest' });
   }, [active]);
-
-  const gemLangside = () => {
-    if (String(langsideCm ?? '') === udkast.trim()) return;
-    invoke('print:setLangside', { cm: udkast.trim() })
-      .then((res) => setLangsideCm(res.langsideCm))
-      .catch(() => {});
-  };
 
   const klik = (r, i, e) => {
     if (e.shiftKey) {
@@ -66,19 +58,10 @@ export default function PrintList({ rows, selected, active, setSelected, setActi
   return (
     <div className="print-liste" ref={listeRef}>
       <div className="print-indstilling">
-        <label htmlFor="print-langside">Largest print, long side</label>
-        <input
-          id="print-langside"
-          inputMode="decimal"
-          value={udkast}
-          placeholder="e.g. 100"
-          onChange={(e) => setUdkast(e.target.value)}
-          onBlur={gemLangside}
-          onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
-        />
-        <span>cm at 300 DPI.</span>
         <span className="tom">
-          {langsideCm ? 'The Gigapixel column is the size to enlarge each crop to.' : 'Fill it in to see the size to enlarge each crop to in Gigapixel.'}
+          The Gigapixel target is the largest print in each format in the price list, at 300 DPI:
+          {' '}1:1 {langsider['1-1'] ?? '…'} cm, 2:3 and 3:2 {langsider['2-3'] ?? '…'} cm,
+          {' '}1:2 and 2:1 {langsider['1-2'] ?? '…'} cm on the long side.
         </span>
       </div>
       <div className="print-linje hoved" role="row">
@@ -92,7 +75,7 @@ export default function PrintList({ rows, selected, active, setSelected, setActi
       {rows.length === 0 && <p className="tom">No crops yet. Make them under Crop.</p>}
       {rows.map((r, i) => {
         const token = r.crop ? r.crop.replace(':', '-') : null;
-        const maalet = gigapixelMaal(token, langsideCm);
+        const maalet = gigapixelMaal(token, token ? langsider[token] : null);
         const krop = maal[r.file_id];
         const giga = r.giga_fil ? maal[r.giga_fil.id] : null;
         const stor = giga && krop && giga.bredde * giga.hoejde > krop.bredde * krop.hoejde;

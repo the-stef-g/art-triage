@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { invoke, onEvent } from '../api';
 
 // Sidepanelet er navigation: en visning ad gangen. Uden det her skulle
 // man klikke sig ud af fx kandidatlisten, foer man kunne gaa til en
@@ -208,6 +209,7 @@ export default function Sidebar({
           to veje til den samme visning er én for meget. */}
       {(fase === 5 || fase === 6) && (
       <>
+      <PrisSektion />
       <section>
         <h3>Series</h3>
         {series.length === 0 && <p className="tom">No series yet</p>}
@@ -273,5 +275,42 @@ export default function Sidebar({
       </>
       )}
     </aside>
+  );
+}
+
+// Prislisten for print, og knappen der laegger den ud paa alle
+// printprodukter i shoppen: varianter og priser, ikke tekster og billeder.
+function PrisSektion() {
+  const [liste, setListe] = useState(null);
+  const [status, setStatus] = useState(null);
+  useEffect(() => { invoke('print:prisliste').then(setListe).catch(() => {}); }, []);
+  useEffect(() => onEvent((evt) => {
+    if (evt.type === 'shopFremdrift') setStatus((s) => (s?.igang ? { igang: true, tekst: evt.tekst } : s));
+  }), []);
+  const opdater = async () => {
+    setStatus({ igang: true, tekst: 'Starting' });
+    try {
+      const res = await invoke('shop:updateAllPrints');
+      setStatus({ igang: false, ok: true, tekst: `Updated ${res.antal} print product${res.antal === 1 ? '' : 's'} to price list ${res.version}` });
+    } catch (err) {
+      setStatus({ igang: false, ok: false, tekst: `Not updated: ${String(err?.message || err).replace(/^Error: /, '')}` });
+    }
+  };
+  return (
+    <section>
+      <h3>Prices</h3>
+      <p className="tom">
+        Price list {liste?.version ?? '…'}{liste?.dato ? ` (${liste.dato})` : ''}. Update all prints puts its
+        prices and variants on every print product in the shop. Texts and pictures are left alone.
+      </p>
+      <div className="knapraekke">
+        <button disabled={status?.igang} onClick={opdater}>Update all prints</button>
+      </div>
+      {status && (
+        <p className={`shop-fremdrift ${status.igang ? 'igang' : status.ok ? 'ok' : 'fejl'}`} role="status">
+          {status.igang ? `${status.tekst} …` : `${status.ok ? '✓' : '✕'} ${status.tekst}`}
+        </p>
+      )}
+    </section>
   );
 }

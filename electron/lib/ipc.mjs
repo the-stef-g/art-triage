@@ -6,6 +6,7 @@ import { existsSync, statSync } from 'node:fs';
 import { cropMaster } from './crop.mjs';
 import { lavMaster } from './master.mjs';
 import { lavPrintfil, pixelAreal, pixelMaal } from './printfil.mjs';
+import { PRISLISTE, stoersteLangside } from './prisliste.mjs';
 import { openDatabase } from './db.mjs';
 import { Catalog } from './catalog.mjs';
 import { Thumbnailer } from './thumbs.mjs';
@@ -52,6 +53,7 @@ const ARBEJDE = {
   'shop:send': 'sending to the shop',
   'shop:publish': 'publishing in the shop',
   'shop:remove': 'taking a product off the shop',
+  'shop:updateAllPrints': 'updating all prints in the shop',
   'print:make': 'making print files',
   'crop:save': 'saving a crop',
   'edit:makeMaster': 'making a master',
@@ -817,17 +819,8 @@ export class AppSession {
     });
 
     // Fase 4: printfiler til Prodigi, én pr. markeret forstoerrelse i Edits.
-    // Det stoerste print, maalt paa den lange side i cm. Ud fra det regnes
-    // pixeltallet til Gigapixel for hvert format.
-    handle('print:settings', () => ({ langsideCm: this.settings.data.printLangsideCm ?? null }));
-    handle('print:setLangside', ({ cm }) => {
-      const tal = Number(cm);
-      this.settings.data.printLangsideCm = tal > 0 ? tal : null;
-      this.settings.save();
-      // Listen og panelet til hoejre regner pixeltallene om.
-      this.broadcast('changed');
-      return { langsideCm: this.settings.data.printLangsideCm };
-    });
+    // Prislisten: version, dato og det stoerste print i hvert format.
+    handle('print:prisliste', () => ({ version: PRISLISTE.version, dato: PRISLISTE.date }));
     // Maalene paa filerne i pixels, og hvad Gigapixel skal forstoerre til.
     // Gemmes pr. fil og mtime, saa listen ikke laeser filerne hver gang.
     handle('print:maal', async ({ filer = [] }) => {
@@ -842,7 +835,10 @@ export class AppSession {
         }
         ud[id] = this.maalCache.get(noegle);
       }
-      return { maal: ud, langsideCm: this.settings.data.printLangsideCm ?? null };
+      // Den lange side af det stoerste print i hvert format, fra prislisten.
+      const langsider = Object.fromEntries(['1-1', '2-3', '3-2', '1-2', '2-1']
+        .map((t) => [t, stoersteLangside(t.replace('-', ':'))]));
+      return { maal: ud, langsider };
     });
     handle('print:make', async ({ versionIds }) => {
       const catalog = this.requireCatalog();
@@ -1035,6 +1031,13 @@ export class AppSession {
     handle('shop:send', async ({ imageId, kobl = null }) => {
       this._requireFormat();
       const res = await this._shopCall((shop) => shop.send(imageId, { kobl }));
+      this.broadcast('changed');
+      return res;
+    });
+    // Update all prints: varianter og priser paa alle printprodukter.
+    handle('shop:updateAllPrints', async () => {
+      this._requireFormat();
+      const res = await this._shopCall((shop) => shop.opdaterAlleVarianter());
       this.broadcast('changed');
       return res;
     });

@@ -149,15 +149,14 @@ try {
     null,
     { timeout: 10000 }
   );
-  // Det stoerste print giver pixeltallet til Gigapixel: 100 cm ved 300 DPI.
-  await page.fill('#print-langside', '100');
-  await page.locator('#print-langside').press('Enter');
-  await page.waitForSelector('.print-linje:not(.hoved) >> text=11811 × 7874', { timeout: 10000 });
+  // Pixeltallet til Gigapixel kommer fra prislisten: det stoerste 3:2-print
+  // er 150 × 100 cm, ved 300 DPI 17717 × 11811 px.
+  await page.waitForSelector('.print-linje:not(.hoved) >> text=17717 × 11811', { timeout: 10000 });
 
   // Paa beskaeringen er der ingen printknap foer den er forstoerret.
   await page.locator('.print-linje:not(.hoved)').first().click();
   await page.waitForSelector('button:has-text("Enlarge in Gigapixel")', { timeout: 10000 });
-  await page.waitForSelector('.gigapixel-maal >> text=11811 px', { timeout: 10000 });
+  await page.waitForSelector('.gigapixel-maal >> text=17717 px', { timeout: 10000 });
   if (await page.locator('button', { hasText: 'Make print file' }).count()) {
     throw new Error('Beskaeringen har en printknap foer den er forstoerret');
   }

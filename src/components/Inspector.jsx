@@ -474,20 +474,23 @@ function GigapixelMaal({ row, dataRev }) {
   useEffect(() => {
     let aktuel = true;
     invoke('print:maal', { filer: [{ id: row.file_id, mtime: row.mtime }] })
-      .then((res) => { if (aktuel) setInfo({ krop: res.maal?.[row.file_id], cm: res.langsideCm }); })
+      .then((res) => {
+        const token = row.crop ? row.crop.replace(':', '-') : null;
+        if (aktuel) setInfo({ krop: res.maal?.[row.file_id], cm: token ? res.langsider?.[token] : null });
+      })
       .catch(() => {});
     return () => { aktuel = false; };
   }, [row.file_id, row.mtime, dataRev]);
   if (!info) return null;
   const maal = gigapixelMaal(row.crop ? row.crop.replace(':', '-') : null, info.cm);
   if (!maal) {
-    return <p className="tom">Fill in the largest print size above the list to see what to enlarge to.</p>;
+    return null;
   }
   const gange = info.krop ? maal.bredde / info.krop.bredde : null;
   return (
     <p className="gigapixel-maal">
       Set the width to <b>{maal.bredde} px</b> ({maal.bredde} × {maal.hoejde}
-      {gange ? `, ×${gange.toFixed(2)}` : ''}) for {info.cm} cm on the long side at 300 DPI.
+      {gange ? `, ×${gange.toFixed(2)}` : ''}) for the largest print, {info.cm} cm on the long side, at 300 DPI.
     </p>
   );
 }
