@@ -10,7 +10,7 @@ import { openDatabase } from '../electron/lib/db.mjs';
 import { Catalog } from '../electron/lib/catalog.mjs';
 import { Works } from '../electron/lib/works.mjs';
 import {
-  ShopClient, ShopSync, MediaSync, ShopError, parseWooKey, parseWpLogin,
+  ShopClient, ShopSync, MediaSync, ShopError, parseWooKey, parseWpLogin, vaerkSku,
   buildProduct, acptMeta, cropMetaKey, ACPT_FIELDS, compareFormat, mergeAttributes,
 } from '../electron/lib/shop.mjs';
 
@@ -89,6 +89,10 @@ function attrapShop(opts = {}) {
       return svar(200, { id: pid, attributes: opts.attributter || [] });
     }
     if (init.method === 'POST' && sti === '/wc/v3/products') {
+      const sku = JSON.parse(init.body).sku;
+      if (sku && opts.optagneSku?.includes(sku)) {
+        return svar(400, { code: 'product_invalid_sku', message: 'Invalid or duplicated SKU.' });
+      }
       return svar(201, { id: nextProduct++, status: 'draft', permalink: 'https://shop.stefg.art/p' });
     }
     if (init.method === 'PUT' && sti.startsWith('/wc/v3/products/')) {
@@ -534,6 +538,48 @@ describe('send til shop', () => {
     await (await sync(fetchImpl)).send(id);
     const post = kald.find((k) => k.method === 'POST' && k.sti === '/wc/v3/products');
     expect(JSON.parse(post.body).tags).toBeUndefined();
+  });
+
+  it('giver produktet en SKU som variant-SKU erne, og en anden hvis den er taget', async () => {
+    expect(vaerkSku({ effective: { title: 'Desert Canyon 04', catalogueNumber: '04' } })).toBe('DC04');
+    expect(vaerkSku({ effective: { title: 'Roofs 2', catalogueNumber: '2' } })).toBe('ROO2');
+    expect(vaerkSku({ effective: { title: 'Ærø Havn', catalogueNumber: null } })).toBe('AH');
+    const { id } = klartVaerk('Desert Canyon 04.png');
+    const { kald, fetchImpl } = attrapShop({ optagneSku: ['DC04'] });
+    const res = await (await sync(fetchImpl)).send(id);
+    expect(res.created).toBe(true);
+    const poster = kald.filter((k) => k.method === 'POST' && k.sti === '/wc/v3/products');
+    expect(poster.map((k) => JSON.parse(k.body).sku)).toEqual(['DC04', `DC04-${id}`]);
+  });
+
+  it('linker seriens vaerker til hinanden som upsells', async () => {
+    const a = klartVaerk('Sand 1.png').id;
+    const b = klartVaerk('Sand 2.png').id;
+    const serie = catalog.createSeries('Sand');
+    catalog.assignSeries([a, b], serie);
+    const { kald, fetchImpl } = attrapShop();
+    const shop = await sync(fetchImpl);
+    await shop.send(a); // produkt 500
+    kald.length = 0;
+    await shop.send(b); // produkt 501
+    const post = kald.find((k) => k.method === 'POST' && k.sti === '/wc/v3/products');
+    expect(JSON.parse(post.body).upsell_ids).toEqual([500]);
+    const tilbage = kald.find((k) => k.method === 'PUT' && k.sti === '/wc/v3/products/500');
+    expect(JSON.parse(tilbage.body)).toEqual({ upsell_ids: [501] });
+  });
+
+  it('Remove from shop goer produktet til en kladde, uden at slette det', async () => {
+    const { id } = klartVaerk('a.png');
+    const { kald, fetchImpl } = attrapShop();
+    const shop = await sync(fetchImpl);
+    await expect(shop.fjern(id)).rejects.toThrow(/not in the shop/);
+    await shop.send(id);
+    await shop.publish(id);
+    kald.length = 0;
+    expect(await shop.fjern(id)).toMatchObject({ productId: 500, status: 'draft' });
+    expect(JSON.parse(kald[0].body)).toEqual({ status: 'draft' });
+    expect(kald.some((k) => k.method === 'DELETE')).toBe(false);
+    expect(works.get(id).wooStatus).toBe('draft');
   });
 
   it('henter status fra shoppen, og glemmer et produkt der er slettet', async () => {

@@ -143,6 +143,12 @@ export default function WorkPanel({ row, versions, tekstRev = 0, hasKey, shop, o
     setBusy(false);
   };
   const publish = () => shopKald('shop:publish', (r) => `Product ${r.productId} is now ${r.status}`);
+  // Af sitet igen: produktet bliver en kladde, ikke slettet, for gamle
+  // ordrer peger paa det.
+  const remove = () => {
+    if (!window.confirm('Take the work off stefg.art? The product becomes a draft again (it is not deleted, so old orders still point to it), and the work goes back to 5 Product.')) return;
+    shopKald('shop:remove', (r) => `Product ${r.productId} is now a draft and off the site`);
+  };
   // Seriens felter til shoppen. En ny serie faar altid en skabelon i
   // shoppen; en der findes, faar kun de felter der er udfyldt her.
   const saveSeries = async (patch) => {
@@ -284,10 +290,13 @@ export default function WorkPanel({ row, versions, tekstRev = 0, hasKey, shop, o
             : (!shop?.harWoo || !shop?.harWp) ? 'Add the WooCommerce key and the WordPress application password under Help'
               : shop?.formatOk === false ? 'The shop\'s product format has changed since the app was made for it. Sending is locked so no product is damaged.' : ''}
         >
-          Send to shop
+          {work.wooProductId ? 'Update shop' : 'Send to shop'}
         </button>
         {work.wooProductId && work.wooStatus !== 'publish' && (
           <button disabled={busy} onClick={publish} title="Publish the draft in the shop. The work moves to 6 Shop.">Publish</button>
+        )}
+        {work.wooProductId && work.wooStatus === 'publish' && (
+          <button disabled={busy} onClick={remove} title="Take the product off the site. It becomes a draft again.">Remove from shop</button>
         )}
       </div>
       {shop?.formatOk === false && (

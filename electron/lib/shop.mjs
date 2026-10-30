@@ -50,9 +50,10 @@ export function parseWpLogin(text) {
 // ---------- Klienten ----------
 
 export class ShopError extends Error {
-  constructor(message, { status = null } = {}) {
+  constructor(message, { status = null, code = null } = {}) {
     super(message);
     this.status = status;
+    this.code = code;
   }
 }
 
@@ -95,7 +96,7 @@ export class ShopClient {
       if (res.status === 401 || res.status === 403) {
         throw new ShopError(`The shop rejected the ${kind === 'woo' ? 'WooCommerce key' : 'WordPress application password'}${grund}`, { status: res.status });
       }
-      throw new ShopError(`The shop answered ${res.status}${grund}`, { status: res.status });
+      throw new ShopError(`The shop answered ${res.status}${grund}`, { status: res.status, code: data?.code ?? null });
     }
     return data;
   }
@@ -362,6 +363,22 @@ export function mergeAttributes(existing, work) {
   return [...nye, ...ud].map((a, i) => ({ ...a, position: i }));
 }
 
+// Vaerkets SKU, som i variant-SKU'erne: forbogstaverne i titlen og
+// nummeret ("Desert Canyon 04" -> DC04). En titel paa ét ord giver de
+// tre foerste bogstaver ("Roofs 2" -> ROO2).
+export function vaerkSku(work) {
+  const nummer = work.effective?.catalogueNumber || '';
+  const ord = String(work.effective?.title || '')
+    .replace(/\d+\s*$/, '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/æ/gi, 'ae').replace(/ø/gi, 'oe').replace(/å/gi, 'aa')
+    .split(/[^A-Za-z]+/).filter(Boolean);
+  const bogstaver = ord.length === 1
+    ? ord[0].slice(0, 3)
+    : ord.map((w) => w[0]).join('');
+  return `${bogstaver.toUpperCase() || 'W'}${nummer}`;
+}
+
 // Produktet som Stef G Art ejer det. Lager, ordrer og printvarianter
 // roeres ikke. Et unikt vaerk er et simpelt produkt med 1 paa lager; alle
 // andre er variable, som produkt 20, og faar deres varianter fra CSV'en.
@@ -560,15 +577,61 @@ export class ShopSync {
     const body = buildProduct(work, media, {
       categoryId, create, existingAttributes: eksisterende?.attributes || [], tagIds,
     });
-    const produkt = create
-      ? await this.client.wc('POST', '/products', body)
-      : await this.client.wc('PUT', `/products/${work.wooProductId}`, body);
+    // SKU'en saettes kun, naar produktet ikke har én: en Stef har givet det
+    // i Woo, eller som varianterne bygger paa, roeres ikke.
+    if (!eksisterende?.sku) body.sku = vaerkSku(work);
+    // Seriens andre vaerker som upsells ("You may also like").
+    if (work.seriesId) {
+      body.upsell_ids = this.works.serieProdukter(work.seriesId)
+        .filter((p) => p.imageId !== imageId).map((p) => p.productId);
+    }
+    const gem = () => (create
+      ? this.client.wc('POST', '/products', body)
+      : this.client.wc('PUT', `/products/${work.wooProductId}`, body));
+    let produkt;
+    try {
+      produkt = await gem();
+    } catch (err) {
+      // SKU'en findes i forvejen paa et andet produkt: saa med vaerkets
+      // nummer i appen bagpaa.
+      if (err.code !== 'product_invalid_sku' || !body.sku) throw err;
+      body.sku = `${body.sku}-${imageId}`;
+      produkt = await gem();
+    }
     if (create) this.works.setWooProductId(imageId, produkt.id);
     this.works.setWooStatus(imageId, produkt.status);
+    // De andre vaerker i serien faar det nye med som upsell.
+    if (work.seriesId) await this._serieUpsells(work.seriesId, imageId);
     // Serien saettes ikke via wc/v3 men via WP REST paa selve produktet.
     // Uden en serie i appen roeres den i Woo ikke.
     if (termId) await this.client.wpApi('POST', `/product/${produkt.id}`, { series: [termId] });
     return { productId: produkt.id, status: produkt.status, link: produkt.permalink ?? null, created: create };
+  }
+
+  // Seriens andre produkter linker til hele serien, undtagen sig selv.
+  async _serieUpsells(seriesId, sendt) {
+    const alle = this.works.serieProdukter(seriesId);
+    for (const p of alle) {
+      if (p.imageId === sendt) continue;
+      const upsells = alle.filter((x) => x.imageId !== p.imageId).map((x) => x.productId);
+      try {
+        await this.client.wc('PUT', `/products/${p.productId}`, { upsell_ids: upsells });
+      } catch (err) {
+        // Et produkt der er slettet i Woo, springes over; det rydder
+        // statusopdateringen op i.
+        if (err.status !== 404) throw err;
+      }
+    }
+  }
+
+  // Tager produktet af sitet: det bliver en kladde igen og ikke slettet,
+  // for gamle ordrer peger paa det. Vaerket gaar tilbage til 5 Product.
+  async fjern(imageId) {
+    const work = this.works.get(imageId);
+    if (!work.wooProductId) throw new ShopError('The work is not in the shop');
+    const produkt = await this.client.wc('PUT', `/products/${work.wooProductId}`, { status: 'draft' });
+    this.works.setWooStatus(imageId, produkt.status);
+    return { productId: produkt.id, status: produkt.status };
   }
 
   async publish(imageId) {

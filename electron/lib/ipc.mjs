@@ -963,6 +963,11 @@ export class AppSession {
       this.broadcast('changed');
       return res;
     });
+    handle('shop:remove', async ({ imageId }) => {
+      const res = await this._shopCall((shop) => shop.fjern(imageId));
+      this.broadcast('changed');
+      return res;
+    });
     handle('shop:publish', async ({ imageId }) => {
       const res = await this._shopCall((shop) => shop.publish(imageId));
       this.broadcast('changed');

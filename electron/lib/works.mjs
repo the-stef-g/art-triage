@@ -337,6 +337,15 @@ export class Works {
     this.db.run('UPDATE works SET woo_status=? WHERE image_id=?', status ?? null, imageId);
   }
 
+  // Seriens vaerker der har et produkt i shoppen: { imageId, productId }.
+  serieProdukter(seriesId) {
+    return this.db.all(
+      `SELECT w.image_id, w.woo_product_id FROM works w JOIN images i ON i.id = w.image_id
+       WHERE i.series_id=? AND w.woo_product_id IS NOT NULL ORDER BY w.image_id`,
+      seriesId
+    ).map((r) => ({ imageId: r.image_id, productId: r.woo_product_id }));
+  }
+
   // Vaerkerne der har et produkt i shoppen: { imageId, productId, status }.
   medProdukt() {
     return this.db.all('SELECT image_id, woo_product_id, woo_status FROM works WHERE woo_product_id IS NOT NULL')
