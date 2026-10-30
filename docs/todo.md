@@ -15,6 +15,5 @@ Det der venter. Stef siger "byg", før noget herfra bliver lavet.
 
 Sitet stefg.art ligger i repoet `the-stef-g/stefs.cloud` (navnet kunne ikke ændres).
 
-
 - **Skjul varianter med `hide_in_countries`** (120 × 120 canvas og canvas med ramme i US og JP).
 - **Materialerne hedder nu som i prislisten:** *Fine art paper* og *Canvas*, og canvas med ramme er Material *Canvas* med Frame *Black* eller *White* (før *Framed canvas*). *Framed paper* findes ikke mere.
