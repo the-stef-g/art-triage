@@ -138,7 +138,15 @@ export class Works {
   // Filen der sendes til Claude: den foerste godkendte og faerdige version,
   // originalen foerst. Det er den udgave Stef har gjort faerdig, ikke
   // noedvendigvis masteren.
+  // Filen der viser vaerket: masteren i Master (den uden et format i
+  // navnet), ikke originalen i Original, som kan vaere en RAW-fil. Den
+  // bruges til shoppens hovedbillede og til teksterne fra Claude.
   imageFile(imageId) {
+    const master = this.catalog.masterFil(imageId);
+    if (master) {
+      const f = this.catalog.getFile(master.id);
+      if (f?.present) return f;
+    }
     return this.db.get(
       `SELECT f.* FROM versions v
        JOIN images i ON i.id = v.image_id

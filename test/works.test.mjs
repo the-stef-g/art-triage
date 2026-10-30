@@ -328,3 +328,18 @@ describe('seriens felter til shoppen', () => {
     expect(works.get(id).series).toBeNull();
   });
 });
+
+describe('vaerkets billede', () => {
+  it('er masteren i Master, ikke originalen', () => {
+    mkdirSync(join(root, 'Import', 'Ahl'), { recursive: true });
+    writeFileSync(join(root, 'Import', 'Ahl', 'Mur.cr2'), 'raw');
+    catalog.brugMappestruktur();
+    catalog.sync();
+    const orig = catalog.listVersions({}).find((r) => r.rel_path === 'Import/Ahl/Mur.cr2');
+    catalog.setRating([orig.version_id], 'godkendt');
+    skriv('Approved/Mur/Master/Mur 2-3.tif', 'beskaering');
+    skriv('Approved/Mur/Master/Mur.tif', 'master');
+    catalog.sync();
+    expect(works.imageFile(orig.image_id).rel_path).toBe('Approved/Mur/Master/Mur.tif');
+  });
+});
