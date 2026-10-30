@@ -296,10 +296,22 @@ button:focus, button:focus-visible, [tabindex]:focus, [tabindex]:focus-visible {
   font-size: 12px;
   background: transparent;
 }
-.fase .fasenr { color: var(--tekst-svag); font-variant-numeric: tabular-nums; }
-.fase .antal { color: var(--tekst-svag); font-size: 11px; }
+.fase .antal {
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  background: var(--bg-aktiv);
+  color: var(--tekst);
+  border-radius: 8px;
+  padding: 0 6px;
+  line-height: 15px;
+}
 .fase.aktiv { background: var(--accent); border-color: var(--accent); color: #fff; }
-.fase.aktiv .fasenr, .fase.aktiv .antal { color: rgba(255, 255, 255, 0.8); }
+.fase.aktiv .antal { background: rgba(255, 255, 255, 0.25); color: #fff; }
+/* Hver fase sin farve, fra varm i Sort til koelig i Shop. Den saetter
+   accenten, saa fanen, markeringen og knapperne foelger med. */
+.fase-farve { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--fasefarve); }
+.fase.aktiv .fase-farve { background: #fff; }
+.inspector h4, .sidebar h3 { color: var(--accent); }
 .celle { padding: 8px; }
 .tile {
   height: 100%;
@@ -421,6 +433,8 @@ button:focus, button:focus-visible, [tabindex]:focus, [tabindex]:focus-visible {
   overflow: hidden;
 }
 .stor-preview img { max-width: 100%; max-height: 260px; object-fit: contain; }
+.stor-preview.lille-preview { min-height: 0; }
+.stor-preview.lille-preview img { max-height: 140px; }
 .detaljer { color: var(--tekst-svag); font-size: 12px; margin: 4px 0; }
 .knapraekke { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 4px 0; }
 .knapraekke select { flex: 1; min-width: 0; }

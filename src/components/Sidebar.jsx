@@ -146,7 +146,7 @@ function Noegleordskoe({ status, act }) {
 
 const FASE_TEKST = {
   2: ['Edit', 'Approved works without a master. Send a copy to an editor, and make the master as the last step.'],
-  3: ['Crops', 'The masters and their crops. Each crop is its own file in Master.'],
+  3: ['Crop', 'The masters and their crops. Each crop is its own file in Master.'],
   4: ['Print', 'The crops and their enlargements. Each enlargement becomes a print file for Prodigi: a PNG in sRGB at full size, in the work\'s Print files folder.'],
 };
 
@@ -238,10 +238,14 @@ export default function Sidebar({
           </div>
         ))}
       </section>
+      {/* I Product rettes et vaerks soegeord i hoejre kolonne; her staar
+          kun koeren, saa ordene ikke staar to steder. I Shop kan man
+          stadig klikke paa et ord og se alle vaerkerne med det. */}
       <section>
-        <h3>Keywords</h3>
+        <h3>{fase === 5 ? 'Automatic keywords' : 'Keywords'}</h3>
         <Noegleordskoe status={kwStatus} act={act} />
-        {topKeywords.length === 0 && <p className="tom">Add your own words to an image in the right column</p>}
+        {fase === 6 && topKeywords.length === 0 && <p className="tom">No keywords yet</p>}
+        {fase === 6 && (
         <div className="chips">
           {topKeywords.map((k) => (
             <span
@@ -264,6 +268,7 @@ export default function Sidebar({
             </span>
           ))}
         </div>
+        )}
       </section>
       </>
       )}

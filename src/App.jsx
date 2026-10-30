@@ -8,6 +8,7 @@ import Inspector from './components/Inspector';
 import StatusBar, { MIN_KOLONNER, MAX_KOLONNER } from './components/StatusBar';
 import Filmstrip from './components/Filmstrip';
 import { PreviewOverlay, NameModal } from './components/Overlay';
+import { FASEFARVE } from './faser';
 
 // Fasen huskes, saa appen aabner hvor man slap.
 const gemtFase = () => {
@@ -439,7 +440,7 @@ export default function App() {
       if (!f) return;
       try {
         const res = await invoke('edit:makeMaster', { versionId: f.version_id });
-        setFejl(`Master saved as ${res.rel}${res.konverteret ? ' (converted to TIFF)' : ''}. The work is now in 3 Crops.`);
+        setFejl(`Master saved as ${res.rel}${res.konverteret ? ' (converted to TIFF)' : ''}. The work is now in Crop.`);
         setTimeout(() => setFejl(null), 7000);
       } catch (err) { visFejl(err); }
     },
@@ -772,7 +773,7 @@ export default function App() {
   }
 
   return (
-    <div className="app">
+    <div className="app" style={{ '--accent': FASEFARVE[filter.fase] || undefined }}>
       <Toolbar
         filter={filter}
         setFilter={setFilter}

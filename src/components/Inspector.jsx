@@ -136,9 +136,13 @@ export default function Inspector({
           )}
         </div>
       )}
-      <div className="stor-preview">
-        <img src={thumbUrl(row.file_id, row.mtime, 2048, row.rotation)} alt={fileName(row.rel_path)} />
+      {/* Stort i Sort, hvor billederne bedoemmes; ellers er en lille
+          forhaandsvisning nok. */}
+      <div className={fase === 1 ? 'stor-preview' : 'stor-preview lille-preview'}>
+        <img src={thumbUrl(row.file_id, row.mtime, fase === 1 ? 2048 : 512, row.rotation)} alt={fileName(row.rel_path)} />
       </div>
+      {/* Drejningen hoerer til Sort og Edit. L og R virker stadig overalt. */}
+      {fase <= 2 && (
       <div className="knapraekke drej">
         <button className="lille" onClick={() => act.rotate(-90)} title="Rotate left (shortcut L)">⟲ Left</button>
         <button className="lille" onClick={() => act.rotate(90)} title="Rotate right (shortcut R)">⟳ Right</button>
@@ -146,6 +150,7 @@ export default function Inspector({
           <button className="lille" onClick={() => act.rotate(0)} title="Back to the automatic rotation">Reset</button>
         ) : null}
       </div>
+      )}
       <h3 title={row.rel_path}>{fileName(row.rel_path)}</h3>
       <p className="detaljer">
         {formatBytes(row.size)} · {formatDate(row.mtime)}
@@ -231,22 +236,6 @@ export default function Inspector({
 
       {(fase === 5 || fase === 6) && (
         <>
-          <h4>Series</h4>
-          <div className="knapraekke">
-            <select
-              value={row.series_id || ''}
-              onChange={(e) => {
-                const v = e.target.value;
-                if (v === 'ny') act.newSeries();
-                else act.assignSeries(v ? Number(v) : null);
-              }}
-            >
-              <option value="">Not in a series</option>
-              {series.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-              <option value="ny">New series …</option>
-            </select>
-          </div>
-
           <WorkPanel
             key={row.image_id}
             row={row}
@@ -256,44 +245,60 @@ export default function Inspector({
             shop={shop}
             onShop={onShop}
             onError={onError}
-          />
-
-          <h4>Keywords</h4>
-          {activeKeyword && keywords.some((k) => k.word === activeKeyword) && (
+          >
+            <h4>Series</h4>
             <div className="knapraekke">
-              <button
-                className="fjern-fra-noegleord"
-                onClick={() => fjernOrd(activeKeyword)}
-                title={`Remove this image from the keyword "${activeKeyword}"`}
+              <select
+                value={row.series_id || ''}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v === 'ny') act.newSeries();
+                  else act.assignSeries(v ? Number(v) : null);
+                }}
               >
-                Does not belong to «{activeKeyword}»
-              </button>
+                <option value="">Not in a series</option>
+                {series.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                <option value="ny">New series …</option>
+              </select>
             </div>
-          )}
-          <div className="chips">
-            {keywords.map((k) => (
-              <span
-                key={k.word}
-                className={`chip ${k.manual ? 'manuel' : ''}`}
-                title={k.manual ? 'Your own keyword' : 'Automatic keyword'}
-              >
-                {k.word}
-                <button className="chip-fjern" onClick={() => fjernOrd(k.word)} title="Remove keyword">×</button>
-              </span>
-            ))}
-            {keywords.length === 0 && <span className="tom">No keywords yet</span>}
-          </div>
-          <div className="knapraekke">
-            <input
-              value={nytOrd}
-              placeholder="Add keyword"
-              onChange={(e) => setNytOrd(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') tilfoejOrd();
-              }}
-            />
-            <button className="lille" onClick={tilfoejOrd}>Add</button>
-          </div>
+
+            <h4>Keywords</h4>
+            {activeKeyword && keywords.some((k) => k.word === activeKeyword) && (
+              <div className="knapraekke">
+                <button
+                  className="fjern-fra-noegleord"
+                  onClick={() => fjernOrd(activeKeyword)}
+                  title={`Remove this image from the keyword "${activeKeyword}"`}
+                >
+                  Does not belong to «{activeKeyword}»
+                </button>
+              </div>
+            )}
+            <div className="chips">
+              {keywords.map((k) => (
+                <span
+                  key={k.word}
+                  className={`chip ${k.manual ? 'manuel' : ''}`}
+                  title={k.manual ? 'Your own keyword' : 'Automatic keyword'}
+                >
+                  {k.word}
+                  <button className="chip-fjern" onClick={() => fjernOrd(k.word)} title="Remove keyword">×</button>
+                </span>
+              ))}
+              {keywords.length === 0 && <span className="tom">No keywords yet</span>}
+            </div>
+            <div className="knapraekke">
+              <input
+                value={nytOrd}
+                placeholder="Add keyword"
+                onChange={(e) => setNytOrd(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') tilfoejOrd();
+                }}
+              />
+              <button className="lille" onClick={tilfoejOrd}>Add</button>
+            </div>
+          </WorkPanel>
         </>
       )}
 

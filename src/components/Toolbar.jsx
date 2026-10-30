@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { FASER } from '../faser';
+import { FASER, FASEFARVE } from '../faser';
 
 // Handlingerne paa det markerede, med den tast der goer det samme. Foer
 // stod de kun som en liste i inspektoerens tomme tilstand, altsaa netop
@@ -87,9 +87,10 @@ export default function Toolbar({
             key={nr}
             className={filter.fase === nr ? 'fase aktiv' : 'fase'}
             onClick={() => act.setFase(nr)}
-            title={`Phase ${nr}: ${navn} (Cmd+${nr})`}
+            title={`${navn} (Cmd+${nr})`}
+            style={{ '--fasefarve': FASEFARVE[nr] }}
           >
-            <span className="fasenr">{nr}</span>
+            <span className="fase-farve" />
             {navn}
             {faseTal && faseTal[nr] > 0 && <span className="antal">{faseTal[nr]}</span>}
           </button>

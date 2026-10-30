@@ -12,7 +12,7 @@ const TEXT_LABELS = {
 // Vaerk-panelet (docs/plan-shop.md). Teksterne rettes kun her; Woo er en
 // kopi. Felterne gemmes naar man forlader dem, ikke for hver tast, saa
 // en igangvaerende rettelse aldrig bliver skrevet over af en genindlaesning.
-export default function WorkPanel({ row, versions, tekstRev = 0, hasKey, shop, onShop, onError }) {
+export default function WorkPanel({ row, versions, tekstRev = 0, hasKey, shop, onShop, onError, children = null }) {
   const imageId = row.image_id;
   const [work, setWork] = useState(null);
   const [draft, setDraft] = useState({});
@@ -206,6 +206,15 @@ export default function WorkPanel({ row, versions, tekstRev = 0, hasKey, shop, o
           <option value="">Not set</option>
           {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
+        {/* Ikke et valg: alle vaerker saelges som print, undtagen malerier og
+            skulpturer. Appen skriver det til shoppen (work_prints), saa
+            produktsiden ved, om den skal vise printmulighederne. */}
+        <span
+          className="vaerk-tael"
+          title="Set by the app from the category, and sent to the shop so the product page knows whether to show the print options."
+        >
+          {work.prints ? 'Offered as prints' : 'Sold as the original, not as prints'}
+        </span>
       </label>
       <label>Technique
         <input
@@ -241,16 +250,6 @@ export default function WorkPanel({ row, versions, tekstRev = 0, hasKey, shop, o
         </span>
       </label>
 
-      {/* Ikke et valg: alle vaerker saelges som print, undtagen malerier og
-          skulpturer. Appen skriver det til shoppen (work_prints). */}
-      <p
-        className="vaerk-note"
-        title="Set by the app from the category: every work is offered as prints, except Paintings and Sculptures, which are sold as the original."
-      >
-        {work.prints
-          ? 'Offered as prints.'
-          : 'Sold as the original, not as prints.'}
-      </p>
 
       {work.unique && (
         <div className="vaerk-raekke">
@@ -274,6 +273,49 @@ export default function WorkPanel({ row, versions, tekstRev = 0, hasKey, shop, o
         </div>
       )}
 
+      <h4>Texts</h4>
+      <label>Your notes (sent to Claude)
+        <textarea
+          rows={3}
+          value={draft.notes}
+          placeholder="What, why, how"
+          onChange={set('notes')}
+          onBlur={blurSave('notes', 'notes', work.notes)}
+        />
+      </label>
+      <div className="knapraekke">
+        <button disabled={!kanSkrive || busy} onClick={() => writeTexts(false)} title={skriveHint}>
+          {busy ? 'Writing …' : 'Write texts'}
+        </button>
+        {skriveHint && <span className="vaerk-note">{skriveHint}</span>}
+      </div>
+      {warnings.length > 0 && (
+        <ul className="vaerk-advarsler">
+          {warnings.map((w) => <li key={w}>{w}</li>)}
+        </ul>
+      )}
+      {[['description', 'description', 'Description', 7],
+        ['short_text', 'shortText', 'Short text', 2],
+        ['alt_text', 'altText', 'Alt text', 2]].map(([column, key, label, rows]) => (
+          <label key={column}>
+            {label}
+            {work.editedTexts.includes(column) && <span className="vaerk-rettet"> · edited by you</span>}
+            <textarea
+              rows={rows}
+              value={draft[key]}
+              onChange={set(key)}
+              onBlur={blurSave(key, column, work[key])}
+            />
+            {column === 'description' && (
+              <span className="vaerk-tael">{(draft[key].match(/\S+/g) || []).length} words</span>
+            )}
+            {column === 'alt_text' && <span className="vaerk-tael">{draft[key].length} characters</span>}
+          </label>
+        ))}
+      {/* Serie og soegeord, fra inspektoeren, saa hver ting kun staar ét sted. */}
+      {children}
+
+      {/* Shoppen til sidst: den bruges foerst, naar alt andet er klar. */}
       <h4>Shop</h4>
       <p className="vaerk-note">
         {!work.wooProductId
@@ -335,45 +377,6 @@ export default function WorkPanel({ row, versions, tekstRev = 0, hasKey, shop, o
         </>
       )}
 
-      <h4>Texts</h4>
-      <label>Your notes (sent to Claude)
-        <textarea
-          rows={3}
-          value={draft.notes}
-          placeholder="What, why, how"
-          onChange={set('notes')}
-          onBlur={blurSave('notes', 'notes', work.notes)}
-        />
-      </label>
-      <div className="knapraekke">
-        <button disabled={!kanSkrive || busy} onClick={() => writeTexts(false)} title={skriveHint}>
-          {busy ? 'Writing …' : 'Write texts'}
-        </button>
-        {skriveHint && <span className="vaerk-note">{skriveHint}</span>}
-      </div>
-      {warnings.length > 0 && (
-        <ul className="vaerk-advarsler">
-          {warnings.map((w) => <li key={w}>{w}</li>)}
-        </ul>
-      )}
-      {[['description', 'description', 'Description', 7],
-        ['short_text', 'shortText', 'Short text', 2],
-        ['alt_text', 'altText', 'Alt text', 2]].map(([column, key, label, rows]) => (
-          <label key={column}>
-            {label}
-            {work.editedTexts.includes(column) && <span className="vaerk-rettet"> · edited by you</span>}
-            <textarea
-              rows={rows}
-              value={draft[key]}
-              onChange={set(key)}
-              onBlur={blurSave(key, column, work[key])}
-            />
-            {column === 'description' && (
-              <span className="vaerk-tael">{(draft[key].match(/\S+/g) || []).length} words</span>
-            )}
-            {column === 'alt_text' && <span className="vaerk-tael">{draft[key].length} characters</span>}
-          </label>
-        ))}
     </div>
   );
 }

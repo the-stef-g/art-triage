@@ -56,7 +56,7 @@ try {
   await billede(join(lib, 'Approved', 'blaa', 'Master', 'blaa master.png'));
   await page.locator('button', { hasText: 'Scan again' }).click();
   await page.waitForFunction(() => document.querySelectorAll('.tile').length === 0, null, { timeout: 20000 });
-  await page.locator('.fase', { hasText: 'Crops' }).click();
+  await page.locator('.fase', { hasText: 'Crop' }).click();
   await page.waitForSelector('.tile-navn[title*="/Master/"]', { timeout: 20000 });
   if (await page.locator('.tile-navn[title*="/Original/"]').count() !== 0) {
     throw new Error('Originalen staar i fase 3');

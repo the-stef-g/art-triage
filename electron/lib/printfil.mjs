@@ -71,7 +71,7 @@ export async function lavPrintfil({ kilde, mappe, base, token, forstoerrelser = 
     const nb = k * p;
     const nh = k * q;
     if (nb < valgt.b * 0.99 || nh < valgt.h * 0.99) {
-      throw new Error(`${basename(valgt.fil)} is ${valgt.b} × ${valgt.h} pixels, which is not ${p}:${q}. Crop it again under 3 Crops.`);
+      throw new Error(`${basename(valgt.fil)} is ${valgt.b} × ${valgt.h} pixels, which is not ${p}:${q}. Crop it again under Crop.`);
     }
     udsnit = { left: Math.floor((valgt.b - nb) / 2), top: Math.floor((valgt.h - nh) / 2), width: nb, height: nh };
   }

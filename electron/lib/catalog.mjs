@@ -926,7 +926,7 @@ export class Catalog extends EventEmitter {
   //
   // 1 Sort: det der ikke er godkendt endnu (Import og Candidate).
   // 2 Edit: godkendte vaerker uden en master; originalen og redigeringerne.
-  // 3 Crops: vaerker med en master; masteren og beskaeringerne.
+  // 3 Crop: vaerker med en master; masteren og beskaeringerne.
   // 4 Print: beskaeringerne og forstoerrelserne, hver med sin printfil. Et
   // vaerk der kun saelges i sin egen form, faar en beskaering i det format.
   // 5 Product: vaerker med en master; én flise pr. vaerk. Det sidste tjek
