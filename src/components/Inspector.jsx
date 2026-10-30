@@ -42,10 +42,24 @@ export default function Inspector({
     }
   };
 
+  // Et faelles serieord ville komme igen ved naeste skanning, hvis det kun
+  // blev fjernet her. Saa er valget: fjern det fra hele serien, eller lad
+  // vaere.
   const fjernOrd = async (word) => {
     if (!row) return;
     try {
-      await invoke('kw:remove', { fileId: row.file_id, word });
+      const serie = await invoke('kw:serieOrd', { fileId: row.file_id, word });
+      if (serie) {
+        const ok = window.confirm(
+          `«${word}» is shared by the series «${serie.serie}»: ${serie.fileIds.length} of its ${serie.antal} works have it. `
+          + 'Removed from this work only, it would come back at the next scan.\n\n'
+          + `OK removes «${word}» from all the works in the series. Cancel keeps it.`
+        );
+        if (!ok) return;
+        await invoke('kw:removeFromFiles', { fileIds: serie.fileIds, word });
+      } else {
+        await invoke('kw:remove', { fileId: row.file_id, word });
+      }
       loadKeywords();
     } catch {
       // ignoreres

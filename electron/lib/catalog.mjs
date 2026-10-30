@@ -1882,6 +1882,25 @@ export class Catalog extends EventEmitter {
   // Fjerner et ord fra en bunke valgte billeder. Det er vejen til at rydde
   // et forkert ord op i én omgang: klik ordet i sidepanelet, marker de
   // billeder det er forkert paa, og fjern det derfra.
+  // Er ordet et faelles serieord, som synkSerieOrd ville laegge paa filen
+  // igen, hvis det kun blev fjernet her? Saa { serie, fileIds } med alle de
+  // af seriens mastre der har ordet; ellers null.
+  serieOrd(fileId, word) {
+    const img = this.db.get(
+      `SELECT i.id, i.series_id, s.name FROM versions v JOIN images i ON i.id = v.image_id
+       JOIN series s ON s.id = i.series_id WHERE v.file_id=? OR i.master_file_id=? LIMIT 1`,
+      fileId, fileId
+    );
+    if (!img) return null;
+    const mastre = this.db.all('SELECT id FROM images WHERE series_id=?', img.series_id)
+      .map((i) => this.masterFil(i.id))
+      .filter(Boolean);
+    const med = mastre.filter((m) => this.db.get('SELECT 1 AS ok FROM keywords WHERE file_id=? AND word=?', m.id, word));
+    const andre = med.filter((m) => m.id !== fileId).length;
+    if (andre < 2 || andre * 2 < mastre.length) return null;
+    return { serie: img.name, antal: mastre.length, fileIds: med.map((m) => m.id) };
+  }
+
   removeKeywordFromFiles(fileIds, word) {
     const trimmed = String(word || '').trim();
     if (!trimmed || !fileIds || !fileIds.length) return 0;

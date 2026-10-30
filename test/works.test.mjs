@@ -367,5 +367,15 @@ describe('serien deler soegeord', () => {
     expect(ord(2)).toEqual(['desert', 'dune']);
     expect(ord(0)).toEqual(['desert', 'yellow']);
     expect(ord(1)).toEqual(['camel', 'desert']);
+
+    // At fjerne et faelles ord fra ét vaerk advarer: det ville komme igen.
+    const info = catalog.serieOrd(m[2].id, 'desert');
+    expect(info).toMatchObject({ serie: 'Sand', antal: 3 });
+    expect(info.fileIds.sort()).toEqual(m.map((x) => x.id).sort());
+    expect(catalog.serieOrd(m[0].id, 'yellow')).toBe(null);
+    // Fjernet fra hele serien kommer det ikke igen.
+    catalog.removeKeywordFromFiles(info.fileIds, 'desert');
+    catalog.synkSerieOrd();
+    expect(ord(2)).toEqual(['dune']);
   });
 });

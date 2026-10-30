@@ -939,6 +939,7 @@ export class AppSession {
     // det der staar, er det Stef selv har skrevet ind.
     handle('kw:add', ({ fileId, word }) => this.requireCatalog().addKeyword(fileId, word));
     handle('kw:remove', ({ fileId, word }) => this.requireCatalog().removeKeyword(fileId, word));
+    handle('kw:serieOrd', ({ fileId, word }) => this.requireCatalog().serieOrd(fileId, word));
     handle('kw:removeFromFiles', ({ fileIds, word }) =>
       this.requireCatalog().removeKeywordFromFiles(fileIds, word));
 
