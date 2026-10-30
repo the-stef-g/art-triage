@@ -691,7 +691,8 @@ button.stor {
 .print-linje:not(.hoved):hover { background: var(--bg-hover); }
 .print-linje.valgt { border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
 .print-linje.aktiv { border-color: var(--accent); background: var(--bg-aktiv); }
-.print-linje .navn { display: flex; gap: 6px; align-items: center; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.print-linje .navn { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.print-linje .navn-linje { display: flex; gap: 6px; align-items: center; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .print-linje .tal { font-variant-numeric: tabular-nums; }
 .print-linje .ok { color: var(--godkendt); }
 .print-linje .halv { color: var(--kandidat); }
@@ -766,3 +767,9 @@ button.stor {
 
 .kw-forklaring { font-size: 11px; margin: 4px 0; }
 .chip-farve.manuel { color: var(--accent); }
+
+/* Foraeldet: lavet af en gammel udgave af kilden. */
+.badge.foraeldet { background: var(--kandidat); color: #3a2f00; }
+.print-linje.foraeldet { border-color: color-mix(in srgb, var(--kandidat) 60%, transparent); }
+.foraeldet-tekst { color: var(--kandidat); font-size: 11px; white-space: normal; }
+.foraeldet-liste { margin: 8px 0; padding: 8px 10px 8px 24px; border: 1px solid var(--kandidat); border-radius: var(--radius); color: var(--kandidat); font-size: 12px; }

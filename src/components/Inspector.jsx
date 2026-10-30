@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { invoke, thumbUrl } from '../api';
-import { formatBytes, formatDate, fileName } from '../util';
+import { formatBytes, formatDate, fileName, foraeldetTekster } from '../util';
 import WorkPanel from './WorkPanel';
 import CropModal from './CropModal';
 import { gigapixelMaal } from '../printmaal';
@@ -159,7 +159,7 @@ export default function Inspector({
       )}
       <h3 title={row.rel_path}>{fileName(row.rel_path)}</h3>
       <p className="detaljer">
-        {formatBytes(row.size)} · {formatDate(row.mtime)}
+        {formatBytes(row.size)} · Last edit {formatDate(row.mtime)}
         {row.series_name ? ` · Series: ${row.series_name}` : ''}
       </p>
 
@@ -318,6 +318,14 @@ export default function Inspector({
             </div>
           </WorkPanel>
         </>
+      )}
+
+      {/* En beskaering lavet af en gammel udgave af masteren, en
+          forstoerrelse af en gammel beskaering eller en gammel printfil. */}
+      {(fase === 3 || fase === 4) && foraeldetTekster(row.foraeldet).length > 0 && (
+        <ul className="foraeldet-liste">
+          {foraeldetTekster(row.foraeldet).map((t) => <li key={t}>{t}</li>)}
+        </ul>
       )}
 
       {fase === 3 && (

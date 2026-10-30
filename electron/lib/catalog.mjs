@@ -164,6 +164,10 @@ function effektiveFiler(betingelse) {
           WHERE ${betingelse}`;
 }
 
+// To filer gemt inden for samme sekund regnes for lige gamle, saa en kopi
+// der er lavet lige efter sin kilde, ikke ser foraeldet ud.
+const FORAELDET_MS = 2000;
+
 export class Catalog extends EventEmitter {
   constructor(db, root) {
     super();
@@ -838,6 +842,22 @@ export class Catalog extends EventEmitter {
         r.giga_fil = st ? { id: st.id, rel: st.rel_path, mtime: st.mtime } : null;
       }
     }
+    // Kaeden master -> beskaering -> -giga -> printfil: er et led nyere end
+    // det naeste, er det naeste lavet af en gammel udgave.
+    if (fase === 3 || fase === 4) {
+      for (const r of ud) {
+        if (r.giga || !r.crop || r.crop === 'free') continue;
+        const f = [];
+        const master = this.masterFil(r.image_id);
+        if (master && master.id !== r.file_id && master.mtime > r.mtime + FORAELDET_MS) f.push('master');
+        if (fase === 4) {
+          if (r.giga_fil && r.giga_fil.mtime + FORAELDET_MS < r.mtime) f.push('giga');
+          const kilde = r.giga_fil && r.giga_fil.mtime > r.mtime ? r.giga_fil.mtime : r.mtime;
+          if (r.printfil && r.printfil.mtime + FORAELDET_MS < kilde) f.push('print');
+        }
+        r.foraeldet = f.length ? { led: f, masterMtime: master?.mtime ?? null } : null;
+      }
+    }
     return ud;
   }
 
@@ -1031,7 +1051,7 @@ export class Catalog extends EventEmitter {
   // Vaerkets master i Master: helst den uden et format i navnet.
   masterFil(imageId) {
     const filer = this.db.all(
-      `SELECT f.id, f.rel_path, f.rotation FROM versions v JOIN files f ON f.id = v.file_id
+      `SELECT f.id, f.rel_path, f.rotation, f.mtime FROM versions v JOIN files f ON f.id = v.file_id
        WHERE v.image_id=? AND f.present=1 AND f.rel_path LIKE 'Approved/%/Master/%'
        ORDER BY f.id`,
       imageId

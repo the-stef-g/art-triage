@@ -1,7 +1,7 @@
 // Fase 4: printfilen til Prodigi. sRGB, 8 bit, 300 DPI, PNG i fuld
 // opløsning, og Prodigis profiler kommer ikke i filen.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, writeFileSync, mkdirSync, rmSync, existsSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, mkdirSync, rmSync, existsSync, utimesSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import sharp from 'sharp';
@@ -179,6 +179,33 @@ describe('printfiler i kataloget', () => {
     expect(krop.giga_fil.rel).toBe('Approved/Desert/Edits/Desert 3-2-giga.tif');
     const maal = catalog.printMaal(krop.version_id);
     expect(maal.kilde).toBe(join(root, 'Approved', 'Desert', 'Edits', 'Desert 3-2-giga.tif'));
+  });
+
+  it('kaeden: en beskaering af en gammel master, en gammel -giga og en gammel printfil ses', async () => {
+    const tid = (rel, s) => { const t = new Date(s * 1000); utimesSync(join(root, rel), t, t); };
+    await p3Tiff(join(root, 'Approved', 'Desert', 'Master', 'Desert.tif'), 60, 40);
+    await p3Tiff(join(root, 'Approved', 'Desert', 'Master', 'Desert 3-2.tif'), 60, 40);
+    await p3Tiff(join(root, 'Approved', 'Desert', 'Edits', 'Desert 3-2-giga.tif'), 240, 160);
+    tid('Approved/Desert/Master/Desert.tif', 1000);
+    tid('Approved/Desert/Master/Desert 3-2.tif', 2000);
+    tid('Approved/Desert/Edits/Desert 3-2-giga.tif', 3000);
+    catalog.sync();
+    const krop = () => catalog.listVersions({ fase: 4 }).find((r) => r.rel_path.endsWith('Desert 3-2.tif'));
+    expect(krop().foraeldet).toBe(null);
+    await lavPrintfil(catalog.printMaal(krop().version_id));
+    tid('Approved/Desert/Print files/Desert 3-2.png', 4000);
+    expect(krop().foraeldet).toBe(null);
+
+    // Masteren gemmes igen: beskaeringen er lavet af en gammel udgave.
+    tid('Approved/Desert/Master/Desert.tif', 5000);
+    catalog.sync();
+    expect(krop().foraeldet.led).toEqual(['master']);
+    expect(catalog.listVersions({ fase: 3 }).find((r) => r.rel_path.endsWith('Desert 3-2.tif')).foraeldet.led).toEqual(['master']);
+
+    // Beskaeringen laves igen: nu er -giga-filen og printfilen de gamle.
+    tid('Approved/Desert/Master/Desert 3-2.tif', 6000);
+    catalog.sync();
+    expect(krop().foraeldet.led).toEqual(['giga', 'print']);
   });
 
   it('kun en -giga-fil kan blive til en printfil', () => {

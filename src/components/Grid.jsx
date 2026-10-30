@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { FixedSizeGrid } from 'react-window';
 import { useSize } from '../hooks';
 import { thumbUrl } from '../api';
-import { fileName } from '../util';
+import { fileName, foraeldetTekster } from '../util';
 
 // Fliserne fylder hele bredden af midterfeltet, delt paa det antal
 // kolonner brugeren har valgt. Foer var bredden fast, og de kolonner der
@@ -54,6 +54,7 @@ function Badges({ row }) {
         <span className="badge stak" title={`${row.version_count} versions`}>⧉ {row.version_count}</span>
       )}
       {/* Printfilen er lavet af -giga-filen, saa det er dér den vises. */}
+      {row.foraeldet && <span className="badge foraeldet" title={foraeldetTekster(row.foraeldet).join(' ')}>Out of date</span>}
       {row.printfil && row.giga && <span className="badge print" title={`Print file: ${row.printfil.rel.split('/').pop()}`}>Print file</span>}
       {row.series_name && <span className="badge serie" title={`Series: ${row.series_name}`}>{row.series_name}</span>}
     </div>

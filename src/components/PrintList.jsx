@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { invoke, thumbUrl } from '../api';
-import { fileName } from '../util';
+import { fileName, foraeldetTekster } from '../util';
 import { gigapixelMaal } from '../printmaal';
 
 const px = (m) => (m ? `${m.bredde} × ${m.hoejde}` : '…');
@@ -101,13 +101,16 @@ export default function PrintList({ rows, selected, active, setSelected, setActi
           <div
             key={r.version_id}
             role="row"
-            className={`print-linje ${valgt.has(r.version_id) ? 'valgt' : ''} ${r.version_id === active ? 'aktiv' : ''}`}
+            className={`print-linje ${valgt.has(r.version_id) ? 'valgt' : ''} ${r.version_id === active ? 'aktiv' : ''} ${r.foraeldet ? 'foraeldet' : ''}`}
             onClick={(e) => klik(r, i, e)}
           >
             <img key={thumbRev} src={thumbUrl(r.file_id, r.mtime, 512, r.rotation)} alt="" draggable={false} />
             <span className="navn" title={r.rel_path}>
-              {fileName(r.rel_path)}
-              <span className="badge beskaering">{r.crop}</span>
+              <span className="navn-linje">
+                {fileName(r.rel_path)}
+                <span className="badge beskaering">{r.crop}</span>
+              </span>
+              {r.foraeldet && <span className="foraeldet-tekst">{foraeldetTekster(r.foraeldet)[0]}</span>}
             </span>
             <span className="tal">{px(krop)}</span>
             <span className="tal">{maalet ? px(maalet) : '–'}</span>

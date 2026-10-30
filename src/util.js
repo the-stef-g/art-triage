@@ -23,3 +23,19 @@ export function folderOf(relPath) {
   parts.pop();
   return parts.join('/');
 }
+
+// Hvad der er foraeldet i kaeden master -> beskaering -> -giga -> printfil,
+// som korte saetninger til Crop og Print.
+export function foraeldetTekster(foraeldet) {
+  if (!foraeldet) return [];
+  const ud = [];
+  if (foraeldet.led.includes('master')) {
+    const dato = foraeldet.masterMtime
+      ? new Date(foraeldet.masterMtime).toLocaleDateString('da-DK', { day: 'numeric', month: 'short' })
+      : null;
+    ud.push(`The master was changed after this crop was made${dato ? ` (${dato})` : ''}. Crop again.`);
+  }
+  if (foraeldet.led.includes('giga')) ud.push('The crop was changed after it was enlarged. Enlarge it again.');
+  if (foraeldet.led.includes('print')) ud.push('The print file is older than the crop. Make it again.');
+  return ud;
+}
