@@ -17,7 +17,8 @@ Intet lige nu. Fortrydelsesret og betaling er afgjort 30. oktober 2026: prints h
 Det her ligger i WooCommerce, ikke i appen eller i sitets kode.
 
 - **Testordre i Stripes testtilstand** med kort og MobilePay: betalingen står som Uncaptured og trækkes ved Completed.
-- **Mangler i shopteksterne** (`docs/shop-tekster.md` i sitets repo): Prodigis forsendelsestider, [TJEK]-punkterne i privatlivspolitikken (cookies, nyhedsbrev, webhost, kundekonti).
+- **Køb som gæst.** WooCommerce › Settings › Accounts & Privacy: tillad køb uden konto, og slå oprettelse af konto i kassen fra. Ingen regel kræver en konto, og EU's databeskyttelsesråd anbefaler, at man kan købe som gæst.
+- **Bruges der statistik- eller reklame-cookies** (fx Google Analytics), skal privatlivspolitikken rettes, og der skal et samtykkebanner til. Får shoppen en tilmelding til nyhedsbrevet (MailerPress Pro), tages afsnittet om nyhedsbrevet med i politikken.
 - **Skjul de store canvas uden for Europa i shoppen.** Varianterne får et metafelt om det (se "Venter på byg"), men WooCommerce læser det ikke selv. Kunden vælger varianten på shop.stefg.art, så det skal gøres der, fx med et lille plugin eller et snippet, der fjerner varianten for de lande.
 
 ## Til sitet (Astro)
