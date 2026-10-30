@@ -257,32 +257,44 @@ export default function App() {
           .catch(visFejl);
         return;
       }
+      // Noeglerne vises aldrig igen efter de er gemt: de ligger i
+      // indstillingerne, ikke i UI'et. Feltet starter derfor tomt, men
+      // siger om der er en noegle, og OK paa et tomt felt beholder den.
       if (evt.cmd === 'woo-key' || evt.cmd === 'wp-key') {
-        // Som Claude-noeglen: feltet starter tomt, og en tom indtastning
-        // fjerner det der staar.
         const woo = evt.cmd === 'woo-key';
-        setModal({
-          title: woo ? 'WooCommerce key' : 'WordPress application password',
-          value: '',
-          placeholder: woo ? 'ck_…  cs_…' : 'username:application password',
-          onSubmit: (key) => invoke(woo ? 'app:setWooKey' : 'app:setWpKey', { key })
-            .then(() => invoke('shop:status').then(setShop))
-            .catch(visFejl),
-        });
+        invoke('shop:status').then((st) => {
+          const gemt = woo ? st.harWoo : st.harWp;
+          setModal({
+            title: woo ? 'WooCommerce key' : 'WordPress application password',
+            value: '',
+            placeholder: gemt
+              ? 'Saved. Type a new one to replace it'
+              : (woo ? 'ck_…  cs_…' : 'username:application password'),
+            onSubmit: (key) => {
+              if (!key.trim() && gemt) return undefined;
+              return invoke(woo ? 'app:setWooKey' : 'app:setWpKey', { key })
+                .then(() => invoke('shop:status').then(setShop))
+                .catch(visFejl);
+            },
+          });
+        }).catch(visFejl);
         return;
       }
       if (evt.cmd === 'claude-key') {
-        // Noeglen vises aldrig igen efter den er gemt: den ligger i
-        // indstillingerne, ikke i UI'et. Feltet starter derfor tomt, og
-        // en tom indtastning fjerner den, der staar.
-        setModal({
-          title: 'Claude API key',
-          value: '',
-          placeholder: 'sk-ant-...',
-          onSubmit: (key) => invoke('app:setClaudeKey', { key })
-            .then(() => invoke('kw:status').then(setKwStatus))
-            .catch(visFejl),
-        });
+        invoke('kw:status').then((st) => {
+          const gemt = Boolean(st?.harKey);
+          setModal({
+            title: 'Claude API key',
+            value: '',
+            placeholder: gemt ? 'Saved. Type a new one to replace it' : 'sk-ant-...',
+            onSubmit: (key) => {
+              if (!key.trim() && gemt) return undefined;
+              return invoke('app:setClaudeKey', { key })
+                .then(() => invoke('kw:status').then(setKwStatus))
+                .catch(visFejl);
+            },
+          });
+        }).catch(visFejl);
         return;
       }
       // Cmd+Z / Skift+Cmd+Z fra menuen: tekstfelter faar tekst-fortryd,
