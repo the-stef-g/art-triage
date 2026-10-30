@@ -16,7 +16,6 @@ export default function Inspector({
   const [versions, setVersions] = useState([]);
   const [keywords, setKeywords] = useState([]);
   const [nytOrd, setNytOrd] = useState('');
-  const [beskaer, setBeskaer] = useState(false);
 
   const loadKeywords = () => {
     if (row) invoke('kw:forFile', { fileId: row.file_id }).then(setKeywords).catch(() => {});
@@ -356,43 +355,12 @@ export default function Inspector({
         </>
       )}
 
-      {/* En ny beskaering kan ogsaa laves af et vaerk der er i shoppen. Den
-          dukker saa op i Print, til den har sin printfil. */}
       {/* Crop: beskaeringen staar midt i vinduet, for vaerkets master. */}
       {fase === 3 && cropNode && createPortal(
         master
           ? <CropModal key={master.file_id} inline row={master} onClose={() => {}} onDone={onError} onError={onError} />
           : <p className="tom crop-tom">Select a work to crop its master.</p>,
         cropNode
-      )}
-
-      {fase === 6 && (
-        <>
-          <h4>Crops</h4>
-          <div className="knapraekke">
-            <button
-              className="lille"
-              disabled={!master}
-              onClick={() => setBeskaer(true)}
-              title={master
-                ? `Crop ${master.rel_path.split('/').pop()} to an exact print format. The crop is saved as a new file in Master.`
-                : 'Only finished works can be cropped: put the master in the Master folder first.'}
-            >
-              Crop master …
-            </button>
-          </div>
-          {!master && (
-            <p className="tom">Only finished works can be cropped. Put the master in the Master folder.</p>
-          )}
-          {beskaer && master && (
-            <CropModal
-              row={master}
-              onClose={() => setBeskaer(false)}
-              onDone={(besked) => { setBeskaer(false); onError(besked); }}
-              onError={onError}
-            />
-          )}
-        </>
       )}
 
       {/* Fase 4: én linje pr. beskaering. Forstoerrelsen (-giga) hoerer til

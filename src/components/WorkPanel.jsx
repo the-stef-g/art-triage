@@ -179,8 +179,11 @@ export default function WorkPanel({ row, versions, tekstRev = 0, hasKey, shop, o
     ? 'Texts unlock when the image is Approved and Finished'
     : !hasKey ? 'Add your Claude API key under Help first' : '';
 
+  // To kolonner: vaerkets felter, serie og soegeord til venstre, teksterne
+  // til hoejre, saa det hele kan ses uden at scrolle.
   const form = (
-    <div className="vaerk">
+    <div className="vaerk vaerk-kolonner">
+      <div className="vaerk-kolonne">
       <h4>Work</h4>
       <p className="vaerk-note">
         Texts are edited here only. The shop is a copy: anything changed in
@@ -286,6 +289,11 @@ export default function WorkPanel({ row, versions, tekstRev = 0, hasKey, shop, o
         </div>
       )}
 
+      {/* Serie og soegeord, fra inspektoeren, saa hver ting kun staar ét sted. */}
+      {children}
+      </div>
+
+      <div className="vaerk-kolonne">
       <h4>Texts</h4>
       <label>Your notes (sent to Claude)
         <textarea
@@ -325,9 +333,7 @@ export default function WorkPanel({ row, versions, tekstRev = 0, hasKey, shop, o
             {column === 'alt_text' && <span className="vaerk-tael">{draft[key].length} characters</span>}
           </label>
         ))}
-      {/* Serie og soegeord, fra inspektoeren, saa hver ting kun staar ét sted. */}
-      {children}
-
+      </div>
     </div>
   );
   // Shoppen til sidst: den bruges foerst, naar alt andet er klar. I Product
