@@ -7,7 +7,7 @@ Det der venter. Stef siger "byg", før noget herfra bliver lavet.
 - **Product: formularen i to kolonner, med Texts i den højre**, så det hele kan ses uden at scrolle.
 - **Crop: formaterne nederst til venstre for Save crop**, så musen ikke skal op og ned. Et format der allerede er beskåret, kan ikke vælges igen, og det kan ses på knappen.
 - **Crop: linjen "Saved in Master as …" fjernes, og Straighten flyttes ned i bunden**, så billedet får mere plads foroven.
-- **Statuslinjen nederst fjernes.** Skyderen med antal billeder i bredden flyttes op i værktøjslinjen. Versionsnummeret står efter "Stef G Art" øverst, ikke i fed og lidt mindre.
+- **Statuslinjen: skyderen med antal billeder i bredden flyttes helt til venstre**, så den ikke hopper, når teksten i statuslinjen ændrer sig. Resten af statuslinjen bliver som den er.
 - **Værktøjslinjen: mere luft mellem fanerne og søgefeltet**, evt. søgefeltet i midten.
 
 ## Venter på en afklaring
