@@ -44,7 +44,9 @@ export default function App() {
   // saa skulle listen vendes for at flytte fokus, hvilket ikke kunne
   // baere at pilene skal kunne gaa rundt inde i en markering.
   const [active, setActive] = useState(null);
-  const [showPreview, setShowPreview] = useState(false);
+  // Sort er der, hvor billederne bedoemmes: der er den store visning
+  // standard. Mellemrum og Escape skifter stadig til gitteret.
+  const [showPreview, setShowPreview] = useState(() => gemtFase() === 1);
   const [modal, setModal] = useState(null);
   const [fejl, setFejl] = useState(null);
   const [appInfo, setAppInfo] = useState(null);
@@ -358,6 +360,9 @@ export default function App() {
   // formularen bred i midten og shoppen til hoejre.
   const produktLayout = filter.fase === 5 || filter.fase === 6;
   const [shopNode, setShopNode] = useState(null);
+  // Crop: vaerkerne smalt til venstre og beskaeringen i midten.
+  const cropLayout = filter.fase === 3;
+  const [cropNode, setCropNode] = useState(null);
 
   // Slaar det aktive billede op via refs, saa tastaturgenvejene
   // (registreret en gang) altid ser den aktuelle tilstand.
@@ -415,6 +420,7 @@ export default function App() {
     // man kom fra, saa de nulstilles; soegning og sortering bliver.
     setFase: (fase) => {
       localStorage.setItem('fase', String(fase));
+      setShowPreview(fase === 1);
       setFilter((f) => (f.fase === fase ? f : {
         ...f, fase, folder: null, serieId: null, keyword: null,
         kunKandidater: false, kunKasserede: false, visKasserede: false,
@@ -794,7 +800,7 @@ export default function App() {
         act={act}
         harValg={selected.length > 0}
       />
-      <div className={produktLayout ? 'hoved produkt' : 'hoved'}>
+      <div className={produktLayout ? 'hoved produkt' : cropLayout ? 'hoved beskaer' : 'hoved'}>
         <Sidebar
           tree={tree}
           series={series}
@@ -837,7 +843,7 @@ export default function App() {
             onOpenPreview={() => setShowPreview(true)}
             onColumns={(c) => { columnsRef.current = c; }}
             ankerRef={ankerRef}
-            columns={produktLayout ? 2 : kolonner}
+            columns={produktLayout || cropLayout ? 2 : kolonner}
             thumbRev={thumbRev}
           />
           )}
@@ -892,8 +898,11 @@ export default function App() {
             invoke('shop:status').then(setShop).catch(() => {});
           }}
           onError={visFejl}
+          storVisning={showPreview}
           shopNode={produktLayout ? shopNode : null}
+          cropNode={cropLayout ? cropNode : null}
         />
+        {cropLayout && <div className="crop-midte" ref={setCropNode} />}
         {/* Product og Shop: teksterne i midten, og her til hoejre billedet,
             tjeklisten og shopknapperne, som bruges til sidst. */}
         {produktLayout && (

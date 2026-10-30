@@ -679,3 +679,19 @@ button.stor {
 .tjekliste li::before { content: '✓ '; color: var(--godkendt); }
 .tjekliste li.mangler { color: var(--tekst-svag); }
 .tjekliste li.mangler::before { content: '○ '; color: var(--kandidat); }
+
+/* Crop: vaerkerne og beskaeringerne smalt til venstre, beskaeringen i
+   midten, formaterne til hoejre. */
+.hoved.beskaer {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr) 320px;
+  grid-template-rows: minmax(0, 1fr);
+}
+.hoved.beskaer > .sidebar { display: none; }
+.hoved.beskaer > .midte { grid-column: 1; grid-row: 1; border-right: 1px solid var(--kant); background: var(--bg-panel); }
+.hoved.beskaer > .crop-midte { grid-column: 2; grid-row: 1; min-width: 0; min-height: 0; display: flex; }
+.hoved.beskaer > .inspector { grid-column: 3; grid-row: 1; width: auto; min-width: 0; }
+.crop-inline { flex: 1; min-width: 0; display: flex; padding: 16px; }
+.crop-inline .crop-vindue { flex: 1; min-width: 0; max-width: none; max-height: none; box-shadow: none; background: transparent; }
+.crop-inline .crop-flade img { max-width: 100%; max-height: calc(100vh - 230px); }
+.crop-tom { margin: auto; }

@@ -99,8 +99,8 @@ try {
     null,
     { timeout: 10000 }
   );
-  // Den bliver staaende under den store visning.
-  await page.keyboard.press(' ');
+  // I Sort er den store visning standard, og filmstrimlen bliver staaende
+  // under den.
   await page.waitForSelector('.forstoerret', { timeout: 10000 });
   const stripSynlig = await page.evaluate(() => {
     const stor = document.querySelector('.forstoerret').getBoundingClientRect();

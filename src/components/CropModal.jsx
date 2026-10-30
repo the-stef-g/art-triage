@@ -23,7 +23,10 @@ function stoerste(forhold, A) {
 
 const klem = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
-export default function CropModal({ row, onClose, onDone, onError }) {
+// inline: beskaeringen staar midt i vinduet i Crop i stedet for oven paa
+// det. Saa fanger den ikke tasterne, og den bliver staaende efter Gem, saa
+// den naeste beskaering kan laves med det samme.
+export default function CropModal({ row, onClose, onDone, onError, inline = false }) {
   const [A, setA] = useState(1.5);
   const [format, setFormat] = useState('3:2');
   const [rect, setRect] = useState(() => stoerste(1.5, 1.5));
@@ -40,13 +43,14 @@ export default function CropModal({ row, onClose, onDone, onError }) {
 
   // Escape lukker, og ingen anden genvej maa ramme billederne bag vinduet.
   useEffect(() => {
+    if (inline) return undefined;
     const taste = (e) => {
       e.stopImmediatePropagation();
       if (e.key === 'Escape') onClose();
     };
     window.addEventListener('keydown', taste, true);
     return () => window.removeEventListener('keydown', taste, true);
-  }, [onClose]);
+  }, [onClose, inline]);
 
   const vaelgFormat = (f, nyA = A) => {
     setFormat(f);
@@ -108,6 +112,7 @@ export default function CropModal({ row, onClose, onDone, onError }) {
       onDone(res.bit8
         ? `Saved ${res.rel}. It is 8 bit: the 16 bit crop needs macOS.`
         : `Saved ${res.rel}`);
+      if (inline) setGemmer(false);
     } catch (err) {
       onError(err);
       setGemmer(false);
@@ -115,7 +120,7 @@ export default function CropModal({ row, onClose, onDone, onError }) {
   };
 
   return (
-    <div className="crop-bag" onClick={onClose}>
+    <div className={inline ? 'crop-inline' : 'crop-bag'} onClick={inline ? undefined : onClose}>
       <div className="crop-vindue" onClick={(e) => e.stopPropagation()}>
         <div className="crop-top">
           <strong title={row.rel_path}>Crop {fileName(row.rel_path)}</strong>
@@ -165,10 +170,10 @@ export default function CropModal({ row, onClose, onDone, onError }) {
         </div>
         <div className="crop-bund">
           <span className="tom">
-            Saved in Master as «{nytNavn}», exactly {format}. Under 4 Print it is
+            Saved in Master as «{nytNavn}», exactly {format}. Under Print it is
             enlarged in Gigapixel and becomes the print file.
           </span>
-          <button onClick={onClose}>Cancel</button>
+          {!inline && <button onClick={onClose}>Cancel</button>}
           <button disabled={gemmer} onClick={gem}>{gemmer ? 'Saving …' : 'Save crop'}</button>
         </div>
       </div>

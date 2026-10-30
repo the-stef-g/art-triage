@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { invoke, thumbUrl } from '../api';
 import { formatBytes, formatDate, fileName } from '../util';
 import WorkPanel from './WorkPanel';
@@ -10,7 +11,7 @@ import { gigapixelMaal } from '../printmaal';
 // lige havde skrevet foerst dukkede op hvis man gik væk og tilbage igen.
 export default function Inspector({
   row, fase = 1, selectedCount, activeKeyword, editors, statusNavne = [], series, act, dataRev, tekstRev = 0, hasKey, shop, onShop, onError,
-  shopNode = null,
+  shopNode = null, cropNode = null, storVisning = false,
 }) {
   const [versions, setVersions] = useState([]);
   const [keywords, setKeywords] = useState([]);
@@ -142,8 +143,8 @@ export default function Inspector({
           forhaandsvisning nok. */}
       {/* I Product staar forhaandsvisningen i hoejre kolonne, ved shoppen. */}
       {!shopNode && (
-      <div className={fase === 1 ? 'stor-preview' : 'stor-preview lille-preview'}>
-        <img src={thumbUrl(row.file_id, row.mtime, fase === 1 ? 2048 : 512, row.rotation)} alt={fileName(row.rel_path)} />
+      <div className={fase === 1 && !storVisning ? 'stor-preview' : 'stor-preview lille-preview'}>
+        <img src={thumbUrl(row.file_id, row.mtime, fase === 1 && !storVisning ? 2048 : 512, row.rotation)} alt={fileName(row.rel_path)} />
       </div>
       )}
       {/* Drejningen hoerer til Sort og Edit. L og R virker stadig overalt. */}
@@ -337,10 +338,18 @@ export default function Inspector({
       )}
 
       {/* En ny beskaering kan ogsaa laves af et vaerk der er i shoppen. Den
-          dukker saa op i 4 Print, til den har sin printfil. */}
-      {(fase === 3 || fase === 6) && (
+          dukker saa op i Print, til den har sin printfil. */}
+      {/* Crop: beskaeringen staar midt i vinduet, for vaerkets master. */}
+      {fase === 3 && cropNode && createPortal(
+        master
+          ? <CropModal key={master.file_id} inline row={master} onClose={() => {}} onDone={onError} onError={onError} />
+          : <p className="tom crop-tom">Select a work to crop its master.</p>,
+        cropNode
+      )}
+
+      {fase === 6 && (
         <>
-          {fase === 6 && <h4>Crops</h4>}
+          <h4>Crops</h4>
           <div className="knapraekke">
             <button
               className="lille"

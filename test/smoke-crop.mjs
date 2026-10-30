@@ -62,13 +62,13 @@ try {
     throw new Error('Originalen staar i fase 3');
   }
 
-  // Beskaer masteren til 1:1.
+  // Beskaer masteren til 1:1. Beskaeringen staar midt i vinduet.
   await page.locator('.tile', { has: page.locator('.tile-navn[title*="/Master/"]') }).click();
-  await page.locator('button', { hasText: 'Crop master …' }).click();
-  await page.waitForSelector('.crop-vindue', { timeout: 10000 });
+  await page.waitForSelector('.crop-midte .crop-inline .crop-vindue', { timeout: 10000 });
   await page.waitForFunction(() => document.querySelector('.crop-flade img')?.naturalWidth > 0, null, { timeout: 10000 });
   await page.locator('.crop-formater button', { hasText: '1:1' }).click();
-  // Genvejene maa ikke ramme billederne bag vinduet.
+  await page.screenshot({ path: join(projectRoot, 'smoke-crop.png') });
+  // Genvejene maa ikke ramme billederne (X kasserer ikke i Crop).
   await page.keyboard.press('x');
   await page.locator('button', { hasText: 'Save crop' }).click();
   await page.waitForSelector('.tile-navn[title$="blaa master 1-1.png"]', { timeout: 20000 });
@@ -91,7 +91,7 @@ try {
 
   // Et klik paa et andet format omdoeber filen, og etiketten foelger med.
   await flise('blaa master 1-1.png').click();
-  await page.locator('button', { hasText: /^2:3$/ }).click();
+  await page.locator('.inspector button', { hasText: /^2:3$/ }).click();
   await page.waitForSelector('.tile-navn[title$="blaa master 2-3.png"]', { timeout: 15000 });
   if (!existsSync(join(lib, 'Approved', 'blaa', 'Master', 'blaa master 2-3.png'))) throw new Error('Filen blev ikke omdoebt');
 
