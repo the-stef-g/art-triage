@@ -819,9 +819,9 @@ export class Catalog extends EventEmitter {
     if (!filter.fase) return rows;
     const fase = Number(filter.fase);
     const ud = this._filtrerFase(rows, fase);
-    // Fase 5: om der er en printfil, og hvor stor den er. Print files
+    // Fase 4: om der er en printfil, og hvor stor den er. Print files
     // skannes ikke, saa det slaas op paa disken.
-    if (fase === 5) {
+    if (fase === 4) {
       for (const r of ud) {
         r.printfil = this._printfilInfo(r.rel_path);
         r.giga = Boolean(this._gigaDele(r.rel_path));
@@ -887,7 +887,7 @@ export class Catalog extends EventEmitter {
   // kan appen selv lave printfilen til, naar den har tjekket forstoerrelsen.
   autoPrintKandidater() {
     if (!this.mappestyring) return [];
-    return this.listVersions({ fase: 5 })
+    return this.listVersions({ fase: 4 })
       .filter((r) => r.giga && (!r.printfil || r.printfil.mtime < r.mtime))
       .map((r) => ({ versionId: r.version_id, rel: r.rel_path, mtime: r.mtime }));
   }
@@ -926,10 +926,12 @@ export class Catalog extends EventEmitter {
   //
   // 1 Sort: det der ikke er godkendt endnu (Import og Candidate).
   // 2 Edit: godkendte vaerker uden en master; originalen og redigeringerne.
-  // 3 Product: vaerker med en master; én flise pr. vaerk.
-  // 4 Crops: vaerker med en master; masteren og beskaeringerne.
-  // 5 Print: beskaeringerne, hver med sin printfil. Et vaerk der kun saelges
-  // i sin egen form, faar en beskaering i det format.
+  // 3 Crops: vaerker med en master; masteren og beskaeringerne.
+  // 4 Print: beskaeringerne og forstoerrelserne, hver med sin printfil. Et
+  // vaerk der kun saelges i sin egen form, faar en beskaering i det format.
+  // 5 Product: vaerker med en master; én flise pr. vaerk. Det sidste tjek
+  // foer shoppen.
+  // 6 Shop: de vaerker der er publiceret i shoppen.
   // Fasen er ikke en status man saetter. Den foelger af mapperne.
 
   _mastersInfo() {
@@ -960,10 +962,10 @@ export class Catalog extends EventEmitter {
     switch (fase) {
       case 1: return rows.filter((r) => !godk(r));
       case 2: return rows.filter((r) => godk(r) && !medMaster.has(r.image_id));
-      case 3:
+      case 5:
       case 6: {
         // Én flise pr. vaerk: masteren uden et format i navnet, ellers den
-        // foerste. Fase 3 er dem der ikke er publiceret endnu, fase 6 dem
+        // foerste. Fase 5 er dem der ikke er publiceret endnu, fase 6 dem
         // der er.
         const valgt = new Map();
         for (const r of rows) {
@@ -975,11 +977,11 @@ export class Catalog extends EventEmitter {
         const behold = new Set([...valgt.values()].map((r) => r.version_id));
         return rows.filter((r) => behold.has(r.version_id));
       }
-      case 4: return rows.filter((r) => godk(r) && iMaster(r) && !shop.has(r.image_id));
+      case 3: return rows.filter((r) => godk(r) && iMaster(r) && !shop.has(r.image_id));
       // Beskaeringerne i Master og forstoerrelserne af dem i Edits. Et
       // publiceret vaerk er kun med, saa laenge et format mangler sin
       // printfil, fx en ny beskaering lavet fra fase 6.
-      case 5: return rows.filter((r) => godk(r)
+      case 4: return rows.filter((r) => godk(r)
         && ((iMaster(r) && r.crop && r.crop !== 'free') || this._gigaDele(r.rel_path))
         && (!shop.has(r.image_id) || !this._printfilInfo(r.rel_path)));
       default: return rows;
@@ -1008,7 +1010,7 @@ export class Catalog extends EventEmitter {
       else vaerker += 1;
     }
     const print = [...medBeskaering].filter((id) => !shop.has(id)).length;
-    return { 1: sort, 2: edit, 3: vaerker, 4: vaerker, 5: print, 6: online };
+    return { 1: sort, 2: edit, 3: vaerker, 4: print, 5: vaerker, 6: online };
   }
 
   // Vaerkets master i Master: helst den uden et format i navnet.
@@ -1780,7 +1782,7 @@ export class Catalog extends EventEmitter {
   // En fil kan vaere den effektive fil for flere versioner. Er bare én af
   // dem godkendt, hoerer filen med; det er billedet der beskrives, og
   // versionerne deler motiv.
-  // Kun masterne: noegleordene hoerer til vaerket i fase 3, og hver
+  // Kun masterne: noegleordene hoerer til vaerket i fase 5, og hver
   // redigering og original undervejs ville koste uden at blive brugt. Et
   // bibliotek uden mappestyring (kun i aeldre tests) har ingen Master-mapper.
   _kunMastre() {

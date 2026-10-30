@@ -1,4 +1,4 @@
-// Fase 5: printfilen til Prodigi. Prodigi vil have RGB, og deres egne
+// Fase 4: printfilen til Prodigi. Prodigi vil have RGB, og deres egne
 // ICC-profiler er kun til proevetryk og maa ikke lægges i filen. Filen
 // laves derfor i sRGB, 8 bit, maerket 300 DPI, i fuld opløsning: Prodigi
 // skalerer selv til den størrelse der bestilles. Masteren roeres ikke.
@@ -71,7 +71,7 @@ export async function lavPrintfil({ kilde, mappe, base, token, forstoerrelser = 
     const nb = k * p;
     const nh = k * q;
     if (nb < valgt.b * 0.99 || nh < valgt.h * 0.99) {
-      throw new Error(`${basename(valgt.fil)} is ${valgt.b} × ${valgt.h} pixels, which is not ${p}:${q}. Crop it again under 4 Crops.`);
+      throw new Error(`${basename(valgt.fil)} is ${valgt.b} × ${valgt.h} pixels, which is not ${p}:${q}. Crop it again under 3 Crops.`);
     }
     udsnit = { left: Math.floor((valgt.b - nb) / 2), top: Math.floor((valgt.h - nh) / 2), width: nb, height: nh };
   }

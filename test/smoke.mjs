@@ -396,7 +396,7 @@ try {
   );
 
   // Fase 2: det godkendte billede. Make master laver en kopi i Master, og
-  // vaerket gaar videre til fase 3 og 4.
+  // vaerket gaar videre til fase 3 og 5.
   await page.keyboard.press('Control+2');
   await page.waitForFunction(
     () => document.querySelector('.fase.aktiv')?.textContent.includes('Edit')
@@ -428,7 +428,7 @@ try {
     null,
     { timeout: 10000 }
   );
-  // Fase 3 har serier og noegleord i sidepanelet. Uden API-noegle skal
+  // Fase 5 har serier og noegleord i sidepanelet. Uden API-noegle skal
   // noegleordspanelet sige hvor noeglen saettes, ikke bare vaere tomt.
   await page.waitForSelector('.kw-koe', { timeout: 10000 });
   const koeTekst = await page.locator('.kw-koe').innerText();

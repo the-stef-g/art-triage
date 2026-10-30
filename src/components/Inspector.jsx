@@ -90,7 +90,7 @@ export default function Inspector({
         <div className="bunke">
           <h4>{selectedCount} selected</h4>
           {fase === 1 && <p className="tom">The rating applies to the active image only.</p>}
-          {(fase === 3 || fase === 6) && activeKeyword && (
+          {(fase === 5 || fase === 6) && activeKeyword && (
             <div className="knapraekke">
               <button
                 className="fjern-fra-noegleord"
@@ -101,7 +101,7 @@ export default function Inspector({
               </button>
             </div>
           )}
-          {(fase === 3 || fase === 6) && (
+          {(fase === 5 || fase === 6) && (
             <div className="knapraekke">
               <select
                 value=""
@@ -203,7 +203,7 @@ export default function Inspector({
           </div>
 
           <h4>Master</h4>
-          <p className="tom">The last step here: make the finished edit the work&apos;s master. The work then moves on to Product.</p>
+          <p className="tom">The last step here: make the finished edit the work&apos;s master. The work then moves on to Crops.</p>
           <div className="knapraekke">
             <button onClick={act.makeMaster} title="Copies the selected file to Master, named after the work">Make master</button>
           </div>
@@ -215,7 +215,7 @@ export default function Inspector({
         </>
       )}
 
-      {(fase === 3 || fase === 6) && (
+      {(fase === 5 || fase === 6) && (
         <>
           <h4>Series</h4>
           <div className="knapraekke">
@@ -283,7 +283,7 @@ export default function Inspector({
         </>
       )}
 
-      {fase === 4 && (
+      {fase === 3 && (
         <>
           <h4>Crops</h4>
           <div className="knapraekke">
@@ -312,8 +312,8 @@ export default function Inspector({
       )}
 
       {/* En ny beskaering kan ogsaa laves af et vaerk der er i shoppen. Den
-          dukker saa op i 5 Print, til den har sin printfil. */}
-      {(fase === 4 || fase === 6) && (
+          dukker saa op i 4 Print, til den har sin printfil. */}
+      {(fase === 3 || fase === 6) && (
         <>
           {fase === 6 && <h4>Crops</h4>}
           <div className="knapraekke">
@@ -342,7 +342,7 @@ export default function Inspector({
         </>
       )}
 
-      {fase === 5 && !row.giga && (
+      {fase === 4 && !row.giga && (
         <>
           <h4>Enlargement</h4>
           <p className="tom">
@@ -370,7 +370,7 @@ export default function Inspector({
         </>
       )}
 
-      {fase === 5 && row.giga && (
+      {fase === 4 && row.giga && (
         <>
           <h4>Print file</h4>
           <p className="tom">

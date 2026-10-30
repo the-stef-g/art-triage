@@ -146,8 +146,8 @@ function Noegleordskoe({ status, act }) {
 
 const FASE_TEKST = {
   2: ['Edit', 'Approved works without a master. Send a copy to an editor, and make the master as the last step.'],
-  4: ['Crops', 'The masters and their crops. Each crop is its own file in Master.'],
-  5: ['Print', 'The crops. Make a print file for Prodigi from each: a PNG in sRGB at full size, in the work\'s Print files folder.'],
+  3: ['Crops', 'The masters and their crops. Each crop is its own file in Master.'],
+  4: ['Print', 'The crops and their enlargements. Each enlargement becomes a print file for Prodigi: a PNG in sRGB at full size, in the work\'s Print files folder.'],
 };
 
 export default function Sidebar({
@@ -182,7 +182,7 @@ export default function Sidebar({
     );
   }
 
-  if (fase !== 1 && fase !== 3 && fase !== 6) {
+  if (fase !== 1 && fase !== 5 && fase !== 6) {
     return (
       <aside className="sidebar">
         <section>
@@ -206,7 +206,7 @@ export default function Sidebar({
       {/* Kandidatlisten stod her som sin egen sektion. Den er taget ud
           igen: Candidates-chippen i vaerktoejslinjen goer det samme, og
           to veje til den samme visning er én for meget. */}
-      {(fase === 3 || fase === 6) && (
+      {(fase === 5 || fase === 6) && (
       <>
       <section>
         <h3>Series</h3>

@@ -413,7 +413,7 @@ export default function App() {
       }));
     },
     // Fase 2: en kopi i vaerkets Edits med programmets endelse, aabnet i programmet.
-    // Fase 5: alle de markerede beskaeringer til Gigapixel paa én gang.
+    // Fase 4: alle de markerede beskaeringer til Gigapixel paa én gang.
     // -giga-filerne blandt dem er allerede forstoerrelser og sendes ikke.
     sendToEditor: async (program) => {
       const f = getFocused();
@@ -439,11 +439,11 @@ export default function App() {
       if (!f) return;
       try {
         const res = await invoke('edit:makeMaster', { versionId: f.version_id });
-        setFejl(`Master saved as ${res.rel}${res.konverteret ? ' (converted to TIFF)' : ''}. The work is now in 3 Product.`);
+        setFejl(`Master saved as ${res.rel}${res.konverteret ? ' (converted to TIFF)' : ''}. The work is now in 3 Crops.`);
         setTimeout(() => setFejl(null), 7000);
       } catch (err) { visFejl(err); }
     },
-    // Fase 5: en printfil til Prodigi for hver markeret -giga-fil, ellers den aktive.
+    // Fase 4: en printfil til Prodigi for hver markeret -giga-fil, ellers den aktive.
     makePrintFiles: async () => {
       const f = getFocused();
       if (!f) return;

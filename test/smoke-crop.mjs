@@ -52,14 +52,14 @@ try {
   await page.waitForSelector('button:has-text("Make master")', { timeout: 10000 });
 
   // En masterfil lægges i Master, og appen finder den. Vaerket forlader
-  // fase 2 og staar i fase 4 (Crops).
+  // fase 2 og staar i fase 3 (Crops).
   await billede(join(lib, 'Approved', 'blaa', 'Master', 'blaa master.png'));
   await page.locator('button', { hasText: 'Scan again' }).click();
   await page.waitForFunction(() => document.querySelectorAll('.tile').length === 0, null, { timeout: 20000 });
   await page.locator('.fase', { hasText: 'Crops' }).click();
   await page.waitForSelector('.tile-navn[title*="/Master/"]', { timeout: 20000 });
   if (await page.locator('.tile-navn[title*="/Original/"]').count() !== 0) {
-    throw new Error('Originalen staar i fase 4');
+    throw new Error('Originalen staar i fase 3');
   }
 
   // Beskaer masteren til 1:1.
@@ -104,7 +104,7 @@ try {
     { timeout: 20000 }
   );
 
-  // Fase 5 (Print) viser beskaeringerne.
+  // Fase 4 (Print) viser beskaeringerne.
   await page.locator('.fase', { hasText: 'Print' }).click();
   await page.waitForFunction(
     () => document.querySelectorAll('.tile').length === 1
@@ -122,13 +122,13 @@ try {
   }
 
   // "Forstoerrelsen" er en kopi i Edits med -giga i navnet. Den kommer med i
-  // fase 5 ved siden af beskaeringen.
+  // fase 4 ved siden af beskaeringen.
   const edits = join(lib, 'Approved', 'blaa', 'Edits');
   mkdirSync(edits, { recursive: true });
   copyFileSync(join(lib, 'Approved', 'blaa', 'Master', 'blaa master 3-2.png'), join(edits, 'blaa master 3-2-giga.png'));
   await page.locator('button', { hasText: 'Scan again' }).click();
   await page.waitForSelector('.tile-navn[title$="blaa master 3-2-giga.png"]', { timeout: 20000 });
-  if (await page.locator('.tile').count() !== 2) throw new Error('Fase 5 viser ikke beskaeringen og -giga-filen');
+  if (await page.locator('.tile').count() !== 2) throw new Error('Fase 4 viser ikke beskaeringen og -giga-filen');
 
   // Filen er kvadratisk (den blev beskaaret 1:1 og saa omdoebt), og en
   // printfil skal vaere praecis i sit format: den afvises.

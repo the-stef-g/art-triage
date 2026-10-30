@@ -133,7 +133,7 @@ export class AppSession {
     return { ...res, skipped: false, reason, varighed: this.lastScanMs };
   }
 
-  // Fase 5: naar Gigapixel har gemt en forstoerrelse, laver appen selv
+  // Fase 4: naar Gigapixel har gemt en forstoerrelse, laver appen selv
   // printfilen. Foerst naar filen har ligget stille et ojeblik, og kun naar
   // den er stoerre end beskaeringen: ellers er det bare kopien, der blev
   // sendt til Gigapixel.
@@ -750,7 +750,7 @@ export class AppSession {
       return { rel: res.path.slice(catalog.root.length + 1), konverteret: res.konverteret };
     });
 
-    // Fase 5: printfiler til Prodigi, én pr. markeret forstoerrelse i Edits.
+    // Fase 4: printfiler til Prodigi, én pr. markeret forstoerrelse i Edits.
     handle('print:make', async ({ versionIds }) => {
       const catalog = this.requireCatalog();
       const ids = Array.isArray(versionIds) ? versionIds : [];
@@ -935,11 +935,11 @@ export class AppSession {
       return res.canceled || !res.filePaths.length ? null : res.filePaths[0];
     });
     handle('shop:status', () => this.shopStatus());
-    // Statussen i shoppen bestemmer om vaerket staar i fase 3 eller 6, saa
+    // Statussen i shoppen bestemmer om vaerket staar i fase 5 eller 6, saa
     // listerne hentes igen bagefter.
-    handle('shop:send', async ({ imageId }) => {
+    handle('shop:send', async ({ imageId, kobl = null }) => {
       this._requireFormat();
-      const res = await this._shopCall((shop) => shop.send(imageId));
+      const res = await this._shopCall((shop) => shop.send(imageId, { kobl }));
       this.broadcast('changed');
       return res;
     });

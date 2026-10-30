@@ -496,10 +496,27 @@ export class ShopSync {
   // Opretter produktet foerste gang og opdaterer det bagefter. Woo-id'et
   // gemmes straks, saa et afbrudt kald aldrig giver en dublet. Er produktet
   // slettet i Woo, oprettes det paa ny.
-  async send(imageId) {
-    const work = this.works.get(imageId);
+  //
+  // Kender appen ikke et produkt til vaerket, men har shoppen ét med samme
+  // navn (fx et der er lavet i haanden), spoerges der foerst: svaret er
+  // { needsConfirm: true, existing: { id, name, status } }, og intet er
+  // sendt. kobl er det produkt-id brugeren har sagt ja til at opdatere.
+  async send(imageId, { kobl = null } = {}) {
+    let work = this.works.get(imageId);
     const mangler = this.problems(work);
     if (mangler.length) throw new ShopError(`Not ready to send: ${mangler.join('; ')}`);
+    if (!work.wooProductId && kobl) {
+      this.works.setWooProductId(imageId, kobl);
+      work = this.works.get(imageId);
+    } else if (!work.wooProductId) {
+      const navn = work.effective.title.trim().toLowerCase();
+      const fundne = await this.client.wc('GET', `/products?search=${encodeURIComponent(work.effective.title)}&per_page=100&status=any`);
+      const samme = (Array.isArray(fundne) ? fundne : []).filter((p) => String(p.name || '').trim().toLowerCase() === navn);
+      if (samme.length) {
+        const p = samme[0];
+        return { needsConfirm: true, existing: { id: p.id, name: p.name, status: p.status }, flere: samme.length };
+      }
+    }
     const media = await this._mediaFor(work);
     await this._videoFor(work, media);
     const categoryId = await this.categoryId(work.category);

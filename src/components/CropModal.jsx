@@ -165,7 +165,7 @@ export default function CropModal({ row, onClose, onDone, onError }) {
         </div>
         <div className="crop-bund">
           <span className="tom">
-            Saved in Master as «{nytNavn}», exactly {format}. Under 5 Print it is
+            Saved in Master as «{nytNavn}», exactly {format}. Under 4 Print it is
             enlarged in Gigapixel and becomes the print file.
           </span>
           <button onClick={onClose}>Cancel</button>

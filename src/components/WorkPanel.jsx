@@ -121,8 +121,27 @@ export default function WorkPanel({ row, versions, tekstRev = 0, hasKey, shop, o
     setBusy(false);
   };
 
-  const sendToShop = () => shopKald('shop:send', (r) =>
-    (r.created ? `Created draft product ${r.productId} in the shop` : `Updated product ${r.productId} in the shop`));
+  // Har shoppen allerede et produkt med samme navn, spoerges der, om det er
+  // det, der skal opdateres. Saa bliver der ikke lavet en dublet.
+  const sendToShop = async (valg = {}) => {
+    setBusy(true);
+    try {
+      const res = await invoke('shop:send', { imageId, ...valg });
+      if (res.needsConfirm) {
+        setBusy(false);
+        const e = res.existing;
+        if (window.confirm(`The shop already has a product called «${e.name}» (product ${e.id}, ${e.status}). Update that product from the app? Its texts and images are replaced by the ones here.\n\nCancel sends nothing.`)) {
+          await sendToShop({ kobl: e.id });
+        }
+        return;
+      }
+      adopt(await invoke('work:get', { imageId }));
+      onShop(res.created ? `Created draft product ${res.productId} in the shop` : `Updated product ${res.productId} in the shop`);
+    } catch (err) {
+      onError(err);
+    }
+    setBusy(false);
+  };
   const publish = () => shopKald('shop:publish', (r) => `Product ${r.productId} is now ${r.status}`);
   // Seriens felter til shoppen. En ny serie faar altid en skabelon i
   // shoppen; en der findes, faar kun de felter der er udfyldt her.
@@ -260,7 +279,7 @@ export default function WorkPanel({ row, versions, tekstRev = 0, hasKey, shop, o
       <div className="knapraekke">
         <button
           disabled={busy || !work.eligible || !shop?.harWoo || !shop?.harWp || shop?.formatOk === false}
-          onClick={sendToShop}
+          onClick={() => sendToShop()}
           title={!work.eligible ? 'The image must be Approved and Finished'
             : (!shop?.harWoo || !shop?.harWp) ? 'Add the WooCommerce key and the WordPress application password under Help'
               : shop?.formatOk === false ? 'The shop\'s product format has changed since the app was made for it. Sending is locked so no product is damaged.' : ''}

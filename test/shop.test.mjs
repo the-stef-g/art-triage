@@ -67,6 +67,10 @@ function attrapShop(opts = {}) {
     if (init.method === 'POST' && sti.startsWith('/wp/v2/product/')) {
       return svar(200, { id: Number(sti.split('/').pop()) });
     }
+    if (init.method === 'GET' && sti.startsWith('/wc/v3/products?search=')) {
+      const q = new URLSearchParams(u.search).get('search').toLowerCase();
+      return svar(200, (opts.produkter || []).filter((p) => p.name.toLowerCase().includes(q)));
+    }
     if (init.method === 'GET' && sti.startsWith('/wc/v3/products?include=')) {
       const ids = new URLSearchParams(u.search).get('include').split(',').map(Number);
       return svar(200, ids.filter((pid) => !opts.slettetProdukter?.includes(pid))
@@ -487,6 +491,22 @@ describe('send til shop', () => {
     expect(await shop.publish(id)).toMatchObject({ productId: 500, status: 'publish' });
     expect(JSON.parse(kald[0].body)).toEqual({ status: 'publish' });
     expect(works.get(id).wooStatus).toBe('publish');
+  });
+
+  it('spoerger foer et produkt med samme navn i shoppen opdateres, og laver ingen dublet', async () => {
+    const { id } = klartVaerk('Desert Canyon 04.png');
+    const { kald, fetchImpl } = attrapShop({ produkter: [{ id: 20, name: 'Desert Canyon 04', status: 'publish' }] });
+    const shop = await sync(fetchImpl);
+    const svar = await shop.send(id);
+    expect(svar).toMatchObject({ needsConfirm: true, existing: { id: 20, name: 'Desert Canyon 04', status: 'publish' } });
+    expect(kald.some((k) => k.method === 'POST' && k.sti === '/wc/v3/products')).toBe(false);
+    expect(works.get(id).wooProductId).toBe(null);
+
+    const res = await shop.send(id, { kobl: 20 });
+    expect(res).toMatchObject({ productId: 20, created: false });
+    expect(works.get(id).wooProductId).toBe(20);
+    expect(kald.some((k) => k.method === 'POST' && k.sti === '/wc/v3/products')).toBe(false);
+    expect(kald.some((k) => k.method === 'PUT' && k.sti === '/wc/v3/products/20')).toBe(true);
   });
 
   it('henter status fra shoppen, og glemmer et produkt der er slettet', async () => {
