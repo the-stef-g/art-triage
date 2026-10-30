@@ -16,7 +16,7 @@ Intet lige nu. Fortrydelsesret og betaling er afgjort 30. oktober 2026: prints h
 Det her ligger i WooCommerce, ikke i appen eller i sitets kode.
 
 - **Testordre i Stripes testtilstand** med kort og MobilePay: betalingen står som Uncaptured og trækkes ved Completed.
-- **Mangler i shopteksterne** (`docs/shop-tekster.md` i sitets repo): Prodigis forsendelsestider, om told er betalt til nogle lande, et skøn over returfragten og en privatlivspolitik.
+- **Mangler i shopteksterne** (`docs/shop-tekster.md` i sitets repo): Prodigis forsendelsestider, returfragten for store canvas og skulpturer, og [TJEK]-punkterne i privatlivspolitikken (cookies, nyhedsbrev, webhost, kundekonti).
 - **Skjul 120 × 120 canvas i US og JP i shoppen.** Varianterne har metafeltet `hide_in_countries`, men WooCommerce læser det ikke selv. Kunden vælger varianten på shop.stefg.art, så det skal gøres der, fx med et lille plugin eller et snippet, der fjerner varianten for de lande.
 
 ## Til sitet (Astro)
