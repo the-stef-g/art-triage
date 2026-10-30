@@ -38,6 +38,11 @@ const RESCAN_DUTY = 10;
 // af databasen. Manuelle ord roeres ikke. Noeglen staar i meta, saa
 // oprydningen kun koerer en gang.
 const AUTOKW_RYDDET = 'autokw_ryddet';
+// Engangsskift pr. bibliotek til soegeord for kunderne (motiv, aarstid,
+// farver, retning) i stedet for katalogord som roof og brick: alle de
+// gamle ord, ogsaa Stefs egne (det har han sagt ja til), og kvitteringerne
+// slettes, saa mastrene faar nye ord.
+const KUNDEORD = 'kundeord_v1';
 // En -giga-fil skal have ligget stille saa laenge, foer appen laver
 // printfilen af den: Gigapixel kan vaere ved at skrive den.
 const AUTO_PRINT_RO_MS = 5000;
@@ -123,6 +128,9 @@ export class AppSession {
       try {
         const antal = this.works.autoSerier();
         if (antal) this.log(`auto series: ${antal} work(s)`);
+        // En serie deler de ord de fleste af dens vaerker har.
+        const ord = katalog.synkSerieOrd();
+        if (ord) this.log(`series keywords: ${ord} added`);
       } catch (err) {
         this.log(`auto series failed: ${String(err?.message || err).slice(0, 200)}`);
       }
@@ -269,6 +277,16 @@ export class AppSession {
     await this.runSync('aabning');
     this.autoTeksterKlar = true;
     this.tjekShopFormatSnart();
+    if (this.catalog.getMeta(KUNDEORD) !== '1') {
+      try {
+        this.catalog.clearAllKeywords();
+        this.catalog.clearKeywordRuns();
+        this.catalog.setMeta(KUNDEORD, '1');
+        this.log('keywords: switched to customer search words; masters get new words');
+      } catch (err) {
+        this.log(`keyword switch failed: ${String(err?.message || err).slice(0, 200)}`);
+      }
+    }
     // Mastere uden noegleord faar dem nu; kun mastere, saa det er til at overse.
     if (this.settings.data.claudeKey && this.catalog.keywordQueueSize() > 0) {
       try {
@@ -831,6 +849,7 @@ export class AppSession {
       const catalog = this.requireCatalog();
       this.undoMgr.beforeSeries(imageIds);
       catalog.assignSeries(imageIds, seriesId ?? null);
+      catalog.synkSerieOrd();
     });
     handle('ser:setShop', ({ seriesId, patch }) => this.requireCatalog().setSeriesShop(seriesId, patch));
     handle('ser:rename', ({ seriesId, name }) => this.requireCatalog().renameSeries(seriesId, name));

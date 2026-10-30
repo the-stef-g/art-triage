@@ -21,6 +21,8 @@ export const SHOP_JPEG_QUALITY = 92;
 // Det produkt ACPT-formatet er hentet fra (Desert Canyon 04). Se
 // docs/reference-product-20.json.
 export const REFERENCE_PRODUCT_ID = 20;
+// Hoejst saa mange soegeord sendes som tags til et produkt.
+export const MAX_TAGS = 12;
 
 // ---------- Noegler ----------
 
@@ -363,7 +365,9 @@ export function mergeAttributes(existing, work) {
 // Produktet som Stef G Art ejer det. Lager, ordrer og printvarianter
 // roeres ikke. Et unikt vaerk er et simpelt produkt med 1 paa lager; alle
 // andre er variable, som produkt 20, og faar deres varianter fra CSV'en.
-export function buildProduct(work, media, { categoryId = null, create = true, existingAttributes = [] } = {}) {
+export function buildProduct(work, media, {
+  categoryId = null, create = true, existingAttributes = [], tagIds = null,
+} = {}) {
   const produkt = {
     name: work.effective.title,
     description: work.description || '',
@@ -375,6 +379,8 @@ export function buildProduct(work, media, { categoryId = null, create = true, ex
     tax_class: work.category === 'Sculptures' ? 'reduced-rate' : '',
   };
   if (categoryId) produkt.categories = [{ id: categoryId }];
+  // Soegeordene som tags. Uden ord roeres tags i shoppen ikke.
+  if (tagIds?.length) produkt.tags = tagIds.map((id) => ({ id }));
   if (work.unique && work.price) produkt.regular_price = work.price;
   if (create) {
     produkt.type = work.unique ? 'simple' : 'variable';
@@ -429,6 +435,31 @@ export class ShopSync {
   // Finder seriens term paa navn, og opretter den med sine tre felter hvis
   // den ikke findes. En term der findes, faar kun de felter Stef har
   // udfyldt i appen; tomme felter staar uroert i Woo.
+  // Vaerkets soegeord, som de staar paa hovedbilledet (masteren): Stefs
+  // egne foerst.
+  ordFor(imageId) {
+    const fil = this.works.imageFile(imageId);
+    if (!fil) return [];
+    return this.catalog.keywordsForFile(fil.id).map((k) => k.word).slice(0, MAX_TAGS);
+  }
+
+  // Tag-id'erne i shoppen for ordene. Et tag der ikke findes, oprettes.
+  async tagIds(ord) {
+    this.tagCache ??= new Map();
+    const ids = [];
+    for (const ordet of ord) {
+      const noegle = ordet.toLowerCase();
+      if (!this.tagCache.has(noegle)) {
+        const svar = await this.client.wc('GET', `/products/tags?search=${encodeURIComponent(ordet)}&per_page=100`);
+        const fund = (Array.isArray(svar) ? svar : []).find((t) => afkod(t.name).toLowerCase() === noegle);
+        const id = fund ? fund.id : (await this.client.wc('POST', '/products/tags', { name: ordet })).id;
+        this.tagCache.set(noegle, id);
+      }
+      ids.push(this.tagCache.get(noegle));
+    }
+    return ids;
+  }
+
   async seriesTermId(serie) {
     const svar = await this.client.wpApi('GET', `/series?search=${encodeURIComponent(serie.name)}&per_page=100`);
     const fund = (svar || []).find((t) => afkod(t.name).toLowerCase() === serie.name.toLowerCase());
@@ -525,8 +556,9 @@ export class ShopSync {
     const eksisterende = work.wooProductId ? await this._existing(work.wooProductId) : null;
     if (work.wooProductId && !eksisterende) this.works.setWooProductId(imageId, null);
     const create = !eksisterende;
+    const tagIds = await this.tagIds(this.ordFor(imageId));
     const body = buildProduct(work, media, {
-      categoryId, create, existingAttributes: eksisterende?.attributes || [],
+      categoryId, create, existingAttributes: eksisterende?.attributes || [], tagIds,
     });
     const produkt = create
       ? await this.client.wc('POST', '/products', body)

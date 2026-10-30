@@ -1898,10 +1898,51 @@ export class Catalog extends EventEmitter {
   // Rydder alt appen selv har gaettet, og lader det Stef har skrevet ind
   // staa. Bruges naar de automatiske noegleord tages ud af drift, saa
   // chips og soegning ikke bliver ved med at vise gamle gaet.
+  // Alle ord, ogsaa Stefs egne. Bruges kun ved skiftet til soegeord for
+  // kunderne, som Stef har sagt ja til.
+  clearAllKeywords() {
+    const antal = this.db.run('DELETE FROM keywords').changes;
+    if (antal) this.emit('changed');
+    return antal;
+  }
+
   clearAutoKeywords() {
     const antal = this.db.run('DELETE FROM keywords WHERE manual=0').changes;
     if (antal) this.emit('changed');
     return antal;
+  }
+
+  // Vaerkerne i en serie skal kunne findes paa de samme ord. Et ord som
+  // mindst halvdelen af seriens vaerker har (og mindst to), faar resten af
+  // serien ogsaa, som et automatisk ord paa vaerkets master. Hvert vaerk
+  // beholder sine egne ord. Returnerer antallet af ord der blev lagt paa.
+  synkSerieOrd() {
+    let lagtPaa = 0;
+    const serier = this.db.all(
+      'SELECT series_id AS id FROM images WHERE series_id IS NOT NULL GROUP BY series_id HAVING COUNT(*) > 1'
+    );
+    for (const { id } of serier) {
+      const mastre = this.db.all('SELECT id FROM images WHERE series_id=?', id)
+        .map((i) => this.masterFil(i.id))
+        .filter(Boolean);
+      if (mastre.length < 2) continue;
+      const ordPr = mastre.map((m) => new Set(this.keywordsForFile(m.id).map((k) => k.word)));
+      const antal = new Map();
+      for (const ord of ordPr) for (const w of ord) antal.set(w, (antal.get(w) || 0) + 1);
+      const faelles = [...antal].filter(([, n]) => n >= 2 && n * 2 >= mastre.length).map(([w]) => w);
+      mastre.forEach((m, i) => {
+        for (const w of faelles) {
+          if (ordPr[i].has(w)) continue;
+          this.db.run(
+            'INSERT INTO keywords(file_id, word, score, manual) VALUES(?,?,500,0) ON CONFLICT(file_id, word) DO NOTHING',
+            m.id, w
+          );
+          lagtPaa += 1;
+        }
+      });
+    }
+    if (lagtPaa) this.emit('changed');
+    return lagtPaa;
   }
 
   keywordsForFile(fileId) {

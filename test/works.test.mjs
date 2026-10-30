@@ -343,3 +343,29 @@ describe('vaerkets billede', () => {
     expect(works.imageFile(orig.image_id).rel_path).toBe('Approved/Mur/Master/Mur.tif');
   });
 });
+
+describe('serien deler soegeord', () => {
+  it('et ord de fleste af seriens vaerker har, faar resten ogsaa', () => {
+    mkdirSync(join(root, 'Import', 'Ahl'), { recursive: true });
+    for (const n of ['1', '2', '3']) writeFileSync(join(root, 'Import', 'Ahl', `Sand ${n}.cr2`), 'raw');
+    catalog.brugMappestruktur();
+    catalog.sync();
+    const orig = catalog.listVersions({}).filter((r) => r.rel_path.startsWith('Import/'));
+    catalog.setRating(orig.map((r) => r.version_id), 'godkendt');
+    for (const n of ['1', '2', '3']) skriv(`Approved/Sand ${n}/Master/Sand ${n}.tif`, `m${n}`);
+    catalog.sync();
+    const serie = catalog.createSeries('Sand');
+    const ids = orig.map((r) => r.image_id);
+    catalog.assignSeries(ids, serie.id ?? serie);
+    const m = ids.map((id) => catalog.masterFil(id));
+    catalog.saveKeywords(m[0].id, [{ word: 'desert', score: 900 }, { word: 'yellow', score: 899 }]);
+    catalog.saveKeywords(m[1].id, [{ word: 'desert', score: 900 }, { word: 'camel', score: 899 }]);
+    catalog.saveKeywords(m[2].id, [{ word: 'dune', score: 900 }]);
+    catalog.synkSerieOrd();
+    const ord = (i) => catalog.keywordsForFile(m[i].id).map((k) => k.word).sort();
+    // desert har to af tre; camel og yellow kun én, og bliver hvor de er.
+    expect(ord(2)).toEqual(['desert', 'dune']);
+    expect(ord(0)).toEqual(['desert', 'yellow']);
+    expect(ord(1)).toEqual(['camel', 'desert']);
+  });
+});

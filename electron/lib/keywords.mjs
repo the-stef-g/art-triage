@@ -31,43 +31,61 @@ export function modelInfo(id) {
 // forvejen og et RAW-billede paa et eksternt drev ikke skal renderes igen.
 export const THUMB_SIZE = 512;
 
-// Den faste instruktion caches, saa den kun betales fuldt paa foerste
-// billede. Derfor maa den ikke indeholde noget der skifter fra kald til
-// kald: en dato eller et filnavn her ville aflyse cachen hver gang.
-//
-// Instruktionen er skaerpet efter foerste runde paa Stefs billeder. En
-// haerget murvaeg gav weathered wood, peeling paint, brown wood, rust
-// stains, decay, patina, aged texture, distressed surface, worn finish og
-// horizontal layers: flere af dem forkerte, resten det samme ord sagt paa
-// fem maader, og hverken wall eller brick var med. Derfor: faa ord, kun
-// enkeltord, motivet og materialet foerst, farve altid med, og ingen
-// stemning.
+// Ordene er til kunderne i shoppen, ikke til et katalog: det folk skriver
+// i soegefeltet naar de leder efter et billede til vaeggen. Ingen soeger
+// paa "roof" eller "chimney"; de soeger paa beach, winter, blue. Derfor:
+// det brede motiv, aarstiden, farverne fra en fast liste. Retningen
+// (horizontal, vertical, square) laegger appen selv paa, for den kan
+// maales og skal ikke gaettes.
+export const FARVER = [
+  'red', 'orange', 'yellow', 'green', 'blue', 'turquoise', 'purple', 'pink',
+  'brown', 'beige', 'grey', 'black', 'white', 'gold', 'silver',
+];
+
 export const SYSTEM_PROMPT = [
-  'You write search keywords for an artist\'s own photographs so they can be found again later.',
-  'These are working keywords for a catalogue, not a description of the picture.',
+  'You write search keywords for artworks in an online art shop. Customers type these words',
+  'in the shop\'s search box when they look for a picture for their wall, so every word must be',
+  'one a customer would actually search for.',
   '',
-  'Give 5 to 8 keywords, in this order of priority:',
-  '1. What the thing IS. The plainest noun for the main subject: wall, door, tree, hand, boat.',
-  '2. What it is MADE OF, if you can see it beyond doubt: brick, concrete, wood, metal, glass, paper.',
-  '3. The DOMINANT COLOURS. Always give at least one, at most two.',
-  '4. The setting or a second clear object, only if it really is there.',
+  'Give 4 to 8 keywords, in this order:',
+  '1. The SUBJECT in the broad, everyday words customers search for: landscape, seascape, beach,',
+  '   sea, coast, lake, river, forest, tree, flower, garden, field, mountain, desert, sky,',
+  '   cloud, sunset, sunrise, night, snow, city, street, town, village, house, architecture,',
+  '   church, bridge, harbour, boat, lighthouse, animal, bird, horse, people, portrait,',
+  '   abstract, pattern, texture, and the like. One to three words.',
+  '   Never a detail or a part of the subject: not roof, chimney, window, brick, wall, door,',
+  '   tile or branch, unless it really is the whole subject of the picture.',
+  '2. The SEASON, only when it is clearly visible: spring, summer, autumn or winter.',
+  '3. The DOMINANT COLOURS: one to three, chosen only from this list: ' + FARVER.join(', ') + '.',
   '',
   'Hard rules:',
-  '- Single words only. Never two words. "blue paint" is wrong; give "blue" and "paint".',
-  '  "brick wall" is wrong; give "brick" and "wall". Single words can be reused across',
-  '  thousands of images; phrases cannot, and the catalogue fills up with near-duplicates.',
-  '- Lowercase. Nouns in the singular, except where the plural is the normal word (bricks, leaves).',
-  '- No two words that mean the same thing. Pick one and drop the rest. decay, patina,',
-  '  weathered, aged, distressed and worn are all the same word for this purpose.',
-  '- No mood, no atmosphere, no light quality, no composition, no aesthetics. Leave out',
-  '  dramatic, moody, stormy, serene, textured, minimal, layered, abstract and their kind.',
-  '  Nobody searches for those.',
-  '- Say nothing you are not sure of. A wrong material is worse than a missing one. If you',
-  '  cannot tell wood from stone, leave the material out and keep the subject and colour.',
-  '- Never guess a place, a person, a date or a technique.',
-  '',
-  'Fewer, right words beat more, nearly-right ones. Six good keywords is a good answer.',
+  '- Single words only, lowercase, British spelling (colour, grey, harbour).',
+  '- No two words that mean the same thing.',
+  '- Never horizontal, vertical, square, landscape format or portrait format: the shop adds',
+  '  the orientation itself.',
+  '- Never guess a place name, a person, a date or a technique.',
+  '- Say nothing you are not sure of. A wrong word is worse than a missing one.',
 ].join('\n');
+
+async function maalRetning(fil) {
+  try {
+    const sharp = (await import('sharp')).default;
+    const m = await sharp(fil).metadata();
+    const [b, h] = m.orientation >= 5 ? [m.height, m.width] : [m.width, m.height];
+    return retning(b, h);
+  } catch {
+    return null;
+  }
+}
+
+// Retningen maales paa billedet: en flise der er 5 % bredere end hoej er
+// horizontal, og omvendt; ellers square.
+export function retning(bredde, hoejde) {
+  if (!bredde || !hoejde) return null;
+  if (bredde > hoejde * 1.05) return 'horizontal';
+  if (hoejde > bredde * 1.05) return 'vertical';
+  return 'square';
+}
 
 // Katalogets egne ord sendes med, saa den samme ting faar det samme ord
 // hver gang. Uden det bliver det wall paa ét billede og walls paa det
@@ -141,9 +159,11 @@ export const MAX_KEYWORDS = 8;
 
 // Ord der ikke er vaerd at soege paa, og som kun dukker op fordi et
 // flerordssvar blev delt op.
+// Retningsordene laegger appen selv paa, saa de tages ud af svaret.
 const STOPORD = new Set([
   'a', 'an', 'and', 'of', 'the', 'with', 'in', 'on', 'at', 'to', 'or', 'is',
   'very', 'some', 'this', 'that', 'it', 'its',
+  'horizontal', 'vertical', 'square',
 ]);
 
 // Instruktionen beder om enkeltord, men beder er ikke det samme som
@@ -339,8 +359,15 @@ export class KeywordRunner extends EventEmitter {
       this.setProgress({ phase: 'fejl', fejl: err?.message || 'The connection to Claude failed' });
       return false;
     }
-    if (res.entries.length) this.catalog.saveKeywords(file.id, res.entries);
-    this.catalog.markKeywordRun(file.id, this.service.model, res.entries.length);
+    // Retningen maales paa forhaandsvisningen, som allerede er drejet som
+    // billedet vises.
+    const entries = [...res.entries];
+    const r = await maalRetning(thumbPath);
+    if (r) entries.push({ word: r, score: 100 });
+    if (entries.length) this.catalog.saveKeywords(file.id, entries);
+    this.catalog.markKeywordRun(file.id, this.service.model, entries.length);
+    // En serie deler de ord de fleste af dens vaerker har.
+    this.catalog.synkSerieOrd?.();
     this.setProgress({ cost: this.progress.cost + res.cost });
     return true;
   }

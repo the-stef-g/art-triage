@@ -67,6 +67,13 @@ function attrapShop(opts = {}) {
     if (init.method === 'POST' && sti.startsWith('/wp/v2/product/')) {
       return svar(200, { id: Number(sti.split('/').pop()) });
     }
+    if (init.method === 'GET' && sti.startsWith('/wc/v3/products/tags?')) {
+      const q = new URLSearchParams(u.search).get('search').toLowerCase();
+      return svar(200, (opts.tags || []).filter((t) => t.name.toLowerCase().includes(q)));
+    }
+    if (init.method === 'POST' && sti === '/wc/v3/products/tags') {
+      return svar(201, { id: 700 + kald.filter((k) => k.method === 'POST' && k.sti === '/wc/v3/products/tags').length, name: JSON.parse(init.body).name });
+    }
     if (init.method === 'GET' && sti.startsWith('/wc/v3/products?search=')) {
       const q = new URLSearchParams(u.search).get('search').toLowerCase();
       return svar(200, (opts.produkter || []).filter((p) => p.name.toLowerCase().includes(q)));
@@ -507,6 +514,26 @@ describe('send til shop', () => {
     expect(works.get(id).wooProductId).toBe(20);
     expect(kald.some((k) => k.method === 'POST' && k.sti === '/wc/v3/products')).toBe(false);
     expect(kald.some((k) => k.method === 'PUT' && k.sti === '/wc/v3/products/20')).toBe(true);
+  });
+
+  it('sender soegeordene som tags, og genbruger tags der findes', async () => {
+    const { id } = klartVaerk('a.png');
+    const fil = works.imageFile(id);
+    catalog.saveKeywords(fil.id, [{ word: 'beach', score: 900 }, { word: 'blue', score: 899 }]);
+    const { kald, fetchImpl } = attrapShop({ tags: [{ id: 42, name: 'Blue' }] });
+    await (await sync(fetchImpl)).send(id);
+    const post = kald.find((k) => k.method === 'POST' && k.sti === '/wc/v3/products');
+    expect(JSON.parse(post.body).tags).toEqual([{ id: 701 }, { id: 42 }]);
+    const nye = kald.filter((k) => k.method === 'POST' && k.sti === '/wc/v3/products/tags');
+    expect(nye.map((k) => JSON.parse(k.body).name)).toEqual(['beach']);
+  });
+
+  it('roerer ikke tags i shoppen, naar vaerket ingen soegeord har', async () => {
+    const { id } = klartVaerk('a.png');
+    const { kald, fetchImpl } = attrapShop();
+    await (await sync(fetchImpl)).send(id);
+    const post = kald.find((k) => k.method === 'POST' && k.sti === '/wc/v3/products');
+    expect(JSON.parse(post.body).tags).toBeUndefined();
   });
 
   it('henter status fra shoppen, og glemmer et produkt der er slettet', async () => {

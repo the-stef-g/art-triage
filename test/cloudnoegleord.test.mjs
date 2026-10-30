@@ -13,7 +13,7 @@ import { openDatabase } from '../electron/lib/db.mjs';
 import { Catalog } from '../electron/lib/catalog.mjs';
 import {
   buildRequest, parseKeywords, costOf, mediaTypeFor, KeywordRunner, vocabularyBlock,
-  SYSTEM_PROMPT, KEYWORD_MODELS, DEFAULT_KEYWORD_MODEL, MAX_KEYWORDS,
+  SYSTEM_PROMPT, KEYWORD_MODELS, DEFAULT_KEYWORD_MODEL, MAX_KEYWORDS, retning,
 } from '../electron/lib/keywords.mjs';
 
 let root;
@@ -82,6 +82,15 @@ afterEach(() => {
   try { db.close(); } catch { /* allerede lukket */ }
   rmSync(root, { recursive: true, force: true });
 });
+
+
+// Venter til koeren er faerdig, i stedet for en fast pause: sharp (til
+// retningen) indlaeses foerste gang undervejs og tager sin tid.
+async function faerdig(runner) {
+  for (let i = 0; i < 300 && runner.running; i += 1) {
+    await new Promise((r) => setTimeout(r, 10));
+  }
+}
 
 describe('koeen rummer kun godkendte', () => {
   it('tager kun det godkendte billede med', () => {
@@ -262,7 +271,7 @@ describe('koeren', () => {
     const service = attrap();
     const runner = new KeywordRunner({ catalog, thumbs, service });
     runner.start();
-    await new Promise((r) => setTimeout(r, 30));
+    await faerdig(runner);
     expect(service.kald).toHaveLength(1);
     expect(runner.progress.phase).toBe('faerdig');
   });
@@ -275,7 +284,7 @@ describe('koeren', () => {
     const service = attrap();
     const runner = new KeywordRunner({ catalog, thumbs, service });
     runner.start();
-    await new Promise((r) => setTimeout(r, 30));
+    await faerdig(runner);
     expect(service.vocabulary).toContain('brick');
   });
 
@@ -283,7 +292,7 @@ describe('koeren', () => {
     const service = attrap({ ord: ['flower', 'meadow'] });
     const runner = new KeywordRunner({ catalog, thumbs, service });
     runner.start();
-    await new Promise((r) => setTimeout(r, 30));
+    await faerdig(runner);
     const fil = versionFor('godkendt.png');
     const ord = catalog.keywordsForFile(fil.file_id);
     expect(ord.map((k) => k.word)).toEqual(['flower', 'meadow']);
@@ -295,7 +304,7 @@ describe('koeren', () => {
     catalog.addKeyword(fil.file_id, 'mit eget ord');
     const runner = new KeywordRunner({ catalog, thumbs, service: attrap({ ord: ['meadow'] }) });
     runner.start();
-    await new Promise((r) => setTimeout(r, 30));
+    await faerdig(runner);
     const ord = catalog.keywordsForFile(fil.file_id);
     expect(ord.find((k) => k.word === 'mit eget ord').manual).toBe(1);
     expect(ord.map((k) => k.word)).toContain('meadow');
@@ -305,9 +314,9 @@ describe('koeren', () => {
     const service = attrap();
     const runner = new KeywordRunner({ catalog, thumbs, service });
     runner.start();
-    await new Promise((r) => setTimeout(r, 30));
+    await faerdig(runner);
     runner.start();
-    await new Promise((r) => setTimeout(r, 30));
+    await faerdig(runner);
     expect(service.kald).toHaveLength(1);
   });
 
@@ -315,7 +324,7 @@ describe('koeren', () => {
     const service = attrap({ kaster: Object.assign(new Error('nej'), { status: 401 }) });
     const runner = new KeywordRunner({ catalog, thumbs, service });
     runner.start();
-    await new Promise((r) => setTimeout(r, 30));
+    await faerdig(runner);
     expect(runner.progress.phase).toBe('fejl');
     expect(runner.progress.fejl).toMatch(/API key was rejected/);
     // Ingen kvittering: billedet skal med naeste gang der koeres.
@@ -328,7 +337,7 @@ describe('koeren', () => {
     const ingenThumb = { async ensure() { return null; } };
     const runner = new KeywordRunner({ catalog, thumbs: ingenThumb, service });
     runner.start();
-    await new Promise((r) => setTimeout(r, 30));
+    await faerdig(runner);
     expect(service.kald).toHaveLength(0);
     expect(catalog.keywordQueueSize()).toBe(0);
   });
@@ -343,5 +352,38 @@ describe('koeren', () => {
     await new Promise((r) => setTimeout(r, 60));
     expect(runner.progress.phase).toBe('stoppet');
     expect(service.kald.length).toBeLessThan(3);
+  });
+});
+
+describe('soegeord til kunderne', () => {
+  it('retningen maales: horizontal, vertical eller square', () => {
+    expect(retning(300, 200)).toBe('horizontal');
+    expect(retning(200, 300)).toBe('vertical');
+    expect(retning(200, 205)).toBe('square');
+    expect(retning(0, 10)).toBe(null);
+  });
+
+  it('beder om motiv, aarstid og farver, ikke detaljer, og aldrig retningen', () => {
+    expect(SYSTEM_PROMPT).toMatch(/customer/);
+    expect(SYSTEM_PROMPT).toMatch(/spring, summer, autumn or winter/);
+    expect(SYSTEM_PROMPT).toMatch(/not roof, chimney/);
+    expect(SYSTEM_PROMPT).toMatch(/Never horizontal, vertical, square/);
+  });
+
+  it('tager retningsord ud af svaret; dem laegger appen selv paa', () => {
+    const svar = { content: [{ type: 'text', text: JSON.stringify({ keywords: ['beach', 'vertical', 'blue'] }) }] };
+    expect(parseKeywords(svar).map((k) => k.word)).toEqual(['beach', 'blue']);
+  });
+
+  it('koeren laegger den maalte retning paa ordene', async () => {
+    const sharp = (await import('sharp')).default;
+    const thumb = join(root, 'thumb.png');
+    await sharp({ create: { width: 60, height: 40, channels: 3, background: '#00f' } }).png().toFile(thumb);
+    const service = attrap({ ord: ['beach'] });
+    const runner = new KeywordRunner({ catalog, thumbs: { async ensure() { return thumb; } }, service });
+    runner.start();
+    await faerdig(runner);
+    const fil = versionFor('godkendt.png');
+    expect(catalog.keywordsForFile(fil.file_id).map((k) => k.word)).toEqual(['beach', 'horizontal']);
   });
 });
