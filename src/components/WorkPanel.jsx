@@ -367,6 +367,14 @@ export default function WorkPanel({ row, versions, tekstRev = 0, hasKey, shop, o
           <button disabled={busy} onClick={remove} title="Take the product off the site. It becomes a draft again.">Remove from shop</button>
         )}
       </div>
+      <div className="knapraekke">
+        <button
+          onClick={() => invoke('img:openWorkFolder', { versionId: row.version_id }).catch(onError)}
+          title="Open the work's folder with Original, Edits, Master and Print files"
+        >
+          Show in Finder
+        </button>
+      </div>
       {shop?.formatOk === false && (
         <ul className="vaerk-advarsler">
           {shop.formatProblems.slice(0, 4).map((p) => <li key={p}>{p}</li>)}

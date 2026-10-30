@@ -663,6 +663,7 @@ button.stor {
 .crop-vinkel-tal { width: 64px; }
 .crop-indenfor { display: inline-flex; align-items: center; gap: 6px; margin-left: 8px; }
 .crop-bund { display: flex; align-items: center; justify-content: flex-end; gap: 10px; }
+.crop-bund button { white-space: nowrap; flex: none; }
 .crop-bund .tom { margin-right: auto; }
 
 /* Fase 4: listen over beskaeringerne, én linje hver. */
@@ -729,7 +730,9 @@ button.stor {
 .hoved.beskaer > .inspector { grid-column: 3; grid-row: 1; width: auto; min-width: 0; }
 .crop-inline { flex: 1; min-width: 0; display: flex; padding: 16px; }
 .crop-inline .crop-vindue { flex: 1; min-width: 0; max-width: none; max-height: none; box-shadow: none; background: transparent; }
-.crop-inline .crop-flade img { max-width: 100%; max-height: calc(100vh - 230px); }
+.crop-inline .crop-flade img { max-width: 100%; }
+.crop-inline .crop-vindue { min-height: 0; }
+.crop-inline .crop-scene { min-height: 0; overflow: hidden; }
 .crop-tom { margin: auto; }
 
 /* Print: listen faar hele bredden; forklaringen staar over den. */
@@ -738,3 +741,9 @@ button.stor {
 /* Om shoppen har det, der staar i appen. */
 .shop-status { font-size: 12px; margin: 4px 0; color: var(--godkendt); }
 .shop-status.aendret { color: var(--kandidat); }
+
+/* Nettet i beskaeringsrammen, mens den traekkes. */
+.crop-net { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.crop-net line { vector-effect: non-scaling-stroke; }
+.crop-net .fin line { stroke: rgba(255, 255, 255, 0.22); stroke-width: 1; stroke-dasharray: 3 3; }
+.crop-net .tredjedel line { stroke: rgba(255, 255, 255, 0.55); stroke-width: 1; }

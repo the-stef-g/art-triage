@@ -76,6 +76,13 @@ export default function CropModal({ row, onClose, onDone, onError, inline = fals
   const [vinkel, setVinkel] = useState(0);
   const [indenfor, setIndenfor] = useState(true);
   const fladeRef = useRef(null);
+  const sceneRef = useRef(null);
+  // Pladsen billedet har, og billedfeltets stoerrelse paa skaermen. Billedet
+  // tilpasses pladsen, saa det aldrig gaar ind over knapperne under det.
+  const [plads, setPlads] = useState(null);
+  const [felt, setFelt] = useState({ w: 0, h: 0 });
+  // Nettet vises, mens rammen traekkes, flyttes eller billedet drejes.
+  const [traekker, setTraekker] = useState(false);
   const trak = useRef(null);
   const forhold = FORMATER.find(([f]) => f === format)[1];
   // Samme navn som crop.mjs giver filen: "Mur 2 3-2.tif".
@@ -84,6 +91,31 @@ export default function CropModal({ row, onClose, onDone, onError, inline = fals
   const nytNavn = punkt > 0
     ? `${kildeNavn.slice(0, punkt)} ${format.replace(':', '-')}${kildeNavn.slice(punkt)}`
     : `${kildeNavn} ${format.replace(':', '-')}`;
+
+  useEffect(() => {
+    const maal = () => {
+      const sc = sceneRef.current;
+      if (sc) setPlads({ w: Math.max(100, sc.clientWidth - 48), h: Math.max(100, sc.clientHeight - 48) });
+      const fl = fladeRef.current;
+      if (fl) setFelt({ w: fl.clientWidth, h: fl.clientHeight });
+    };
+    maal();
+    const ro = new ResizeObserver(maal);
+    if (sceneRef.current) ro.observe(sceneRef.current);
+    if (fladeRef.current) ro.observe(fladeRef.current);
+    return () => ro.disconnect();
+  }, []);
+
+  // Slipper man musen uden for vinduet, stopper traekket alligevel.
+  useEffect(() => {
+    const stop = () => { trak.current = null; setTraekker(false); };
+    window.addEventListener('pointerup', stop);
+    window.addEventListener('blur', stop);
+    return () => {
+      window.removeEventListener('pointerup', stop);
+      window.removeEventListener('blur', stop);
+    };
+  }, []);
 
   // Escape lukker, og ingen anden genvej maa ramme billederne bag vinduet.
   useEffect(() => {
@@ -134,6 +166,7 @@ export default function CropModal({ row, onClose, onDone, onError, inline = fals
     e.preventDefault();
     e.stopPropagation();
     e.currentTarget.setPointerCapture?.(e.pointerId);
+    setTraekker(true);
     const p = pos(e);
     if (art === 'flyt') {
       trak.current = { art, dx: p.x - rect.x, dy: p.y - rect.y };
@@ -157,11 +190,17 @@ export default function CropModal({ row, onClose, onDone, onError, inline = fals
     const cx = b.left + b.width / 2;
     const cy = b.top + b.height / 2;
     trak.current = { art: 'drej', cx, cy, a0: Math.atan2(e.clientY - cy, e.clientX - cx), v0: vinkel };
+    setTraekker(true);
   };
 
   const flyt = (e) => {
     const t = trak.current;
     if (!t) return;
+    // Knappen er sluppet, selv om slip-haendelsen ikke naaede frem.
+    if (e.buttons === 0) {
+      slip();
+      return;
+    }
     if (t.art === 'drej') {
       const a = Math.atan2(e.clientY - t.cy, e.clientX - t.cx);
       let d = ((a - t.a0) * 180) / Math.PI;
@@ -196,7 +235,7 @@ export default function CropModal({ row, onClose, onDone, onError, inline = fals
     setRect(indenfor ? krymp(ny, vinkel, A, t.ax, t.ay) : ny);
   };
 
-  const slip = () => { trak.current = null; };
+  const slip = () => { trak.current = null; setTraekker(false); };
 
   const gem = async () => {
     setGemmer(true);
@@ -264,6 +303,7 @@ export default function CropModal({ row, onClose, onDone, onError, inline = fals
             aendrer stoerrelsen. */}
         <div
           className="crop-scene"
+          ref={sceneRef}
           onPointerDown={startDrej}
           onPointerMove={flyt}
           onPointerUp={slip}
@@ -278,7 +318,10 @@ export default function CropModal({ row, onClose, onDone, onError, inline = fals
                 src={thumbUrl(row.file_id, row.mtime, 2048, row.rotation)}
                 alt=""
                 draggable={false}
-                style={vinkel ? { transform: `rotate(${vinkel}deg)` } : undefined}
+                style={{
+                  ...(vinkel ? { transform: `rotate(${vinkel}deg)` } : {}),
+                  ...(inline && plads ? { maxWidth: plads.w, maxHeight: plads.h } : {}),
+                }}
                 onLoad={(e) => {
                   const nyA = e.currentTarget.naturalWidth / e.currentTarget.naturalHeight;
                   const f = naermeste(nyA);
@@ -294,7 +337,9 @@ export default function CropModal({ row, onClose, onDone, onError, inline = fals
                   width: `${rect.w * 100}%`, height: `${rect.h * 100}%`,
                 }}
                 onPointerDown={(e) => start(e, 'flyt')}
-              />
+              >
+                {traekker && <Net format={format} bredde={rect.w * felt.w} />}
+              </div>
             </div>
             <div className="crop-greb-lag">
               <div
@@ -321,5 +366,30 @@ export default function CropModal({ row, onClose, onDone, onError, inline = fals
         </div>
       </div>
     </div>
+  );
+}
+
+// Nettet i rammen: tredjedelene (afdaempet) og et fint, stiplet net med
+// cirka en centimeter mellem stregerne, som i Photoshop og Lightroom. Alle
+// tern er lige store og hele: i formatet p:q er der p·k gange q·k tern.
+const CM = 38;
+function Net({ format, bredde }) {
+  const [p, q] = format.split(':').map(Number);
+  const k = Math.max(1, Math.round(bredde / (p * CM)));
+  const n = p * k;
+  const m = q * k;
+  const fine = [];
+  for (let i = 1; i < n; i += 1) fine.push(<line key={`v${i}`} x1={i} y1={0} x2={i} y2={m} />);
+  for (let j = 1; j < m; j += 1) fine.push(<line key={`h${j}`} x1={0} y1={j} x2={n} y2={j} />);
+  return (
+    <svg className="crop-net" viewBox={`0 0 ${n} ${m}`} preserveAspectRatio="none" aria-hidden="true">
+      <g className="fin">{fine}</g>
+      <g className="tredjedel">
+        <line x1={n / 3} y1={0} x2={n / 3} y2={m} />
+        <line x1={(2 * n) / 3} y1={0} x2={(2 * n) / 3} y2={m} />
+        <line x1={0} y1={m / 3} x2={n} y2={m / 3} />
+        <line x1={0} y1={(2 * m) / 3} x2={n} y2={(2 * m) / 3} />
+      </g>
+    </svg>
   );
 }

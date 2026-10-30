@@ -81,6 +81,17 @@ try {
   const fri = Number(await page.locator('.crop-vinkel-tal').inputValue());
   if (!(Math.abs(fri) > 1)) throw new Error(`Traek uden for rammen drejede ikke billedet (${fri}°)`);
   await page.fill('.crop-vinkel-tal', '0');
+  // Mens rammen traekkes, vises nettet; naar musen slippes, forsvinder det.
+  const greb = await page.locator('.crop-greb.se').boundingBox();
+  await page.mouse.move(greb.x + 6, greb.y + 6);
+  await page.mouse.down();
+  await page.mouse.move(greb.x - 20, greb.y - 20, { steps: 4 });
+  await page.waitForSelector('.crop-net', { timeout: 5000 });
+  await page.screenshot({ path: join(projectRoot, 'smoke-crop-net.png') });
+  await page.mouse.up();
+  await page.waitForSelector('.crop-net', { state: 'detached', timeout: 5000 });
+  // Et klik paa formatet giver den stoerste ramme igen.
+  await page.locator('.crop-formater button', { hasText: '1:1' }).click();
   const hoejdeFoer = await page.locator('.crop-ramme').evaluate((el) => el.getBoundingClientRect().height);
   await page.fill('.crop-vinkel-tal', '5');
   await page.waitForFunction(

@@ -434,8 +434,9 @@ export default function Inspector({
         </>
       )}
 
-      {/* I Edit staar Show in Finder ved Discard work. */}
-      {fase !== 2 && (
+      {/* I Edit staar Show in Finder ved Discard work, og i Product og Shop
+          under shopknapperne i hoejre kolonne. */}
+      {fase !== 2 && !shopNode && (
       <div className="knapraekke">
         {iArbejde ? (
           <button
