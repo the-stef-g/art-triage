@@ -1,0 +1,38 @@
+{
+ "version": "3.0",
+ "date": "2026-10-30",
+ "currency": "DKK",
+ "prices_include": "25% Danish VAT and free shipping; same price in every country",
+ "materials": {
+  "paper": { "label": "Fine art paper", "prodigi_sku_prefix": "GLOBAL-FAP", "frames": ["None"] },
+  "canvas": { "label": "Canvas", "prodigi_sku_prefix": "GLOBAL-CAN", "prodigi_options": { "wrap": "ImageWrap" }, "frames": ["None"] },
+  "canvas_framed": { "label": "Canvas", "prodigi_sku_prefix": "GLOBAL-FRA-CAN", "prodigi_options": { "wrap": "ImageWrap", "color": "black or white" }, "frames": ["Black", "White"] }
+ },
+ "formats": {
+  "1:1": [
+   { "size_cm": "30x30", "prodigi_size": "12X12", "paper": 600, "canvas": 1400, "canvas_framed": 2000 },
+   { "size_cm": "50x50", "prodigi_size": "20X20", "paper": 750, "canvas": 1900, "canvas_framed": 2500 },
+   { "size_cm": "75x75", "prodigi_size": "30X30", "paper": 1100, "canvas": 2800, "canvas_framed": 3500 },
+   { "size_cm": "100x100", "prodigi_size": "40X40", "paper": 1500, "canvas": 4100, "canvas_framed": 5000 },
+   { "size_cm": "120x120", "prodigi_size": "48X48", "paper": null, "canvas": 5400, "canvas_framed": 6400 }
+  ],
+  "2:3": [
+   { "size_cm": "30x45", "prodigi_size": "12X18", "paper": 650, "canvas": 1600, "canvas_framed": 2100 },
+   { "size_cm": "40x60", "prodigi_size": "16X24", "paper": 750, "canvas": 1900, "canvas_framed": 2500 },
+   { "size_cm": "50x75", "prodigi_size": "20X30", "paper": 900, "canvas": 2300, "canvas_framed": 2900 },
+   { "size_cm": "60x90", "prodigi_size": "24X36", "paper": 1000, "canvas": 2800, "canvas_framed": 3500 },
+   { "size_cm": "80x120", "prodigi_size": "32X48", "paper": 1500, "canvas": 4000, "canvas_framed": 4800 },
+   { "size_cm": "100x150", "prodigi_size": "40X60", "paper": 2000, "canvas": 5600, "canvas_framed": 6600 }
+  ],
+  "1:2": [
+   { "size_cm": "30x60", "prodigi_size": "12X24", "paper": 700, "canvas": 1700, "canvas_framed": 2300 },
+   { "size_cm": "40x80", "prodigi_size": "16X32", "paper": 850, "canvas": 2100, "canvas_framed": 2700 },
+   { "size_cm": "50x100", "prodigi_size": "20X40", "paper": 1000, "canvas": 2600, "canvas_framed": 3300 },
+   { "size_cm": "60x120", "prodigi_size": "24X48", "paper": 1200, "canvas": 3300, "canvas_framed": 4000 }
+  ]
+ },
+ "rotated_formats": { "3:2": "2:3", "2:1": "1:2" },
+ "hide_for_shipping_countries": [
+  { "format": "1:1", "size_cm": "120x120", "materials": ["canvas", "canvas_framed"], "countries": ["US", "JP"] }
+ ]
+}
