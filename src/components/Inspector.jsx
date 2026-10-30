@@ -16,6 +16,8 @@ export default function Inspector({
   const [versions, setVersions] = useState([]);
   const [keywords, setKeywords] = useState([]);
   const [nytOrd, setNytOrd] = useState('');
+  // Beskaeringen der er ved at blive fjernet, med filerne i dens kaede.
+  const [slet, setSlet] = useState(null);
 
   const loadKeywords = () => {
     if (row) invoke('kw:forFile', { fileId: row.file_id }).then(setKeywords).catch(() => {});
@@ -103,15 +105,20 @@ export default function Inspector({
       rel: v.rel_path,
       foraeldet: Boolean(master && master.mtime > v.mtime + 2000),
     }));
+  // Minus spoerger foerst i en dialog, der viser hele kaeden der fjernes.
   const sletCrop = async (c) => {
-    const ok = window.confirm(
-      `Remove the ${c.format} crop «${fileName(c.rel)}»? It goes to the Trash. `
-      + 'An enlargement or print file made from it stays where it is.'
-    );
-    if (!ok) return;
     try {
-      await invoke('crop:delete', { versionId: c.versionId });
-      onError(`Removed ${fileName(c.rel)}`);
+      setSlet({ c, filer: await invoke('crop:kaede', { versionId: c.versionId }) });
+    } catch (err) {
+      onError(err);
+    }
+  };
+  const bekraeftSlet = async () => {
+    const { filer } = slet;
+    setSlet(null);
+    try {
+      await invoke('crop:delete', { versionId: slet.c.versionId });
+      onError(`Moved ${filer.length} file${filer.length === 1 ? '' : 's'} to the Trash`);
     } catch (err) {
       onError(err);
     }
@@ -373,6 +380,10 @@ export default function Inspector({
           : <p className="tom crop-tom">Select a work to crop its master.</p>,
         cropNode
       )}
+      {fase === 3 && slet && createPortal(
+        <SletCropDialog slet={slet} onCancel={() => setSlet(null)} onOk={bekraeftSlet} />,
+        document.body
+      )}
 
       {/* Fase 4: én linje pr. beskaering. Forstoerrelsen (-giga) hoerer til
           beskaeringen, og printfilen laves af den, af sig selv. */}
@@ -471,5 +482,43 @@ function GigapixelMaal({ row, dataRev }) {
       Set the width to <b>{maal.bredde} px</b> ({maal.bredde} × {maal.hoejde}
       {gange ? `, ×${gange.toFixed(2)}` : ''}) for the largest print, {info.cm} cm on the long side, at 300 DPI.
     </p>
+  );
+}
+
+// Dialogen foer minus fjerner en beskaering: hvilke filer der gaar i
+// papirkurven, og hvad det betyder.
+const ART = { crop: 'The crop in Master', giga: 'Enlargement in Edits', print: 'Print file' };
+function SletCropDialog({ slet, onCancel, onOk }) {
+  useEffect(() => {
+    // Escape fortryder, Enter bekraefter, og ingen anden genvej slipper igennem.
+    const taste = (e) => {
+      e.stopImmediatePropagation();
+      if (e.key === 'Escape') onCancel();
+      if (e.key === 'Enter') onOk();
+    };
+    window.addEventListener('keydown', taste, true);
+    return () => window.removeEventListener('keydown', taste, true);
+  }, [onCancel, onOk]);
+  return (
+    <div className="dialog-bag" onClick={onCancel}>
+      <div className="dialog" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+        <h3>Remove the {slet.c.format} crop?</h3>
+        <p>These files go to the Trash:</p>
+        <ul className="dialog-filer">
+          {slet.filer.map((f) => (
+            <li key={f.rel} title={f.rel}>
+              <span className="tom">{ART[f.art]}</span> {fileName(f.rel)}
+            </li>
+          ))}
+        </ul>
+        <p className="tom">
+          The {slet.c.format} format can then be cropped again. Files in the Trash can be put back from Finder.
+        </p>
+        <div className="knapraekke dialog-knapper">
+          <button onClick={onCancel}>Cancel</button>
+          <button className="fare" onClick={onOk}>Move to Trash</button>
+        </div>
+      </div>
+    </div>
   );
 }

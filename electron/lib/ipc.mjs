@@ -12,7 +12,7 @@ import { Catalog } from './catalog.mjs';
 import { Thumbnailer } from './thumbs.mjs';
 import { watchLibrary } from './watcher.mjs';
 import { detectEditors, openInApp, statusNavne } from './editors.mjs';
-import { EDITOR_SUFFIKS, beskaeringFraSti } from './util.mjs';
+import { EDITOR_SUFFIKS } from './util.mjs';
 import { SearchIndex, normalize } from './searchIndex.mjs';
 import { Indexer, MODEL_ID } from './indexer.mjs';
 import {
@@ -904,20 +904,20 @@ export class AppSession {
       await this.runSync('beskaering');
       return { rel: res.path.slice(catalog.root.length + 1), bit8: res.bit8 };
     });
-    // Minus paa formatknappen i Crop: beskaeringen i Master i papirkurven.
-    // Forstoerrelsen og printfilen bliver liggende.
+    // Minus paa formatknappen i Crop: hele kaeden i papirkurven, altsaa
+    // beskaeringen, dens -giga-filer og dens printfil. crop:kaede viser foerst
+    // hvilke filer det er, saa der kan spoerges.
+    handle('crop:kaede', ({ versionId }) => this.requireCatalog().cropKaede(versionId));
     handle('crop:delete', async ({ versionId }) => {
       const catalog = this.requireCatalog();
-      const v = catalog.getVersion(versionId);
-      const f = v ? catalog.getFile(v.effective_file_id) : null;
-      if (!f || !f.present) throw new Error('The crop is not available right now');
-      if (!/^Approved\/[^/]+\/Master\//.test(f.rel_path) || !beskaeringFraSti(f.rel_path)) {
-        throw new Error('Only crops in the Master folder can be removed here');
+      const filer = catalog.cropKaede(versionId);
+      for (const f of filer) {
+        const abs = catalog.abs(f.rel);
+        if (existsSync(abs)) await shell.trashItem(abs);
       }
-      await shell.trashItem(catalog.abs(f.rel_path));
-      this.log(`crop: ${f.rel_path} to the Trash`);
+      this.log(`crop: ${filer.map((f) => f.rel).join(', ')} to the Trash`);
       await this.runSync('beskaering');
-      return { rel: f.rel_path };
+      return { filer };
     });
     // Aabner en af arbejdsmappens undermapper i Finder.
     handle('img:openWorkFolder', async ({ versionId, del = null }) => {

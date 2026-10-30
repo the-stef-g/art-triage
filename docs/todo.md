@@ -4,8 +4,7 @@ Det der venter. Stef siger "byg", før noget herfra bliver lavet.
 
 ## Venter på "byg"
 
-- **Crop: en beskæring lavet af en ældre master er rød, ikke gul**, både på formatknappen og tallet i filmstriben. Det er en alvorlig fejl.
-- **Crop: minus fjerner hele kæden.** Beskæringen, dens -giga-filer i Edits og dens printfil går i papirkurven. Først en dialogboks, der viser hvilke filer der fjernes, og beder om en bekræftelse.
+Intet lige nu.
 
 ## Venter på en afklaring
 

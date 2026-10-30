@@ -151,6 +151,22 @@ describe('printfiler i kataloget', () => {
     expect(res.path).toBe(join(root, 'Approved', 'Desert', 'Print files', 'Desert 3-2.png'));
   });
 
+  it('cropKaede: beskaeringen, dens -giga-filer og dens printfil, ikke de andre formaters', async () => {
+    await p3Tiff(join(root, 'Approved', 'Desert', 'Master', 'Desert 3-2.tif'), 60, 40);
+    await p3Tiff(join(root, 'Approved', 'Desert', 'Master', 'Desert 2-3.tif'), 40, 60);
+    await p3Tiff(join(root, 'Approved', 'Desert', 'Edits', 'Desert 3-2-giga.tif'), 240, 160);
+    await p3Tiff(join(root, 'Approved', 'Desert', 'Edits', 'Desert 2-3-giga.tif'), 160, 240);
+    catalog.sync();
+    const giga = catalog.listVersions({ fase: 4 }).find((r) => r.giga && r.crop === '3:2');
+    await lavPrintfil(catalog.printMaal(giga.version_id));
+    const krop = catalog.listVersions({ fase: 3 }).find((r) => r.crop === '3:2');
+    expect(catalog.cropKaede(krop.version_id)).toEqual([
+      { rel: 'Approved/Desert/Master/Desert 3-2.tif', art: 'crop' },
+      { rel: 'Approved/Desert/Edits/Desert 3-2-giga.tif', art: 'giga' },
+      { rel: 'Approved/Desert/Print files/Desert 3-2.png', art: 'print' },
+    ]);
+  });
+
   it('autoPrintKandidater: -giga-filer uden en nyere printfil', async () => {
     await p3Tiff(join(root, 'Approved', 'Desert', 'Master', 'Desert 3-2.tif'), 60, 40);
     await p3Tiff(join(root, 'Approved', 'Desert', 'Edits', 'Desert 3-2-giga.tif'), 240, 160);

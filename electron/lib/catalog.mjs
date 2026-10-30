@@ -885,6 +885,21 @@ export class Catalog extends EventEmitter {
     return { work: m[1], base, token, forstoerrelser };
   }
 
+  // Hele kaeden af en beskaering i Master: beskaeringen, dens -giga-filer i
+  // Edits og dens printfil. Det er det minus i Crop fjerner.
+  cropKaede(versionId) {
+    const v = this.getVersion(versionId);
+    const f = v ? this.getFile(v.effective_file_id) : null;
+    if (!f || !f.present) throw new Error('The crop is not available right now');
+    const d = this._printDele(f.rel_path);
+    if (!d || !d.token) throw new Error('Only crops in the Master folder can be removed here');
+    const filer = [{ rel: f.rel_path, art: 'crop' }];
+    for (const g of d.forstoerrelser) filer.push({ rel: g.rel_path, art: 'giga' });
+    const print = this._printfilInfo(f.rel_path);
+    if (print) filer.push({ rel: print.rel, art: 'print' });
+    return filer;
+  }
+
   // En forstoerrelse i Edits af en beskaering: "Desert 2-3-giga.tif", eller
   // det Gigapixel selv gemmer ("Desert 2-3-giga-gigapixel-4x.tif"). Navnet
   // uden format, og formatet. Det er den printfilen laves af.

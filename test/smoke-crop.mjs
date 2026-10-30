@@ -129,10 +129,20 @@ try {
   await page.waitForSelector('.crop-formater button.primaer:has-text("2:1")', { timeout: 10000 });
   await page.locator('button', { hasText: 'Save crop' }).click();
   await page.waitForSelector('.crop-format.findes:has-text("2:1") .crop-minus', { timeout: 20000 });
-  page.once('dialog', (d) => d.accept());
+  // Minus fjerner hele kaeden: ogsaa forstoerrelsen i Edits. Foerst en
+  // dialog, der viser filerne.
+  mkdirSync(join(lib, 'Approved', 'blaa', 'Edits'), { recursive: true });
+  const giga21 = join(lib, 'Approved', 'blaa', 'Edits', 'blaa master 2-1-giga.png');
+  copyFileSync(join(lib, 'Approved', 'blaa', 'Master', 'blaa master 2-1.png'), giga21);
+  await page.locator('button', { hasText: 'Scan again' }).click();
+  await page.waitForTimeout(1500);
   await page.locator('.crop-format.findes:has-text("2:1") .crop-minus').click();
+  await page.waitForSelector('.dialog >> text=blaa master 2-1-giga.png', { timeout: 10000 });
+  await page.screenshot({ path: join(projectRoot, 'smoke-crop-slet.png') });
+  await page.locator('.dialog button', { hasText: 'Move to Trash' }).click();
   await page.waitForSelector('.crop-format:not(.findes) button:has-text("2:1")', { timeout: 20000 });
   if (existsSync(join(lib, 'Approved', 'blaa', 'Master', 'blaa master 2-1.png'))) throw new Error('Minus fjernede ikke beskaeringen');
+  if (existsSync(giga21)) throw new Error('Minus fjernede ikke forstoerrelsen');
   if (!existsSync(join(lib, 'Approved', 'blaa', 'Master', 'blaa master 1-1.png'))) throw new Error('Minus fjernede den forkerte beskaering');
 
   // Omdoeber man den selv i Finder, foelger appen med efter en genscanning.
