@@ -182,7 +182,7 @@ export default function Sidebar({
     );
   }
 
-  if (fase !== 1 && fase !== 3) {
+  if (fase !== 1 && fase !== 3 && fase !== 6) {
     return (
       <aside className="sidebar">
         <section>
@@ -206,7 +206,7 @@ export default function Sidebar({
       {/* Kandidatlisten stod her som sin egen sektion. Den er taget ud
           igen: Candidates-chippen i vaerktoejslinjen goer det samme, og
           to veje til den samme visning er én for meget. */}
-      {fase === 3 && (
+      {(fase === 3 || fase === 6) && (
       <>
       <section>
         <h3>Series</h3>

@@ -437,6 +437,13 @@ try {
   }
   await page.locator('.fase', { hasText: 'Sort' }).click();
 
+  // Cmd+6 gaar til 6 Shop, ogsaa fra et tekstfelt, og Cmd+1 tilbage.
+  await page.locator('input[type="search"], .soeg input, input').first().focus();
+  await page.keyboard.press('Control+6');
+  await page.waitForSelector('.fase.aktiv:has-text("Shop")', { timeout: 5000 });
+  await page.keyboard.press('Control+1');
+  await page.waitForSelector('.fase.aktiv:has-text("Sort")', { timeout: 5000 });
+
   await page.screenshot({ path: join(projectRoot, 'smoke-grid.png') });
   console.log('SMOKE OK: faser, godkend, kandidat, filmstrimmel, kassér, mappefilter og master virker');
   succes = true;

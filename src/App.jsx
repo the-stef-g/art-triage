@@ -12,7 +12,7 @@ import { PreviewOverlay, NameModal } from './components/Overlay';
 // Fasen huskes, saa appen aabner hvor man slap.
 const gemtFase = () => {
   const n = Number(localStorage.getItem('fase'));
-  return n >= 1 && n <= 5 ? n : 1;
+  return n >= 1 && n <= 6 ? n : 1;
 };
 const defaultFilter = {
   folder: null, search: '', visKasserede: false, kunKasserede: false,
@@ -645,9 +645,9 @@ export default function App() {
         setShowPreview(false);
         return;
       }
-      // Cmd+1 til Cmd+5 skifter fase, ogsaa inde i et tekstfelt. Feltet
+      // Cmd+1 til Cmd+6 skifter fase, ogsaa inde i et tekstfelt. Feltet
       // forlades foerst, saa det der er skrevet, bliver gemt.
-      if ((e.metaKey || e.ctrlKey) && /^[1-5]$/.test(e.key)) {
+      if ((e.metaKey || e.ctrlKey) && /^[1-6]$/.test(e.key)) {
         e.preventDefault();
         if (iFelt) document.activeElement?.blur();
         act.setFase(Number(e.key));

@@ -558,6 +558,16 @@ export class AppSession {
     this.tjekShopFormat({ stille: true }).catch((err) => {
       this.log(`shop format check skipped: ${String(err?.message || err).slice(0, 200)}`);
     });
+    // Hvilke vaerker der er publiceret, som shoppen ser det nu: de staar i
+    // fase 6.
+    this._shopCall((shop) => shop.opdaterStatus())
+      .then(({ aendret }) => {
+        if (aendret) {
+          this.log(`shop status: ${aendret} work(s) changed`);
+          this.broadcast('changed');
+        }
+      })
+      .catch((err) => this.log(`shop status skipped: ${String(err?.message || err).slice(0, 200)}`));
   }
 
   async _shopCall(fn) {
@@ -925,11 +935,19 @@ export class AppSession {
       return res.canceled || !res.filePaths.length ? null : res.filePaths[0];
     });
     handle('shop:status', () => this.shopStatus());
-    handle('shop:send', ({ imageId }) => {
+    // Statussen i shoppen bestemmer om vaerket staar i fase 3 eller 6, saa
+    // listerne hentes igen bagefter.
+    handle('shop:send', async ({ imageId }) => {
       this._requireFormat();
-      return this._shopCall((shop) => shop.send(imageId));
+      const res = await this._shopCall((shop) => shop.send(imageId));
+      this.broadcast('changed');
+      return res;
     });
-    handle('shop:publish', ({ imageId }) => this._shopCall((shop) => shop.publish(imageId)));
+    handle('shop:publish', async ({ imageId }) => {
+      const res = await this._shopCall((shop) => shop.publish(imageId));
+      this.broadcast('changed');
+      return res;
+    });
     // Tjekker at ACPT-felterne paa produkt 20 stadig ser ud som dem vi
     // skriver, og husker resultatet.
     handle('shop:checkFormat', () => this.tjekShopFormat());

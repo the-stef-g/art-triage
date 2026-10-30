@@ -237,6 +237,12 @@ export class Catalog extends EventEmitter {
     if (!versionKolonner.includes('editor')) {
       this.db.exec('ALTER TABLE versions ADD COLUMN editor TEXT');
     }
+    // Produktets status i shoppen ('draft', 'publish' ...). Et publiceret
+    // vaerk staar i fase 6 og ikke laengere i 3 til 5.
+    const vaerkKolonner = this.db.all('PRAGMA table_info(works)').map((k) => k.name);
+    if (!vaerkKolonner.includes('woo_status')) {
+      this.db.exec('ALTER TABLE works ADD COLUMN woo_status TEXT');
+    }
     // Det program et billede senest blev aabnet i, saa en fil der dukker op i
     // Edits kan faa det som status.
     this.db.exec(`CREATE TABLE IF NOT EXISTS editor_log(
@@ -941,28 +947,41 @@ export class Catalog extends EventEmitter {
     return { medMaster, medBeskaering };
   }
 
+  // Vaerkerne der er publiceret i shoppen.
+  _iShoppen() {
+    return new Set(this.db.all("SELECT image_id FROM works WHERE woo_status='publish'").map((r) => r.image_id));
+  }
+
   _filtrerFase(rows, fase) {
     const { medMaster } = this._mastersInfo();
+    const shop = this._iShoppen();
     const iMaster = (r) => /^Approved\/[^/]+\/Master\//.test(r.rel_path);
     const godk = (r) => r.rating === 'godkendt';
     switch (fase) {
       case 1: return rows.filter((r) => !godk(r));
       case 2: return rows.filter((r) => godk(r) && !medMaster.has(r.image_id));
-      case 3: {
-        // Én flise pr. vaerk: masteren uden et format i navnet, ellers den foerste.
+      case 3:
+      case 6: {
+        // Én flise pr. vaerk: masteren uden et format i navnet, ellers den
+        // foerste. Fase 3 er dem der ikke er publiceret endnu, fase 6 dem
+        // der er.
         const valgt = new Map();
         for (const r of rows) {
           if (!godk(r) || !iMaster(r)) continue;
+          if (shop.has(r.image_id) !== (fase === 6)) continue;
           const nu = valgt.get(r.image_id);
           if (!nu || (nu.crop && !r.crop)) valgt.set(r.image_id, r);
         }
         const behold = new Set([...valgt.values()].map((r) => r.version_id));
         return rows.filter((r) => behold.has(r.version_id));
       }
-      case 4: return rows.filter((r) => godk(r) && iMaster(r));
-      // Beskaeringerne i Master og forstoerrelserne af dem i Edits.
+      case 4: return rows.filter((r) => godk(r) && iMaster(r) && !shop.has(r.image_id));
+      // Beskaeringerne i Master og forstoerrelserne af dem i Edits. Et
+      // publiceret vaerk er kun med, saa laenge et format mangler sin
+      // printfil, fx en ny beskaering lavet fra fase 6.
       case 5: return rows.filter((r) => godk(r)
-        && ((iMaster(r) && r.crop && r.crop !== 'free') || this._gigaDele(r.rel_path)));
+        && ((iMaster(r) && r.crop && r.crop !== 'free') || this._gigaDele(r.rel_path))
+        && (!shop.has(r.image_id) || !this._printfilInfo(r.rel_path)));
       default: return rows;
     }
   }
@@ -970,6 +989,7 @@ export class Catalog extends EventEmitter {
   // Antal i hver fase: billeder i fase 1, vaerker i de andre.
   faseTal() {
     const { medMaster, medBeskaering } = this._mastersInfo();
+    const shop = this._iShoppen();
     const sort = this.db.get(
       `SELECT COUNT(*) AS c FROM versions v JOIN images i ON i.id = v.image_id
        JOIN files f ON f.id = i.master_file_id
@@ -977,15 +997,18 @@ export class Catalog extends EventEmitter {
     ).c;
     let edit = 0;
     let vaerker = 0;
+    let online = 0;
     for (const r of this.db.all(
       `SELECT v.image_id FROM versions v JOIN images i ON i.id = v.image_id
        JOIN files f ON f.id = i.master_file_id
        WHERE v.is_master=1 AND f.present=1 AND v.rating='godkendt'`
     )) {
-      if (medMaster.has(r.image_id)) vaerker += 1;
-      else edit += 1;
+      if (!medMaster.has(r.image_id)) edit += 1;
+      else if (shop.has(r.image_id)) online += 1;
+      else vaerker += 1;
     }
-    return { 1: sort, 2: edit, 3: vaerker, 4: vaerker, 5: medBeskaering.size };
+    const print = [...medBeskaering].filter((id) => !shop.has(id)).length;
+    return { 1: sort, 2: edit, 3: vaerker, 4: vaerker, 5: print, 6: online };
   }
 
   // Vaerkets master i Master: helst den uden et format i navnet.

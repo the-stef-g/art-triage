@@ -1,4 +1,4 @@
-// De fem faser: Sort, Edit, Product, Crops og Print. Fasen er ikke en status
+// De seks faser: Sort, Edit, Product, Crops, Print og Shop. Fasen er ikke en status
 // man saetter, den foelger af mapperne, og det er det testene holder oeje med.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync, existsSync, readFileSync, utimesSync, renameSync } from 'node:fs';
@@ -83,7 +83,30 @@ describe('fasen foelger af mapperne', () => {
     expect(fase(3)).toEqual(['Approved/y/Master/y.tif']); // én flise pr. vaerk
     expect(fase(4)).toEqual(['Approved/y/Master/y 2-3.tif', 'Approved/y/Master/y.tif']);
     expect(fase(5)).toEqual(['Approved/y/Master/y 2-3.tif']);
-    expect(catalog.faseTal()).toEqual({ 1: 1, 2: 1, 3: 1, 4: 1, 5: 1 });
+    expect(catalog.faseTal()).toEqual({ 1: 1, 2: 1, 3: 1, 4: 1, 5: 1, 6: 0 });
+  });
+
+  it('et publiceret vaerk staar i 6 Shop og ikke i 3 til 5, til en ny beskaering mangler sin printfil', () => {
+    catalog.setRating([raekke('Import/Ahl/y.cr2').version_id], 'godkendt');
+    skriv('Approved/y/Master/y.tif', 'm');
+    skriv('Approved/y/Master/y 2-3.tif', 'c');
+    catalog.sync();
+    const imageId = catalog.listVersions({ fase: 3 })[0].image_id;
+    db.run("INSERT OR IGNORE INTO works(image_id, updated_at) VALUES(?, 0)", imageId);
+    db.run("UPDATE works SET woo_product_id=7, woo_status='draft' WHERE image_id=?", imageId);
+    // Et udkast er stadig i arbejde.
+    expect(fase(3)).toEqual(['Approved/y/Master/y.tif']);
+    expect(fase(6)).toEqual([]);
+
+    db.run("UPDATE works SET woo_status='publish' WHERE image_id=?", imageId);
+    expect(fase(3)).toEqual([]);
+    expect(fase(4)).toEqual([]);
+    expect(fase(5)).toEqual(['Approved/y/Master/y 2-3.tif']); // mangler sin printfil
+    expect(fase(6)).toEqual(['Approved/y/Master/y.tif']);
+    expect(catalog.faseTal()).toEqual({ 1: 2, 2: 0, 3: 0, 4: 0, 5: 0, 6: 1 });
+
+    skriv('Approved/y/Print files/y 2-3.png', 'p');
+    expect(fase(5)).toEqual([]);
   });
 
   it('i Product vises en beskaering, hvis vaerket kun har beskaerne mastere', () => {

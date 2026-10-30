@@ -251,9 +251,11 @@ export default function WorkPanel({ row, versions, tekstRev = 0, hasKey, shop, o
 
       <h4>Shop</h4>
       <p className="vaerk-note">
-        {work.wooProductId
-          ? `Product ${work.wooProductId} in the shop. Sending again overwrites the texts there.`
-          : 'Not in the shop yet. A new product is created as a draft.'}
+        {!work.wooProductId
+          ? 'Not in the shop yet. A new product is created as a draft.'
+          : work.wooStatus === 'publish'
+            ? `Product ${work.wooProductId} is published in the shop. Sending again overwrites the texts there.`
+            : `Product ${work.wooProductId} is a draft in the shop. Sending again overwrites the texts there; Publish moves the work to 6 Shop.`}
       </p>
       <div className="knapraekke">
         <button
@@ -265,8 +267,8 @@ export default function WorkPanel({ row, versions, tekstRev = 0, hasKey, shop, o
         >
           Send to shop
         </button>
-        {work.wooProductId && (
-          <button disabled={busy} onClick={publish} title="Publish the draft in the shop">Publish</button>
+        {work.wooProductId && work.wooStatus !== 'publish' && (
+          <button disabled={busy} onClick={publish} title="Publish the draft in the shop. The work moves to 6 Shop.">Publish</button>
         )}
       </div>
       {shop?.formatOk === false && (

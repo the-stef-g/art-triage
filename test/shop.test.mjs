@@ -67,6 +67,11 @@ function attrapShop(opts = {}) {
     if (init.method === 'POST' && sti.startsWith('/wp/v2/product/')) {
       return svar(200, { id: Number(sti.split('/').pop()) });
     }
+    if (init.method === 'GET' && sti.startsWith('/wc/v3/products?include=')) {
+      const ids = new URLSearchParams(u.search).get('include').split(',').map(Number);
+      return svar(200, ids.filter((pid) => !opts.slettetProdukter?.includes(pid))
+        .map((pid) => ({ id: pid, status: opts.status?.[pid] ?? 'draft' })));
+    }
     if (init.method === 'GET' && /^\/wc\/v3\/products\/\d+$/.test(sti)) {
       const pid = Number(sti.split('/').pop());
       if (opts.slettetProdukter?.includes(pid)) return svar(404, { message: 'Invalid ID' });
@@ -478,8 +483,21 @@ describe('send til shop', () => {
     await expect(shop.publish(id)).rejects.toThrow(/first/);
     await shop.send(id);
     kald.length = 0;
+    expect(works.get(id).wooStatus).toBe('draft');
     expect(await shop.publish(id)).toMatchObject({ productId: 500, status: 'publish' });
     expect(JSON.parse(kald[0].body)).toEqual({ status: 'publish' });
+    expect(works.get(id).wooStatus).toBe('publish');
+  });
+
+  it('henter status fra shoppen, og glemmer et produkt der er slettet', async () => {
+    const a = klartVaerk('a.png').id;
+    const b = klartVaerk('b.png').id;
+    works.setWooProductId(a, 500);
+    works.setWooProductId(b, 501);
+    const { fetchImpl } = attrapShop({ status: { 500: 'publish' }, slettetProdukter: [501] });
+    expect(await (await sync(fetchImpl)).opdaterStatus()).toEqual({ aendret: 2 });
+    expect(works.get(a).wooStatus).toBe('publish');
+    expect(works.get(b).wooProductId).toBe(null);
   });
 
   it('tjekker formatet mod produkt 20', async () => {

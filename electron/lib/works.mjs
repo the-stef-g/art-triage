@@ -197,6 +197,7 @@ export class Works {
       shortText: row.short_text,
       altText: row.alt_text,
       wooProductId: row.woo_product_id,
+      wooStatus: row.woo_status ?? null,
       crops: this.cropsFor(imageId),
       seriesId: img.series_id,
       seriesName: img.series_name,
@@ -319,6 +320,19 @@ export class Works {
   setWooProductId(imageId, id) {
     this._ensure(this._image(imageId));
     this.db.run('UPDATE works SET woo_product_id=?, updated_at=? WHERE image_id=?', id ?? null, this.catalog.now(), imageId);
+    if (id == null) this.setWooStatus(imageId, null);
+  }
+
+  // Produktets status i shoppen, som shoppen sidst meldte den. 'publish'
+  // flytter vaerket til fase 6.
+  setWooStatus(imageId, status) {
+    this.db.run('UPDATE works SET woo_status=? WHERE image_id=?', status ?? null, imageId);
+  }
+
+  // Vaerkerne der har et produkt i shoppen: { imageId, productId, status }.
+  medProdukt() {
+    return this.db.all('SELECT image_id, woo_product_id, woo_status FROM works WHERE woo_product_id IS NOT NULL')
+      .map((r) => ({ imageId: r.image_id, productId: r.woo_product_id, status: r.woo_status }));
   }
 }
 

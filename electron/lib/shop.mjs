@@ -515,6 +515,7 @@ export class ShopSync {
       ? await this.client.wc('POST', '/products', body)
       : await this.client.wc('PUT', `/products/${work.wooProductId}`, body);
     if (create) this.works.setWooProductId(imageId, produkt.id);
+    this.works.setWooStatus(imageId, produkt.status);
     // Serien saettes ikke via wc/v3 men via WP REST paa selve produktet.
     // Uden en serie i appen roeres den i Woo ikke.
     if (termId) await this.client.wpApi('POST', `/product/${produkt.id}`, { series: [termId] });
@@ -525,7 +526,33 @@ export class ShopSync {
     const work = this.works.get(imageId);
     if (!work.wooProductId) throw new ShopError('Send the work to the shop first');
     const produkt = await this.client.wc('PUT', `/products/${work.wooProductId}`, { status: 'publish' });
+    this.works.setWooStatus(imageId, produkt.status);
     return { productId: produkt.id, status: produkt.status, link: produkt.permalink ?? null };
+  }
+
+  // Henter status paa alle vaerkernes produkter fra shoppen, 100 ad gangen,
+  // saa et produkt der er publiceret eller taget af paa siden, ogsaa staar
+  // rigtigt i appen. Et produkt der ikke findes mere, glemmes.
+  async opdaterStatus() {
+    const vaerker = this.works.medProdukt();
+    let aendret = 0;
+    for (let i = 0; i < vaerker.length; i += 100) {
+      const bid = vaerker.slice(i, i + 100);
+      const svar = await this.client.wc('GET', `/products?include=${bid.map((v) => v.productId).join(',')}&per_page=100&status=any`);
+      // Et uventet svar maa aldrig faa appen til at glemme produkterne.
+      if (!Array.isArray(svar)) throw new ShopError('The shop did not return the products');
+      const status = new Map(svar.map((p) => [p.id, p.status]));
+      for (const v of bid) {
+        if (!status.has(v.productId)) {
+          this.works.setWooProductId(v.imageId, null);
+          aendret += 1;
+        } else if (status.get(v.productId) !== v.status) {
+          this.works.setWooStatus(v.imageId, status.get(v.productId));
+          aendret += 1;
+        }
+      }
+    }
+    return { aendret };
   }
 
   // Henter produkt 20 og tjekker at ACPT-felterne stadig ser ud, som vi
