@@ -9,11 +9,11 @@ Det der venter. Stef siger "byg", før noget herfra bliver lavet.
 - **Crop: linjen "Saved in Master as …" fjernes, og Straighten flyttes ned i bunden**, så billedet får mere plads foroven.
 - **Statuslinjen: skyderen med antal billeder i bredden flyttes helt til venstre**, så den ikke hopper, når teksten i statuslinjen ændrer sig. Resten af statuslinjen bliver som den er.
 - **Værktøjslinjen: mere luft mellem fanerne og søgefeltet**, evt. søgefeltet i midten.
+- **Shop: knappen Crop master … fjernes.** Beskæringer laves kun i Crop.
+- **Appen overruler Woo.** Værkdata der ikke er i appen, skal ikke være i shoppen: tags og upsells tømmes, når værket ingen søgeord eller serie har, og attributter appen ikke kender, fjernes. Lager, ordrer og status er ikke værkdata og røres ikke.
 
 ## Venter på en afklaring
 
-- **Crop master … i Shop:** beholde (nye beskæringer af publicerede værker) eller fjerne?
-- **Tags og upsells i Woo, når appen ingen har:** lade dem være (som nu) eller tømme dem?
 - **Betaling og fortrydelsesret for print.** Spørg Forbrugerombudsmanden, e-mærket eller Dansk Erhverv. Svaret afgør Charge Type i Stripe og evt. et flueben om forudbetaling i kassen.
 
 ## Til sitet (Astro)
