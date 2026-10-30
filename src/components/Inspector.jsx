@@ -10,6 +10,7 @@ import { gigapixelMaal } from '../printmaal';
 // lige havde skrevet foerst dukkede op hvis man gik væk og tilbage igen.
 export default function Inspector({
   row, fase = 1, selectedCount, activeKeyword, editors, statusNavne = [], series, act, dataRev, tekstRev = 0, hasKey, shop, onShop, onError,
+  shopNode = null,
 }) {
   const [versions, setVersions] = useState([]);
   const [keywords, setKeywords] = useState([]);
@@ -139,9 +140,12 @@ export default function Inspector({
       )}
       {/* Stort i Sort, hvor billederne bedoemmes; ellers er en lille
           forhaandsvisning nok. */}
+      {/* I Product staar forhaandsvisningen i hoejre kolonne, ved shoppen. */}
+      {!shopNode && (
       <div className={fase === 1 ? 'stor-preview' : 'stor-preview lille-preview'}>
         <img src={thumbUrl(row.file_id, row.mtime, fase === 1 ? 2048 : 512, row.rotation)} alt={fileName(row.rel_path)} />
       </div>
+      )}
       {/* Drejningen hoerer til Sort og Edit. L og R virker stadig overalt. */}
       {fase <= 2 && (
       <div className="knapraekke drej">
@@ -246,6 +250,7 @@ export default function Inspector({
             shop={shop}
             onShop={onShop}
             onError={onError}
+            shopNode={shopNode}
           >
             <h4>Series</h4>
             <div className="knapraekke">

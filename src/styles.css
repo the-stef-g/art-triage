@@ -462,7 +462,13 @@ button:focus, button:focus-visible, [tabindex]:focus, [tabindex]:focus-visible {
 /* ---------- Vaerk-panel ---------- */
 .vaerk label { display: flex; flex-direction: column; gap: 3px; margin: 6px 0; font-size: 11px; color: var(--tekst-svag); }
 .vaerk input, .vaerk select, .vaerk textarea { font-size: 12px; width: 100%; box-sizing: border-box; }
-.vaerk textarea { resize: vertical; font-family: inherit; line-height: 1.4; }
+.vaerk textarea {
+  resize: vertical; font-family: inherit; line-height: 1.4;
+  background: var(--bg-panel); color: var(--tekst); border: 1px solid var(--kant); border-radius: 6px; padding: 6px 8px;
+}
+.vaerk textarea:focus { outline: 1px solid var(--accent); }
+/* I Product er formularen paa den moerke bund i midten; felterne er lidt lysere. */
+.hoved.produkt .vaerk input, .hoved.produkt .vaerk select { background: var(--bg-panel); }
 .vaerk-raekke { display: flex; gap: 8px; }
 .vaerk-raekke label { flex: 1; min-width: 0; }
 .vaerk-note { color: var(--tekst-svag); font-size: 11px; line-height: 1.4; margin: 4px 0; }
@@ -653,3 +659,23 @@ button.stor {
 .print-linje .mangler { color: var(--tekst-svag); }
 .gigapixel-maal { margin: 4px 0; font-size: 12px; }
 .gigapixel-maal b { color: var(--accent); }
+
+/* Product og Shop: serier og vaerker smalt til venstre, formularen bredt i
+   midten, billedet og shoppen til hoejre. */
+.hoved.produkt {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr) 320px;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+.hoved.produkt > .sidebar { grid-column: 1; grid-row: 1; width: auto; min-width: 0; max-height: 40vh; border-bottom: 1px solid var(--kant); }
+.hoved.produkt > .midte { grid-column: 1; grid-row: 2; border-right: 1px solid var(--kant); background: var(--bg-panel); }
+.hoved.produkt > .inspector:not(.produkt-hoejre) {
+  grid-column: 2; grid-row: 1 / span 2;
+  width: auto; min-width: 0; border-left: none; background: var(--bg);
+  padding: 16px max(16px, calc((100% - 720px) / 2));
+}
+.hoved.produkt > .produkt-hoejre { grid-column: 3; grid-row: 1 / span 2; width: auto; min-width: 0; }
+.tjekliste { list-style: none; margin: 4px 0 8px; padding: 0; display: grid; gap: 2px; font-size: 12px; }
+.tjekliste li::before { content: '✓ '; color: var(--godkendt); }
+.tjekliste li.mangler { color: var(--tekst-svag); }
+.tjekliste li.mangler::before { content: '○ '; color: var(--kandidat); }

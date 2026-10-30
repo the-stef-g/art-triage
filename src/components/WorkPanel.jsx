@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { invoke } from '../api';
 
 const CATEGORIES = ['Graphic Design', 'Photography', 'Paintings', 'Sculptures'];
@@ -12,7 +13,7 @@ const TEXT_LABELS = {
 // Vaerk-panelet (docs/plan-shop.md). Teksterne rettes kun her; Woo er en
 // kopi. Felterne gemmes naar man forlader dem, ikke for hver tast, saa
 // en igangvaerende rettelse aldrig bliver skrevet over af en genindlaesning.
-export default function WorkPanel({ row, versions, tekstRev = 0, hasKey, shop, onShop, onError, children = null }) {
+export default function WorkPanel({ row, versions, tekstRev = 0, hasKey, shop, onShop, onError, children = null, shopNode = null }) {
   const imageId = row.image_id;
   const [work, setWork] = useState(null);
   const [draft, setDraft] = useState({});
@@ -166,7 +167,7 @@ export default function WorkPanel({ row, versions, tekstRev = 0, hasKey, shop, o
     ? 'Texts unlock when the image is Approved and Finished'
     : !hasKey ? 'Add your Claude API key under Help first' : '';
 
-  return (
+  const form = (
     <div className="vaerk">
       <h4>Work</h4>
       <p className="vaerk-note">
@@ -315,7 +316,24 @@ export default function WorkPanel({ row, versions, tekstRev = 0, hasKey, shop, o
       {/* Serie og soegeord, fra inspektoeren, saa hver ting kun staar ét sted. */}
       {children}
 
-      {/* Shoppen til sidst: den bruges foerst, naar alt andet er klar. */}
+    </div>
+  );
+  // Shoppen til sidst: den bruges foerst, naar alt andet er klar. I Product
+  // staar den i hoejre kolonne med en tjekliste over det, der mangler.
+  const mangler = [
+    ['Category', Boolean(work.category)],
+    ['Year', Boolean(work.effective.year)],
+    ['Description', Boolean(work.description)],
+    ['Alt text', Boolean(work.altText)],
+    ...(work.unique ? [['Price', Boolean(work.price)]] : []),
+    [`Crops (${work.crops?.length || 0})`, (work.crops?.length || 0) > 0],
+  ];
+  const shopDel = (
+    <div className="vaerk shop-del">
+      <h4>Ready for the shop</h4>
+      <ul className="tjekliste">
+        {mangler.map(([navn, ok]) => <li key={navn} className={ok ? 'ok' : 'mangler'}>{navn}</li>)}
+      </ul>
       <h4>Shop</h4>
       <p className="vaerk-note">
         {!work.wooProductId
@@ -378,5 +396,11 @@ export default function WorkPanel({ row, versions, tekstRev = 0, hasKey, shop, o
       )}
 
     </div>
+  );
+  return (
+    <>
+      {form}
+      {shopNode ? createPortal(shopDel, shopNode) : shopDel}
+    </>
   );
 }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { invoke, onEvent, harBro, setThumbRetry } from './api';
+import { invoke, onEvent, harBro, setThumbRetry, thumbUrl } from './api';
 import Welcome from './components/Welcome';
 import Toolbar from './components/Toolbar';
 import Sidebar from './components/Sidebar';
@@ -354,6 +354,10 @@ export default function App() {
   }, [library, filter, refresh]);
 
   const focusedRow = rows.find((r) => r.version_id === active) || null;
+  // Product og Shop har deres eget layout: vaerkerne smalt til venstre,
+  // formularen bred i midten og shoppen til hoejre.
+  const produktLayout = filter.fase === 5 || filter.fase === 6;
+  const [shopNode, setShopNode] = useState(null);
 
   // Slaar det aktive billede op via refs, saa tastaturgenvejene
   // (registreret en gang) altid ser den aktuelle tilstand.
@@ -790,7 +794,7 @@ export default function App() {
         act={act}
         harValg={selected.length > 0}
       />
-      <div className="hoved">
+      <div className={produktLayout ? 'hoved produkt' : 'hoved'}>
         <Sidebar
           tree={tree}
           series={series}
@@ -833,7 +837,7 @@ export default function App() {
             onOpenPreview={() => setShowPreview(true)}
             onColumns={(c) => { columnsRef.current = c; }}
             ankerRef={ankerRef}
-            columns={kolonner}
+            columns={produktLayout ? 2 : kolonner}
             thumbRev={thumbRev}
           />
           )}
@@ -888,7 +892,20 @@ export default function App() {
             invoke('shop:status').then(setShop).catch(() => {});
           }}
           onError={visFejl}
+          shopNode={produktLayout ? shopNode : null}
         />
+        {/* Product og Shop: teksterne i midten, og her til hoejre billedet,
+            tjeklisten og shopknapperne, som bruges til sidst. */}
+        {produktLayout && (
+          <aside className="inspector produkt-hoejre">
+            {focusedRow && (
+              <div className="stor-preview lille-preview">
+                <img src={thumbUrl(focusedRow.file_id, focusedRow.mtime, 512, focusedRow.rotation)} alt="" />
+              </div>
+            )}
+            <div ref={setShopNode} />
+          </aside>
+        )}
       </div>
       <StatusBar
         counts={counts}

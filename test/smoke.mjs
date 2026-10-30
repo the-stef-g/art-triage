@@ -435,6 +435,14 @@ try {
   if (!/API key/i.test(koeTekst)) {
     throw new Error(`Noegleordspanelet siger ikke hvor noeglen saettes: ${koeTekst}`);
   }
+  // Product: formularen i midten, og shoppen med tjeklisten til hoejre.
+  await page.locator('.tile').first().click();
+  await page.waitForSelector('.produkt-hoejre .tjekliste', { timeout: 10000 });
+  await page.waitForSelector('.produkt-hoejre button:has-text("Send to shop")', { timeout: 10000 });
+  if (await page.locator('.hoved.produkt > .inspector:not(.produkt-hoejre) button:has-text("Send to shop")').count()) {
+    throw new Error('Send to shop staar stadig i formularen');
+  }
+  await page.screenshot({ path: join(projectRoot, 'smoke-product.png') });
   await page.locator('.fase', { hasText: 'Sort' }).click();
 
   // Cmd+6 gaar til 6 Shop, ogsaa fra et tekstfelt, og Cmd+1 tilbage.
