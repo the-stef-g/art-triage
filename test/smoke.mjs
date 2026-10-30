@@ -91,8 +91,8 @@ try {
   if (tiles !== 4) throw new Error(`ventede 4 billeder i grid, fik ${tiles}`);
 
   // Filmstrimlen nederst viser mappens billeder i skudraekkefoelge: de tre
-  // i roden, ikke den i undermappen.
-  await page.locator('.tile').first().click();
+  // i roden, ikke den i undermappen. Det foerste billede er markeret af sig
+  // selv.
   await page.waitForFunction(
     () => document.querySelectorAll('.filmstrip .film-billede').length === 3
       && document.querySelectorAll('.filmstrip .film-billede.aktiv').length === 1,

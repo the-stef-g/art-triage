@@ -335,6 +335,13 @@ export default function WorkPanel({ row, versions, tekstRev = 0, hasKey, shop, o
         {mangler.map(([navn, ok]) => <li key={navn} className={ok ? 'ok' : 'mangler'}>{navn}</li>)}
       </ul>
       <h4>Shop</h4>
+      {work.wooProductId && (
+        <p className={work.shopAendret ? 'shop-status aendret' : 'shop-status'}>
+          {work.shopAendret
+            ? '● Changed in the app since it was last sent. Update shop to send it.'
+            : '✓ The shop has what is here.'}
+        </p>
+      )}
       <p className="vaerk-note">
         {!work.wooProductId
           ? 'Not in the shop yet. A new product is created as a draft.'
@@ -344,6 +351,7 @@ export default function WorkPanel({ row, versions, tekstRev = 0, hasKey, shop, o
       </p>
       <div className="knapraekke">
         <button
+          className={!work.wooProductId || work.shopAendret ? 'primaer' : ''}
           disabled={busy || !work.eligible || !shop?.harWoo || !shop?.harWp || shop?.formatOk === false}
           onClick={() => sendToShop()}
           title={!work.eligible ? 'The image must be Approved and Finished'

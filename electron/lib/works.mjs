@@ -206,6 +206,7 @@ export class Works {
       altText: row.alt_text,
       wooProductId: row.woo_product_id,
       wooStatus: row.woo_status ?? null,
+      wooAftryk: row.woo_aftryk ?? null,
       crops: this.cropsFor(imageId),
       seriesId: img.series_id,
       seriesName: img.series_name,
@@ -335,6 +336,10 @@ export class Works {
   // flytter vaerket til fase 6.
   setWooStatus(imageId, status) {
     this.db.run('UPDATE works SET woo_status=? WHERE image_id=?', status ?? null, imageId);
+  }
+
+  setWooAftryk(imageId, aftryk) {
+    this.db.run('UPDATE works SET woo_aftryk=? WHERE image_id=?', aftryk ?? null, imageId);
   }
 
   // Seriens vaerker der har et produkt i shoppen: { imageId, productId }.

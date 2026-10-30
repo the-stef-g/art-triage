@@ -613,7 +613,18 @@ button.stor {
 .crop-top { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .crop-top strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 40vw; }
 .crop-formater { display: flex; gap: 6px; }
-.crop-scene { display: flex; justify-content: center; min-height: 0; }
+/* Uden for rammen er markoeren en drejepil, som i Photoshop. */
+.crop-scene {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-height: 0;
+  padding: 24px;
+  touch-action: none;
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M5 13a7 7 0 1 0 2-6' fill='none' stroke='%23000' stroke-width='4'/%3E%3Cpath d='M5 13a7 7 0 1 0 2-6' fill='none' stroke='%23fff' stroke-width='2'/%3E%3Cpath d='M3 3l5 1-1 5z' fill='%23fff' stroke='%23000'/%3E%3C/svg%3E") 12 12, crosshair;
+}
+.crop-inline .crop-scene { flex: 1; }
+.crop-flade img { cursor: inherit; }
 .crop-stage { position: relative; line-height: 0; touch-action: none; user-select: none; }
 /* Billedet klippes af feltet, saa et drejet billede viser tomme hjoerner som
    et skakternet, ligesom i Photoshop. */
@@ -689,7 +700,7 @@ button.stor {
    midten, billedet og shoppen til hoejre. */
 .hoved.produkt {
   display: grid;
-  grid-template-columns: 300px minmax(0, 1fr) 320px;
+  grid-template-columns: 375px minmax(0, 1fr) 375px;
   grid-template-rows: auto minmax(0, 1fr);
 }
 .hoved.produkt > .sidebar { grid-column: 1; grid-row: 1; width: auto; min-width: 0; max-height: 40vh; border-bottom: 1px solid var(--kant); }
@@ -709,7 +720,7 @@ button.stor {
    midten, formaterne til hoejre. */
 .hoved.beskaer {
   display: grid;
-  grid-template-columns: 300px minmax(0, 1fr) 320px;
+  grid-template-columns: 375px minmax(0, 1fr) 375px;
   grid-template-rows: minmax(0, 1fr);
 }
 .hoved.beskaer > .sidebar { display: none; }
@@ -723,3 +734,7 @@ button.stor {
 
 /* Print: listen faar hele bredden; forklaringen staar over den. */
 .hoved.print > .sidebar { display: none; }
+
+/* Om shoppen har det, der staar i appen. */
+.shop-status { font-size: 12px; margin: 4px 0; color: var(--godkendt); }
+.shop-status.aendret { color: var(--kandidat); }

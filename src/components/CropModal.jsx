@@ -147,9 +147,29 @@ export default function CropModal({ row, onClose, onDone, onError, inline = fals
     }
   };
 
+  // Fri drejning som i Photoshop: traek uden for rammen, og billedet
+  // drejer om sin midte med musen.
+  const startDrej = (e) => {
+    if (e.button !== 0 || !fladeRef.current) return;
+    e.preventDefault();
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    const b = fladeRef.current.getBoundingClientRect();
+    const cx = b.left + b.width / 2;
+    const cy = b.top + b.height / 2;
+    trak.current = { art: 'drej', cx, cy, a0: Math.atan2(e.clientY - cy, e.clientX - cx), v0: vinkel };
+  };
+
   const flyt = (e) => {
     const t = trak.current;
     if (!t) return;
+    if (t.art === 'drej') {
+      const a = Math.atan2(e.clientY - t.cy, e.clientX - t.cx);
+      let d = ((a - t.a0) * 180) / Math.PI;
+      if (d > 180) d -= 360;
+      if (d < -180) d += 360;
+      drej(Math.round((t.v0 + d) * 10) / 10);
+      return;
+    }
     const p = pos(e);
     if (t.art === 'flyt') {
       setRect((r) => {
@@ -240,10 +260,19 @@ export default function CropModal({ row, onClose, onDone, onError, inline = fals
             <span className="tom">Blank corners are transparent, ready to fill in Photoshop.</span>
           )}
         </div>
-        <div className="crop-scene">
+        {/* Uden for rammen drejes billedet; rammen flyttes, og grebene
+            aendrer stoerrelsen. */}
+        <div
+          className="crop-scene"
+          onPointerDown={startDrej}
+          onPointerMove={flyt}
+          onPointerUp={slip}
+          onPointerCancel={slip}
+          title="Drag outside the frame to turn the picture"
+        >
           {/* Grebene ligger i et lag over billedet, saa de kan stikke ud over
               kanten uden at blive skaaret af. */}
-          <div className="crop-stage" onPointerMove={flyt} onPointerUp={slip} onPointerCancel={slip}>
+          <div className="crop-stage">
             <div className="crop-flade" ref={fladeRef}>
               <img
                 src={thumbUrl(row.file_id, row.mtime, 2048, row.rotation)}

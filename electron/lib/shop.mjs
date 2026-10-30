@@ -6,6 +6,7 @@
 // loggen, aldrig sendt til brugerfladen. Fejlbeskeder herfra indeholder
 // aldrig en noegle; de siger hvad der skete, ikke hvad der blev sendt.
 import { readFileSync, rmSync, mkdtempSync, statSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { join, basename } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execFile } from 'node:child_process';
@@ -181,6 +182,27 @@ export async function exportJpeg(
 }
 
 const VIDEO_TYPES = { mp4: 'video/mp4', m4v: 'video/x-m4v', mov: 'video/quicktime', webm: 'video/webm' };
+
+// Fingeraftrykket af alt det, appen sender til shoppen om et vaerk: felter,
+// tekster, serie, soegeord og hvilke udgaver af billederne. Er det et andet
+// end ved sidste afsendelse, er vaerket aendret i appen og shoppen bagud.
+// Rettelser lavet direkte i WooCommerce kan det ikke se.
+export function vaerkAftryk(work, { works, catalog, ord = [] }) {
+  const fil = (f) => (f ? sourceKey(f) : null);
+  const crops = (work.crops || []).map((c) => {
+    const v = catalog.getVersion(c.versionId);
+    return [c.format, fil(v ? catalog.getFile(v.effective_file_id) : null)];
+  });
+  const data = {
+    titel: work.effective?.title, aar: work.effective?.year, nr: work.effective?.catalogueNumber,
+    kategori: work.category, teknik: work.technique, skabelon: work.template, farve: work.sectionColour,
+    video: work.video, prints: work.prints, maal: work.dimensions, pris: work.price,
+    beskrivelse: work.description, kort: work.shortText, alt: work.altText,
+    serie: work.series ? [work.series.id, work.series.name, work.series.intro, work.series.template, work.series.colour] : null,
+    hoved: fil(works.imageFile(work.imageId)), crops, ord,
+  };
+  return createHash('sha1').update(JSON.stringify(data)).digest('hex');
+}
 
 // Hvilken udgave af en fil der er uploadet. Aendres noget af det, er det en
 // ny fil.
@@ -452,6 +474,10 @@ export class ShopSync {
   // Finder seriens term paa navn, og opretter den med sine tre felter hvis
   // den ikke findes. En term der findes, faar kun de felter Stef har
   // udfyldt i appen; tomme felter staar uroert i Woo.
+  aftryk(imageId) {
+    return vaerkAftryk(this.works.get(imageId), { works: this.works, catalog: this.catalog, ord: this.ordFor(imageId) });
+  }
+
   // Vaerkets soegeord, som de staar paa hovedbilledet (masteren): Stefs
   // egne foerst.
   ordFor(imageId) {
@@ -600,6 +626,7 @@ export class ShopSync {
     }
     if (create) this.works.setWooProductId(imageId, produkt.id);
     this.works.setWooStatus(imageId, produkt.status);
+    this.works.setWooAftryk(imageId, this.aftryk(imageId));
     // De andre vaerker i serien faar det nye med som upsell.
     if (work.seriesId) await this._serieUpsells(work.seriesId, imageId);
     // Serien saettes ikke via wc/v3 men via WP REST paa selve produktet.

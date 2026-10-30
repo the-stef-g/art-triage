@@ -416,6 +416,7 @@ export default function Inspector({
           <div className="knapraekke">
             {row.forstoerrelse && (
               <button
+                className="primaer"
                 onClick={act.makePrintFiles}
                 title="Make the print file again from the enlargement. An old print file with the same name is replaced."
               >

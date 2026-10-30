@@ -42,7 +42,8 @@ try {
   await page.waitForSelector('.tile', { timeout: 60000 });
 
   // Fase 1, godkend: filen flytter ind i en arbejdsmappe og videre til fase 2.
-  await page.locator('.tile').first().click();
+  // Det foerste billede er markeret af sig selv og vises stort.
+  await page.waitForSelector('.forstoerret', { timeout: 15000 });
   await page.keyboard.press('a');
   await page.waitForFunction(() => document.querySelectorAll('.tile').length === 0, null, { timeout: 15000 });
   await page.locator('.fase', { hasText: 'Edit' }).click();
@@ -71,6 +72,15 @@ try {
   await page.locator('.crop-formater button', { hasText: '1:1' }).click();
   // Drejet 5 grader og holdt inde i billedet: rammen bliver mindre end
   // billedets hoejde, og der kommer ingen tomme hjoerner i filen.
+  // Fri drejning: traek uden for rammen, saa drejer billedet.
+  const b = await page.locator('.crop-flade').boundingBox();
+  await page.mouse.move(b.x + 5, b.y + b.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(b.x + 5, b.y + b.height / 2 - 30, { steps: 5 });
+  await page.mouse.up();
+  const fri = Number(await page.locator('.crop-vinkel-tal').inputValue());
+  if (!(Math.abs(fri) > 1)) throw new Error(`Traek uden for rammen drejede ikke billedet (${fri}°)`);
+  await page.fill('.crop-vinkel-tal', '0');
   const hoejdeFoer = await page.locator('.crop-ramme').evaluate((el) => el.getBoundingClientRect().height);
   await page.fill('.crop-vinkel-tal', '5');
   await page.waitForFunction(

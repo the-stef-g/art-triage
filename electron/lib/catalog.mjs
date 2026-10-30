@@ -243,6 +243,11 @@ export class Catalog extends EventEmitter {
     if (!vaerkKolonner.includes('woo_status')) {
       this.db.exec('ALTER TABLE works ADD COLUMN woo_status TEXT');
     }
+    // Fingeraftrykket af det, der sidst blev sendt til shoppen. Er vaerket
+    // aendret siden, viser appen, at shoppen skal opdateres.
+    if (!vaerkKolonner.includes('woo_aftryk')) {
+      this.db.exec('ALTER TABLE works ADD COLUMN woo_aftryk TEXT');
+    }
     // Det program et billede senest blev aabnet i, saa en fil der dukker op i
     // Edits kan faa det som status.
     this.db.exec(`CREATE TABLE IF NOT EXISTS editor_log(

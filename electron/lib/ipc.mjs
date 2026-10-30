@@ -20,7 +20,7 @@ import {
 import { UndoManager } from './undo.mjs';
 import { Works } from './works.mjs';
 import { ClaudeWorkTexts, TEXT_IMAGE_SIZE } from './workTexts.mjs';
-import { ShopClient, ShopSync, DEFAULT_SHOP_URL } from './shop.mjs';
+import { ShopClient, ShopSync, DEFAULT_SHOP_URL, vaerkAftryk, MAX_TAGS } from './shop.mjs';
 import { debounce, dataDirFor, openFdCount } from './util.mjs';
 
 // Mappe-overvaageren (fs.watch) faar sjaeldent fil-system-haendelser fra
@@ -139,6 +139,17 @@ export class AppSession {
       this._autoPrint().catch((err) => this.log(`auto print failed: ${String(err?.message || err).slice(0, 200)}`));
     }
     return { ...res, skipped: false, reason, varighed: this.lastScanMs };
+  }
+
+  // Er vaerket aendret i appen, siden det sidst blev sendt til shoppen?
+  // shopAendret er null for et vaerk, der ikke er sendt.
+  _medShop(work) {
+    if (!work?.wooProductId) return { ...work, shopAendret: null };
+    const works = this.requireWorks();
+    const fil = works.imageFile(work.imageId);
+    const ord = fil ? this.catalog.keywordsForFile(fil.id).map((k) => k.word).slice(0, MAX_TAGS) : [];
+    const aftryk = vaerkAftryk(work, { works, catalog: this.catalog, ord });
+    return { ...work, shopAendret: aftryk !== work.wooAftryk };
   }
 
   // Fase 4: naar Gigapixel har gemt en forstoerrelse, laver appen selv
@@ -971,8 +982,8 @@ export class AppSession {
       this.requireCatalog().removeKeywordFromFiles(fileIds, word));
 
     // Vaerket: tekster og shop-felter pr. billede (docs/plan-shop.md).
-    handle('work:get', ({ imageId }) => this.requireWorks().get(imageId));
-    handle('work:save', ({ imageId, patch }) => this.requireWorks().save(imageId, patch));
+    handle('work:get', ({ imageId }) => this._medShop(this.requireWorks().get(imageId)));
+    handle('work:save', ({ imageId, patch }) => this._medShop(this.requireWorks().save(imageId, patch)));
     handle('work:pickVideo', async () => {
       const res = await dialog.showOpenDialog(this.win, {
         title: 'Choose video',

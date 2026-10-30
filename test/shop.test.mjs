@@ -10,7 +10,7 @@ import { openDatabase } from '../electron/lib/db.mjs';
 import { Catalog } from '../electron/lib/catalog.mjs';
 import { Works } from '../electron/lib/works.mjs';
 import {
-  ShopClient, ShopSync, MediaSync, ShopError, parseWooKey, parseWpLogin, vaerkSku,
+  ShopClient, ShopSync, MediaSync, ShopError, parseWooKey, parseWpLogin, vaerkSku, vaerkAftryk,
   buildProduct, acptMeta, cropMetaKey, ACPT_FIELDS, compareFormat, mergeAttributes,
 } from '../electron/lib/shop.mjs';
 
@@ -566,6 +566,22 @@ describe('send til shop', () => {
     expect(JSON.parse(post.body).upsell_ids).toEqual([500]);
     const tilbage = kald.find((k) => k.method === 'PUT' && k.sti === '/wc/v3/products/500');
     expect(JSON.parse(tilbage.body)).toEqual({ upsell_ids: [501] });
+  });
+
+  it('husker hvad der blev sendt, saa appen kan se om vaerket er aendret siden', async () => {
+    const { id } = klartVaerk('a.png');
+    const { fetchImpl } = attrapShop();
+    const shop = await sync(fetchImpl);
+    await shop.send(id);
+    const aftryk = () => vaerkAftryk(works.get(id), { works, catalog, ord: shop.ordFor(id) });
+    expect(works.get(id).wooAftryk).toBe(aftryk());
+    works.save(id, { description: 'En ny beskrivelse' });
+    expect(works.get(id).wooAftryk).not.toBe(aftryk());
+    await shop.send(id);
+    expect(works.get(id).wooAftryk).toBe(aftryk());
+    // Et nyt soegeord er ogsaa en aendring.
+    catalog.addKeyword(works.imageFile(id).id, 'winter');
+    expect(works.get(id).wooAftryk).not.toBe(aftryk());
   });
 
   it('Remove from shop goer produktet til en kladde, uden at slette det', async () => {

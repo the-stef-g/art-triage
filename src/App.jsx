@@ -123,6 +123,13 @@ export default function App() {
         // Det aktive billede forsvandt, men resten af markeringen staar.
         nyAktiv = beholdt[0];
       }
+      // Er intet markeret, markeres det foerste billede, saa der altid er
+      // noget i kolonnen til hoejre.
+      if (!nyValg.length && !nyAktiv && res.rows.length) {
+        nyValg = [res.rows[0].version_id];
+        nyAktiv = nyValg[0];
+        ankerRef.current = 0;
+      }
       const venter = ventendeValgRef.current;
       // Er billedet heller ikke i hele fase 1 (fx et kasseret billede, mens
       // de kasserede er skjult), opgives det, saa det ikke dukker op senere.
