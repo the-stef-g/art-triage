@@ -6,6 +6,7 @@ Det der venter. Stef siger "byg", før noget herfra bliver lavet.
 
 - **Crop: stakke som i Lightroom.** En master og dens beskæringer er en stak i filmstriben, der kan åbnes og lukkes. Lukket ses kun masteren; åben står beskæringerne lige efter den. Stakken kan ses som en ramme om master og beskæringer, og en lille pil på masteren eller tasten **S** åbner og lukker den (S som i Lightroom; S er ikke brugt i appen, og den virker ikke i tekstfelter). S på en beskæring lukker dens stak og går til masteren. Om stakken er åben, huskes pr. værk.
 - **Crop: formaterne på masteren i stedet for tallet.** Mærket med antal beskæringer erstattes af de beskæringer, der er lavet (fx *1:1 2:3 3:2*), hver rød hvis den er ældre end masteren.
+- **Crop: minus-cirklerne præcist på hjørnet.** Cirklens midte skal ligge præcis på knappens øverste højre hjørne, både vandret og lodret, og minustegnet skal stå i midten af cirklen.
 
 ## Venter på en afklaring
 
