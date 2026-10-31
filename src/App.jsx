@@ -1005,13 +1005,14 @@ export default function App() {
             />
           )}
           </div>
-          {/* Fase 1: Import i den raekkefoelge billederne er skudt. Den staar
+          {/* Fase 1: Import i samme raekkefoelge som grid'et. Den staar
               under baade grid'et og den store visning. */}
           {filter.fase === 1 && focusedRow && (
             <Filmstrip
               row={focusedRow}
               rows={rows}
               visKasserede={filter.visKasserede}
+              sort={filter.sort}
               dataRev={dataRev}
               thumbRev={thumbRev}
               onSelect={(versionId, iGrid) => {

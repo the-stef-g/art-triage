@@ -1,4 +1,4 @@
-// Forhaandsvisninger paa macOS: sips, saa qlmanage, saa sharp, og til sidst
+// Forhaandsvisninger paa macOS: sips, saa sharp, saa qlmanage, og til sidst
 // en forhaandsvisning der allerede ligger i cachen. En TIFF som sips ikke
 // kunne give en 1024 px visning af gav foer bare null, uden en aarsag
 // nogen steder, og "Write texts" fejlede med en besked der ikke sagde mere.
@@ -43,7 +43,7 @@ function lav(opts = {}) {
   return { t, fejl };
 }
 
-describe('mac: sips, qlmanage, sharp', () => {
+describe('mac: sips, sharp, qlmanage', () => {
   it('bruger sips naar den virker, uden at melde fejl', async () => {
     const { writeFileSync: skriv } = await import('node:fs');
     const runner = async (cmd, args) => {
@@ -56,12 +56,15 @@ describe('mac: sips, qlmanage, sharp', () => {
     expect(fejl).toEqual([]);
   });
 
-  it('falder tilbage paa sharp, og melder hvorfor sips og qlmanage svigtede', async () => {
-    const { t, fejl } = lav();
+  it('falder tilbage paa sharp foer Quick Look, og melder hvorfor sips svigtede', async () => {
+    const kald = [];
+    const { t, fejl } = lav({ runner: async (cmd) => { kald.push(cmd); throw Object.assign(new Error('Command failed'), { stderr: 'Error 4: no file was written' }); } });
     const sti = await t.ensure(1, 5, tiff, 1024);
     expect(sti).toMatch(/1-5-1024\.jpg$/);
     expect(existsSync(sti)).toBe(true);
-    expect(fejl.map((f) => f.stage)).toEqual(['sips', 'qlmanage']);
+    // Quick Look kan faa macOS til at spoerge om Apple Music: ikke her.
+    expect(kald).toEqual(['sips']);
+    expect(fejl.map((f) => f.stage)).toEqual(['sips']);
     // Programmets egen besked, ikke bare "Command failed".
     expect(fejl[0]).toMatchObject({ file: 'billede.tif', message: 'Error 4: no file was written' });
   });
@@ -69,10 +72,13 @@ describe('mac: sips, qlmanage, sharp', () => {
   it('giver null og gemmer aarsagen naar ingen vej virker', async () => {
     const psd = join(dir, 'lag.psd');
     writeFileSync(psd, 'ikke et billede');
-    const { t, fejl } = lav();
+    const info = [];
+    const { t, fejl } = lav({ onInfo: (x) => info.push(x) });
     expect(await t.ensure(2, 5, psd, 1024)).toBeNull();
     expect(fejl.map((f) => f.stage)).toEqual(['sips', 'qlmanage']);
     expect(t.lastError).toMatch(/^qlmanage:/);
+    // Loggen siger, hvilken fil Quick Look blev brugt til.
+    expect(info).toEqual(['qlmanage (lag.psd): sips could not read the file, so Quick Look makes the preview']);
   });
 
   it('melder en fil der ikke findes paa disken', async () => {

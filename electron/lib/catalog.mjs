@@ -6,7 +6,6 @@ import {
   copyFileSync, mkdirSync, renameSync, existsSync, statSync, readdirSync, rmdirSync, rmSync,
 } from 'node:fs';
 import { join, dirname, basename, extname, posix } from 'node:path';
-import { exifTid } from './exif.mjs';
 import { printfilNavn, gammelPrintfilNavn } from './printfil.mjs';
 import { FARVER } from './keywords.mjs';
 
@@ -1143,13 +1142,12 @@ export class Catalog extends EventEmitter {
 
   // ---------- Filmstrip ----------
 
-  // Alle billederne i Import, med undermapper, i den raekkefoelge de er
-  // skudt (EXIF), og ellers efter filens dato og navn. Kandidaterne er med,
+  // Alle billederne i Import, med undermapper, i samme raekkefoelge som
+  // grid'et (efter navn eller nyeste foerst). Kandidaterne er med,
   // selv om de er flyttet til Candidate, og de kasserede naar de vises; ellers
   // ville et skud forsvinde fra rækken i det øjeblik det bedømmes. Uden en
-  // Import-mappe er det filerne i filens egen mappe. Optagetidspunktet laeses foerste gang en fil vises og
-  // gemmes. Returnerer { omfang, billeder }.
-  async filmstrip(fileId, { visKasserede = false } = {}) {
+  // Import-mappe er det filerne i filens egen mappe. Returnerer { omfang, billeder }.
+  async filmstrip(fileId, { visKasserede = false, sort = 'navn' } = {}) {
     const f = this.getFile(fileId);
     if (!f) return { omfang: null, billeder: [] };
     const imp = this.importMappe;
@@ -1176,14 +1174,13 @@ export class Catalog extends EventEmitter {
          ${visKasserede ? '' : "AND v.rating != 'kasseret'"}`,
       ...params
     );
-    const mangler = rows.filter((r) => r.taken_at === null || r.taken_at === undefined);
-    await mapGraense(mangler, 8, async (r) => {
-      const t = await exifTid(this.abs(r.rel_path));
-      r.taken_at = t ?? -1;
-      this.db.run('UPDATE files SET taken_at=? WHERE id=?', r.taken_at, r.file_id);
-    });
-    const tid = (r) => (r.taken_at > 0 ? r.taken_at : r.mtime);
-    rows.sort((a, b) => tid(a) - tid(b) || daCollator.compare(a.rel_path, b.rel_path));
+    // Samme raekkefoelge som grid'et: efter filnavn, eller nyeste foerst.
+    if (sort === 'dato') {
+      rows.sort((a, b) => b.mtime - a.mtime || a.version_id - b.version_id);
+    } else {
+      rows.sort((a, b) => daCollator.compare(posix.basename(a.rel_path), posix.basename(b.rel_path))
+        || daCollator.compare(a.rel_path, b.rel_path) || a.version_id - b.version_id);
+    }
     return { omfang: iImport ? 'import' : dir, billeder: rows };
   }
 
@@ -1448,8 +1445,10 @@ export class Catalog extends EventEmitter {
           mkdirSync(join(this.root, arbejd, del), { recursive: true });
         }
         // To filer med samme navn (fx en PNG fra AI og en PSD fra
-        // Photoshop) er ét vaerk: den aeldste er originalen.
+        // Photoshop) er ét vaerk: den aeldste er originalen. Det samme med
+        // et laengere navn (Fishy Fish sketch+pencil.psd).
         this._enOriginal(arbejdsmappeFor(`${mal}/x`).work);
+        this.fletLaengereNavne();
       }
     }
     return moves;
@@ -1525,7 +1524,148 @@ export class Catalog extends EventEmitter {
     ).map((f) => arbejdsmappeFor(f.rel_path)?.work).filter(Boolean));
     let antal = 0;
     for (const w of vaerker) antal += this._enOriginal(w);
-    return antal;
+    return antal + this.fletLaengereNavne();
+  }
+
+  // Filerne i vaerkmapperne, pr. vaerk og del.
+  _vaerkFiler() {
+    const vaerker = new Map();
+    for (const f of this.db.all(
+      "SELECT id, rel_path, mtime FROM files WHERE present=1 AND rel_path LIKE 'Approved/%'"
+    )) {
+      const am = arbejdsmappeFor(f.rel_path);
+      if (!am) continue;
+      if (!vaerker.has(am.work)) vaerker.set(am.work, { Original: [], Edits: [], Masters: [], 'Print files': [] });
+      vaerker.get(am.work)[am.del].push(f);
+    }
+    return vaerker;
+  }
+
+  // Vaerker der er skilt ud med "Make it a work of its own": de flettes
+  // aldrig af sig selv igen.
+  _egneVaerker() {
+    try { return new Set(JSON.parse(this.getMeta('egneVaerker') || '[]')); } catch { return new Set(); }
+  }
+
+  // Et vaerk hvis navn er et andet vaerks navn plus flere ord, og hvis
+  // original har en anden filtype, er en redigering af det andet: *Fishy
+  // Fish sketch+pencil.psd* er Photoshop-arbejdet paa *Fishy Fish.png*. Dets
+  // filer flyttes til det andet vaerks Edits, og billederne flettes. Ord
+  // der kun er et tal (*Desert Canyon 04*), er et nyt vaerk i en serie, og
+  // et vaerk med en master roeres ikke. Returnerer antallet af flyttede filer.
+  fletLaengereNavne() {
+    const vaerker = this._vaerkFiler();
+    const egne = this._egneVaerker();
+    const navne = [...vaerker.keys()].sort((a, b) => b.length - a.length);
+    const endelser = (w) => new Set(vaerker.get(w).Original.map((f) => extname(f.rel_path).toLowerCase()));
+    let flyttet = 0;
+    for (const w of navne) {
+      const d = vaerker.get(w);
+      if (egne.has(w) || !d.Original.length || d.Masters.length || d['Print files'].length) continue;
+      const lille = w.toLowerCase();
+      const v = navne.find((n) => n !== w && vaerker.get(n)?.Original.length
+        && lille.startsWith(`${n.toLowerCase()} `));
+      if (!v) continue;
+      const rest = w.slice(v.length + 1);
+      const ew = endelser(w);
+      const ev = endelser(v);
+      if ([...ew].some((e) => ev.has(e))) continue;
+      if (!erRedigeretUdgave(rest, [...ew][0], [...ev][0])) continue;
+      try {
+        flyttet += this._fletVaerk(w, v);
+      } catch {
+        // Kan en fil ikke flyttes nu (fx aaben), proeves det igen naeste gang.
+      }
+      vaerker.delete(w);
+    }
+    return flyttet;
+  }
+
+  // Flytter vaerket fras originaler og redigeringer til vaerket tils Edits
+  // og fletter billederne. Den tomme vaerkmappe slettes.
+  _fletVaerk(fra, til) {
+    const vaerker = this._vaerkFiler();
+    const a = vaerker.get(fra);
+    const b = vaerker.get(til);
+    if (!a || !b?.Original.length) throw new Error(`The work «${til}» has no original`);
+    if (a.Masters.length || a['Print files'].length) throw new Error(`«${fra}» already has a master, so it cannot be moved into another work`);
+    const billedeFor = (fileId) => this._imageForFile(fileId)?.imageId ?? null;
+    const ejer = billedeFor(b.Original[0].id);
+    const fraBilleder = new Set([...a.Original, ...a.Edits].map((f) => billedeFor(f.id)).filter(Boolean));
+    const flyttet = this.moveFiles([...a.Original, ...a.Edits].map((f) => f.id), `Approved/${til}/Edits`).length;
+    for (const id of fraBilleder) if (id !== ejer) this._flet(id, ejer);
+    this.db.run("UPDATE versions SET rating='godkendt' WHERE image_id=? AND rating != 'godkendt'", ejer);
+    this._fjernTomVaerkmappe(fra);
+    this.emit('changed');
+    return flyttet;
+  }
+
+  // Sletter en vaerkmappe, hvis den og dens fire mapper er tomme.
+  _fjernTomVaerkmappe(work) {
+    const mappe = join(this.root, 'Approved', work);
+    const tom = (abs) => {
+      try { return readdirSync(abs).filter((n) => n !== '.DS_Store').length === 0; } catch { return true; }
+    };
+    if (!existsSync(mappe)) return;
+    const under = readdirSync(mappe).filter((n) => n !== '.DS_Store');
+    if (under.some((n) => !ARBEJDSMAPPER.includes(n) || !tom(join(mappe, n)))) return;
+    rmSync(mappe, { recursive: true, force: true });
+  }
+
+  // Lægger en fil i et andet vaerks Edits. Er filen originalen i sit eget
+  // vaerk, flyttes hele det vaerk med (originalen og redigeringerne).
+  flytTilVaerk(versionId, til) {
+    const v = this.getVersion(versionId);
+    if (!v) throw new Error('The file is not in the catalogue');
+    const f = this.getFile(v.effective_file_id);
+    if (!f?.present) throw new Error('The file is not available right now');
+    if (!this._vaerkFiler().get(til)?.Original.length) throw new Error(`The work «${til}» has no original`);
+    const am = arbejdsmappeFor(f.rel_path);
+    if (am?.work === til) return { flyttet: 0 };
+    if (am?.del === 'Masters' || am?.del === 'Print files') throw new Error('A master, crop or print file cannot be moved to another work');
+    const egne = this._egneVaerker();
+    if (am) { egne.delete(am.work); this.setMeta('egneVaerker', JSON.stringify([...egne])); }
+    if (am?.del === 'Original') return { flyttet: this._fletVaerk(am.work, til) };
+    const flyttet = this.moveFiles([f.id], `Approved/${til}/Edits`).length;
+    this._tilknytArbejdsmapper();
+    this.db.run("UPDATE versions SET rating='godkendt' WHERE file_id=?", f.id);
+    if (am) this._fjernTomVaerkmappe(am.work);
+    this.emit('changed');
+    return { flyttet };
+  }
+
+  // Det modsatte: en redigering i et vaerks Edits bliver et vaerk for sig,
+  // med filen som original. Det huskes, saa den ikke flettes igen.
+  egetVaerk(versionId) {
+    const v = this.getVersion(versionId);
+    const f = v ? this.getFile(v.effective_file_id) : null;
+    if (!f?.present) throw new Error('The file is not available right now');
+    const am = arbejdsmappeFor(f.rel_path);
+    if (am?.del !== 'Edits') throw new Error('Only a file in a work\'s Edits can become a work of its own');
+    const navn = stemOf(posix.basename(f.rel_path)).replace(/[/\\:]/g, '-').trim();
+    if (existsSync(join(this.root, 'Approved', navn))) throw new Error(`There is already a work called «${navn}»`);
+    const maal = `Approved/${navn}/Original`;
+    this.moveFiles([f.id], maal);
+    for (const del of ['Edits', 'Masters', 'Print files']) mkdirSync(join(this.root, 'Approved', navn, del), { recursive: true });
+    this.db.transaction(() => {
+      this.db.run('DELETE FROM versions WHERE file_id=?', f.id);
+      const imageId = this.db.run('INSERT INTO images(master_file_id, created_at) VALUES(?,?)', f.id, this.now()).lastInsertRowid;
+      this.db.run(
+        "INSERT INTO versions(image_id, file_id, name, is_master, rating, created_at) VALUES(?,NULL,'Original',1,'godkendt',?)",
+        imageId, this.now()
+      );
+    });
+    const egne = this._egneVaerker();
+    egne.add(navn);
+    this.setMeta('egneVaerker', JSON.stringify([...egne]));
+    this.emit('changed');
+    return { work: navn };
+  }
+
+  // Vaerkerne med en original, til "Move to work …".
+  vaerkNavne() {
+    return [...this._vaerkFiler()].filter(([, d]) => d.Original.length).map(([w]) => w)
+      .sort((a, b) => daCollator.compare(a, b));
   }
 
   // Mappen en fil skal ligge i for en bedoemmelse, eller null hvis den allerede

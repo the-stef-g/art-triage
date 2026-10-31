@@ -59,6 +59,8 @@ const ARBEJDE = {
   'crop:save': 'saving a crop',
   'crop:delete': 'removing a crop',
   'work:omdoeb': 'renaming the files of a work',
+  'work:flytTil': 'moving a file to another work',
+  'work:egetVaerk': 'making a work of its own',
   'edit:makeMaster': 'making a master',
   'edit:send': 'copying to an editor',
   'work:writeTexts': 'writing texts with Claude',
@@ -154,7 +156,7 @@ export class AppSession {
       try {
         // Ét vaerk, én original: to filer med samme navn i Original flettes.
         const flyttet = katalog.rydDobbelteOriginaler();
-        if (flyttet) this.log(`one original per work: ${flyttet} file(s) moved to Edits`);
+        if (flyttet) this.log(`one original per work (same name, or the name plus more words): ${flyttet} file(s) moved to Edits`);
         const antal = this.works.autoSerier();
         if (antal) this.log(`auto series: ${antal} work(s)`);
         // En serie deler de ord de fleste af dens vaerker har.
@@ -1034,8 +1036,22 @@ export class AppSession {
       return { antal: ids.length };
     });
     // Filmstrip: de andre skud i samme mappe, i den raekkefoelge de er taget.
-    handle('img:filmstrip', ({ fileId, visKasserede }) =>
-      this.requireCatalog().filmstrip(fileId, { visKasserede: Boolean(visKasserede) }));
+    // Fase 2: en fil i et andet vaerk, eller et vaerk for sig.
+    handle('work:navne', () => this.requireCatalog().vaerkNavne());
+    handle('work:flytTil', async ({ versionId, work }) => {
+      const res = this.requireCatalog().flytTilVaerk(versionId, work);
+      this.log(`work: file moved into ${work} (${res.flyttet} file(s))`);
+      await this.runSync('flyt til vaerk');
+      return res;
+    });
+    handle('work:egetVaerk', async ({ versionId }) => {
+      const res = this.requireCatalog().egetVaerk(versionId);
+      this.log(`work: ${res.work} is a work of its own`);
+      await this.runSync('eget vaerk');
+      return res;
+    });
+    handle('img:filmstrip', ({ fileId, visKasserede, sort }) =>
+      this.requireCatalog().filmstrip(fileId, { visKasserede: Boolean(visKasserede), sort }));
 
     // Fase 2: en kopi til et program. Kopien faar programmets endelse
     // (-neo, -tp, -ps) og ligger i vaerkets Edits, saa resultatet ogsaa

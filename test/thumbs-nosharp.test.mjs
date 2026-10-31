@@ -25,8 +25,8 @@ describe('sharp mangler', () => {
         onError: (e) => fejl.push(e),
       });
       expect(await t.ensure(1, 1, tif, 1024)).toBeNull();
-      expect(fejl.map((f) => f.stage)).toEqual(['sips', 'qlmanage', 'sharp']);
-      expect(fejl[2].message).toMatch(/^sharp could not be loaded: /);
+      expect(fejl.map((f) => f.stage)).toEqual(['sips', 'sharp', 'qlmanage']);
+      expect(fejl[1].message).toMatch(/^sharp could not be loaded: /);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

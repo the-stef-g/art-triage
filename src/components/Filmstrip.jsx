@@ -1,31 +1,30 @@
 import { useEffect, useRef, useState } from 'react';
 import { invoke, thumbUrl } from '../api';
 
-// Fase 1: billederne i Import, i den raekkefoelge de er skudt. Grid'et
-// sorterer efter navn og viser én mappe ad gangen; her ses hele importen
-// som den blev taget, ogsaa i den store visning.
-export default function Filmstrip({ row, rows, visKasserede, dataRev, thumbRev, onSelect }) {
+// Fase 1: billederne i Import, i samme raekkefoelge som grid'et. Grid'et
+// viser én mappe ad gangen; her ses hele importen, ogsaa i den store visning.
+export default function Filmstrip({ row, rows, visKasserede, sort, dataRev, thumbRev, onSelect }) {
   const [billeder, setBilleder] = useState([]);
   const stripRef = useRef(null);
-  const hentetRef = useRef({ dataRev: null, visKasserede: null, omfang: null, filer: new Set() });
+  const hentetRef = useRef({ dataRev: null, visKasserede: null, sort: null, omfang: null, filer: new Set() });
 
   // Hentes igen naar kataloget aendres. Uden en Import-mappe ogsaa naar man
   // staar paa et billede i en anden mappe. Ikke ved hvert skridt med pilene.
   useEffect(() => {
     const h = hentetRef.current;
-    const samme = h.dataRev === dataRev && h.visKasserede === visKasserede;
+    const samme = h.dataRev === dataRev && h.visKasserede === visKasserede && h.sort === sort;
     if (samme && (h.omfang === 'import' || h.filer.has(row.file_id))) return undefined;
     let aktuel = true;
-    invoke('img:filmstrip', { fileId: row.file_id, visKasserede })
+    invoke('img:filmstrip', { fileId: row.file_id, visKasserede, sort })
       .then((r) => {
         if (!aktuel) return;
         const liste = r?.billeder || [];
-        hentetRef.current = { dataRev, visKasserede, omfang: r?.omfang ?? null, filer: new Set(liste.map((b) => b.file_id)) };
+        hentetRef.current = { dataRev, visKasserede, sort, omfang: r?.omfang ?? null, filer: new Set(liste.map((b) => b.file_id)) };
         setBilleder(liste);
       })
       .catch(() => { if (aktuel) setBilleder([]); });
     return () => { aktuel = false; };
-  }, [row.file_id, dataRev, visKasserede]);
+  }, [row.file_id, dataRev, visKasserede, sort]);
 
   // Det aktive billede holdes inde i synsfeltet.
   useEffect(() => {

@@ -497,6 +497,83 @@ describe('ét vaerk pr. navn', () => {
     // Én gang er nok.
     expect(catalog.rydDobbelteOriginaler()).toBe(0);
   });
+
+  it('en PSD med vaerkets navn plus flere ord er en redigering af vaerket', () => {
+    skriv('Import/A/Fishy Fish.png', 'ai');
+    skriv('Import/B/Fishy Fish sketch+pencil.psd', 'photoshop');
+    skriv('Import/C/Fishy Fish 2.psd', 'et andet vaerk');
+    skriv('Import/D/Fishy Fish blue.png', 'samme filtype');
+    catalog.sync();
+    catalog.setRating([raekke('Import/A/Fishy Fish.png').version_id], 'godkendt');
+    catalog.sync();
+    for (const r of ['Import/B/Fishy Fish sketch+pencil.psd', 'Import/C/Fishy Fish 2.psd', 'Import/D/Fishy Fish blue.png']) {
+      catalog.setRating([raekke(r).version_id], 'godkendt');
+      catalog.sync();
+    }
+    expect(existsSync(join(root, 'Approved', 'Fishy Fish', 'Edits', 'Fishy Fish sketch+pencil.psd'))).toBe(true);
+    expect(existsSync(join(root, 'Approved', 'Fishy Fish sketch+pencil'))).toBe(false);
+    const r = alle().filter((x) => x.rel_path.startsWith('Approved/Fishy Fish/'));
+    expect(new Set(r.map((x) => x.image_id)).size).toBe(1);
+    expect(fase(2)).toContain('Approved/Fishy Fish/Edits/Fishy Fish sketch+pencil.psd');
+    // Et tal er et nyt vaerk, og samme filtype er et andet billede.
+    expect(existsSync(join(root, 'Approved', 'Fishy Fish 2', 'Original', 'Fishy Fish 2.psd'))).toBe(true);
+    expect(existsSync(join(root, 'Approved', 'Fishy Fish blue', 'Original', 'Fishy Fish blue.png'))).toBe(true);
+  });
+
+  it('fletter to vaerker der allerede er delt, og kan skille dem ad igen', () => {
+    skriv('Import/A/Fishy Fish.png', 'ai');
+    skriv('Import/B/Fishy Fish sketch+pencil.psd', 'photoshop');
+    catalog.sync();
+    // Som i 0.47: hver sit vaerk.
+    catalog.mappestyring = false;
+    catalog.moveFiles([raekke('Import/A/Fishy Fish.png').file_id], 'Approved/Fishy Fish/Original');
+    catalog.moveFiles([raekke('Import/B/Fishy Fish sketch+pencil.psd').file_id], 'Approved/Fishy Fish sketch+pencil/Original');
+    catalog.sync();
+    catalog.setRating(alle().filter((x) => x.rel_path.startsWith('Approved/')).map((x) => x.version_id), 'godkendt');
+    catalog.mappestyring = true;
+    expect(catalog.rydDobbelteOriginaler()).toBe(1);
+    catalog.sync();
+    const psd = 'Approved/Fishy Fish/Edits/Fishy Fish sketch+pencil.psd';
+    expect(raekke(psd).image_id).toBe(raekke('Approved/Fishy Fish/Original/Fishy Fish.png').image_id);
+    expect(existsSync(join(root, 'Approved', 'Fishy Fish sketch+pencil'))).toBe(false);
+
+    // Gaettede reglen forkert, skilles den ud, og den flettes ikke igen.
+    expect(catalog.egetVaerk(raekke(psd).version_id)).toEqual({ work: 'Fishy Fish sketch+pencil' });
+    catalog.sync();
+    const ny = 'Approved/Fishy Fish sketch+pencil/Original/Fishy Fish sketch+pencil.psd';
+    expect(raekke(ny).image_id).not.toBe(raekke('Approved/Fishy Fish/Original/Fishy Fish.png').image_id);
+    expect(raekke(ny).rating).toBe('godkendt');
+    expect(catalog.rydDobbelteOriginaler()).toBe(0);
+    catalog.sync();
+    expect(existsSync(join(root, ny))).toBe(true);
+
+    // Og flyttes tilbage med Move to work.
+    expect(catalog.vaerkNavne()).toEqual(['Fishy Fish', 'Fishy Fish sketch+pencil']);
+    catalog.flytTilVaerk(raekke(ny).version_id, 'Fishy Fish');
+    catalog.sync();
+    expect(raekke(psd).image_id).toBe(raekke('Approved/Fishy Fish/Original/Fishy Fish.png').image_id);
+    expect(existsSync(join(root, 'Approved', 'Fishy Fish sketch+pencil'))).toBe(false);
+  });
+
+  it('Move to work laegger en redigering i et andet vaerks Edits', () => {
+    skriv('Import/A/Roofs.png', 'a');
+    skriv('Import/B/Church.png', 'b');
+    catalog.sync();
+    catalog.setRating([raekke('Import/A/Roofs.png').version_id], 'godkendt');
+    catalog.setRating([raekke('Import/B/Church.png').version_id], 'godkendt');
+    catalog.sync();
+    skriv('Approved/Roofs/Edits/Roofs-ps.psd', 'forkert vaerk');
+    catalog.sync();
+    catalog.flytTilVaerk(raekke('Approved/Roofs/Edits/Roofs-ps.psd').version_id, 'Church');
+    catalog.sync();
+    const flyttet = raekke('Approved/Church/Edits/Roofs-ps.psd');
+    expect(flyttet.image_id).toBe(raekke('Approved/Church/Original/Church.png').image_id);
+    expect(flyttet.rating).toBe('godkendt');
+    // En master kan ikke flyttes.
+    skriv('Approved/Roofs/Masters/Roofs.tif', 'm');
+    catalog.sync();
+    expect(() => catalog.flytTilVaerk(raekke('Approved/Roofs/Masters/Roofs.tif').version_id, 'Church')).toThrow(/master/);
+  });
 });
 
 describe('ny titel', () => {
@@ -569,7 +646,7 @@ describe('gamle mappenavne', () => {
 });
 
 describe('filmstrip', () => {
-  it('viser hele Import, med kandidaterne, i den raekkefoelge de er taget', async () => {
+  it('viser hele Import, med kandidaterne, i samme raekkefoelge som grid\'et', async () => {
     for (const n of ['x', 'y', 'z']) {
       utimesSync(join(root, `Import/Ahl/${n}.cr2`), new Date('2029-01-01'), new Date('2029-01-01'));
     }
@@ -584,16 +661,18 @@ describe('filmstrip', () => {
     catalog.setRating([raekke('Import/Ahl/z.cr2').version_id], 'kasseret');
     const { omfang, billeder: strip } = await catalog.filmstrip(raekke('Import/Serie/a.jpg').file_id);
     expect(omfang).toBe('import');
+    // Efter filnavn, som grid'et.
     expect(strip.map((r) => r.rel_path)).toEqual([
-      'Import/Serie/under/d.jpg', 'Import/Serie/b.jpg', 'Candidate/Serie/c.jpg', 'Import/Serie/a.jpg',
-      'Import/Ahl/x.cr2', 'Import/Ahl/y.cr2', 'Import/Serie/uden.jpg',
+      'Import/Serie/a.jpg', 'Import/Serie/b.jpg', 'Candidate/Serie/c.jpg', 'Import/Serie/under/d.jpg',
+      'Import/Serie/uden.jpg', 'Import/Ahl/x.cr2', 'Import/Ahl/y.cr2',
     ]);
+    // Grid'et sorteret efter Modified: nyeste foerst.
+    const dato = await catalog.filmstrip(raekke('Import/Serie/a.jpg').file_id, { sort: 'dato' });
+    expect(dato.billeder[0].rel_path).toBe('Import/Serie/uden.jpg');
+    expect(dato.billeder.slice(1, 3).map((r) => r.rel_path).sort()).toEqual(['Import/Ahl/x.cr2', 'Import/Ahl/y.cr2']);
     // Med de kasserede vist er de ogsaa med.
     const alle = await catalog.filmstrip(raekke('Import/Serie/a.jpg').file_id, { visKasserede: true });
     expect(alle.billeder.map((r) => r.rel_path)).toContain('Discarded/Ahl/z.cr2');
-    // Tidspunktet gemmes, saa det kun laeses én gang.
-    expect(catalog.getFile(raekke('Import/Serie/b.jpg').file_id).taken_at).toBeGreaterThan(0);
-    expect(catalog.getFile(raekke('Import/Serie/uden.jpg').file_id).taken_at).toBe(-1);
   });
 
   it('laeser sekunder og brøkdele', () => {

@@ -387,7 +387,17 @@ export class Thumbnailer {
       this._report('sips', absPath, err);
       rmSync(tmp, { force: true });
     }
-    // Quick Look som fallback (bl.a. .ai og eksotiske formater).
+    // sharp foer Quick Look til de formater, den kan laese (PNG, TIFF,
+    // JPEG, WebP). Quick Look kan faa macOS til at spoerge om adgang til
+    // Apple Music, saa det bruges kun, naar intet andet kan.
+    const ext = extOf(absPath);
+    if (RASTER_EXTS.has(ext) || ext === 'svg') {
+      const viaSharp = await this._generateSharp(key, absPath, size);
+      if (viaSharp) return viaSharp;
+    }
+    // Quick Look som sidste udvej (bl.a. .ai og eksotiske formater). Det
+    // staar i loggen, saa det kan ses, hvilken fil der fik det i gang.
+    this.onInfo?.(`qlmanage (${basename(absPath)}): sips could not read the file, so Quick Look makes the preview`);
     const qlDir = mkdtempSync(join(tmpdir(), 'bf-ql-'));
     try {
       await this._run('qlmanage', ['-t', '-s', String(size), '-o', qlDir, absPath]);
@@ -403,9 +413,7 @@ export class Thumbnailer {
     } finally {
       rmSync(qlDir, { recursive: true, force: true });
     }
-    // Sidste udvej: sharp laeser TIFF, PNG, JPEG og WebP selv om systemets
-    // billedmotor ikke kunne, fx en TIFF med et usaedvanligt farverum.
-    return this._generateSharp(key, absPath, size);
+    return null;
   }
 
   async _generateSharp(key, absPath, size) {

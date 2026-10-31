@@ -273,6 +273,8 @@ export default function Inspector({
             <button className="primaer" onClick={act.makeMaster} title="Copies the selected file to Masters, named after the work">Make master</button>
           </div>
 
+          <VaerkValg row={row} onError={onError} />
+
           <h4>Discard</h4>
           <div className="knapraekke">
             <button onClick={act.discardWork} title="The original goes to Discarded, and the edits go to the Trash (shortcut X)">Discard work</button>
@@ -592,5 +594,57 @@ function CropVisning({ row, crop, onFinder }) {
         <p className="tom crop-visning-hjaelp">Select the master in the filmstrip to crop again.</p>
       </div>
     </div>
+  );
+}
+
+// Fase 2: en fil der hoerer til et andet vaerk, flyttes dertil (er den et
+// vaerks original, flytter hele vaerket med), og en redigering kan blive et
+// vaerk for sig.
+function VaerkValg({ row, onError }) {
+  const [navne, setNavne] = useState([]);
+  const [travl, setTravl] = useState(false);
+  const am = /^Approved\/([^/]+)\/(Original|Edits|Masters|Print files)\//.exec(row.rel_path || '');
+  const work = am?.[1] ?? null;
+  const del = am?.[2] ?? null;
+  useEffect(() => {
+    invoke('work:navne').then(setNavne).catch(() => setNavne([]));
+  }, [row.version_id]);
+  if (del === 'Masters' || del === 'Print files') return null;
+  const andre = navne.filter((n) => n !== work);
+  const kald = async (kanal, payload) => {
+    setTravl(true);
+    try { await invoke(kanal, payload); } catch (err) { onError(err); }
+    setTravl(false);
+  };
+  return (
+    <>
+      <h4>Work</h4>
+      <p className="tom">
+        {del === 'Original'
+          ? 'Is this an edit of another work? Moving it puts it and its edits in that work\'s Edits.'
+          : 'Does this file belong to another work, or is it a work of its own?'}
+      </p>
+      <div className="knapraekke">
+        <select
+          className="vaerk-flyt"
+          value=""
+          disabled={travl || !andre.length}
+          onChange={(e) => e.target.value && kald('work:flytTil', { versionId: row.version_id, work: e.target.value })}
+          title="Put the file in another work's Edits"
+        >
+          <option value="">Move to work …</option>
+          {andre.map((n) => <option key={n} value={n}>{n}</option>)}
+        </select>
+        {del === 'Edits' && (
+          <button
+            disabled={travl}
+            onClick={() => kald('work:egetVaerk', { versionId: row.version_id })}
+            title="The file becomes the original of a new work, named after the file"
+          >
+            Make it a work of its own
+          </button>
+        )}
+      </div>
+    </>
   );
 }
