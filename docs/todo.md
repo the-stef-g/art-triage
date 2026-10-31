@@ -9,6 +9,8 @@ Det der venter. Stef siger "byg", før noget herfra bliver lavet.
 - **Fejl: upload-beskeden hører ikke til sit værk.** Fremdriften fra Send to shop vises under det værk, man står på, også når det er et andet værks upload, og den sidste besked ("Uploading … (2 of 5)") kan blive stående med snurren, når uploaden er færdig. Derfor så det ud, som om en upload var i gang, da Cmd+Q ikke spurgte. Beskederne knyttes til værket; hvert værk viser sin egen fremdrift og sit resultat ("Sent at 16:12" eller fejlen), også når man klikker tilbage til det.
 - **Shop i loggen:** hver afsendelse logges (start, færdig, fejl), og ved lukning logges, om noget var i gang.
 - **Ingen evige uploads:** en forespørgsel til shoppen uden svar i 5 minutter gives op og tæller som et mislykket forsøg (og prøves igen, hvor det er sikkert).
+- **Product: billedet i højre kolonne er kvadratisk,** lige så højt som det er bredt, så stående værker vises større.
+- **Product: Series intro vokser med teksten,** så hele introen kan ses uden at rulle (i dag kun 2 linjer).
 
 ## Venter på en afklaring
 
