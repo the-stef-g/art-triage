@@ -6,6 +6,9 @@ Det der venter. Stef siger "byg", før noget herfra bliver lavet.
 
 - **Shop: filnavnet i fremdriften.** I stedet for "Uploading the 2:3 crop (2 of 5)" står filens navn, fx "Uploading Desert Canyon 01 2-3.tif (2 of 5)", så det kan ses hvilket værk det er, når flere sendes.
 - **Product: venstre kolonne dobbelt så bred** (750 px i stedet for 375), med plads til flere billeder i bredden.
+- **Fejl: upload-beskeden hører ikke til sit værk.** Fremdriften fra Send to shop vises under det værk, man står på, også når det er et andet værks upload, og den sidste besked ("Uploading … (2 of 5)") kan blive stående med snurren, når uploaden er færdig. Derfor så det ud, som om en upload var i gang, da Cmd+Q ikke spurgte. Beskederne knyttes til værket; hvert værk viser sin egen fremdrift og sit resultat ("Sent at 16:12" eller fejlen), også når man klikker tilbage til det.
+- **Shop i loggen:** hver afsendelse logges (start, færdig, fejl), og ved lukning logges, om noget var i gang.
+- **Ingen evige uploads:** en forespørgsel til shoppen uden svar i 5 minutter gives op og tæller som et mislykket forsøg (og prøves igen, hvor det er sikkert).
 
 ## Venter på en afklaring
 
