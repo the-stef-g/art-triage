@@ -10,6 +10,7 @@ Det der venter. Stef siger "byg", før noget herfra bliver lavet.
 - **Crop: minus-cirklerne præcist på hjørnet.** Cirklens midte skal ligge præcis på knappens øverste højre hjørne, både vandret og lodret, og minustegnet skal stå i midten af cirklen.
 - **Print: bredden til Gigapixel på udklipsholderen.** *Enlarge in Gigapixel* lægger selv tallet (kun tallet, fx `14173`) på udklipsholderen, så det kan sættes direkte ind i Gigapixel med Cmd+V. Tallet kan også klikkes for at kopiere det, og der står kort *Copied*. Med flere beskæringer valgt kopieres tallet for den aktive.
 - **Ingen retningsord som søgeord.** Appen holder op med at sætte *horizontal*, *vertical* og *square* på værkerne, og de automatiske ord fjernes én gang fra alle værker (ord Stef selv har skrevet, bliver). Claude må heller ikke foreslå dem. I shoppen filtrerer kunden på Format-attributten (Square 1:1, Portrait 2:3 osv.), som varianterne allerede har. Alle værker beskæres, også når formatet er det samme som originalen, så Format dækker alle.
+- **Serien i værkets tekster.** Serien sættes, før teksterne skrives (i dag skrives de, når masteren lander, og serien kommer først efter skanningen). Instruksen til Claude: serien nævnes altid i beskrivelsen og i den korte tekst, ikke i alt-teksten. Får et værk en ny serie, skrives teksterne om, hvis Stef ikke selv har rettet i dem; ellers viser værket en note om, at serien ikke står i teksten. Værker, der allerede er i en serie, får teksterne skrevet om én gang efter samme regel.
 
 ## Venter på en afklaring
 
