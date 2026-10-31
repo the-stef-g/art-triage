@@ -5,6 +5,7 @@ Det der venter. Stef siger "byg", før noget herfra bliver lavet.
 ## Venter på "byg"
 
 - **Crop: linjen "Every format is cropped or turned off." fjernes.** Knapperne siger det selv.
+- **Print: antallet på formatknapperne i en boble,** som tallene på fanerne Sort, Edit osv.
 
 ## Venter på en afklaring
 
