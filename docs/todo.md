@@ -4,9 +4,7 @@ Det der venter. Stef siger "byg", før noget herfra bliver lavet.
 
 ## Venter på "byg"
 
-- **Sort: filmstriben følger hovedvinduets rækkefølge.** Den viser i dag importen i den rækkefølge, billederne er taget, så den ikke passer med grid'et, når det er sorteret efter navn (*Fishy Fish.png* står før *Fishy Fish sketch+pencil.psd* i striben, men efter i grid'et). Striben skal sortere som grid'et, også når sorteringen skiftes.
-- **En redigering med længere navn hører til værket.** *Fishy Fish.png* er originalen, og *Fishy Fish sketch+pencil.psd* er Photoshop-arbejdet, der skal være master, men det blev et værk for sig. Regel: en fil med en anden filtype, hvis navn er et værks navn plus et mellemrum og flere ord, er en redigering af det værk og lægges i dets `Edits`. Ord der kun er et tal (*Desert Canyon 04*), gør det ikke: det er et nyt værk i en serie. Værker, der allerede er delt sådan (Fishy Fish), flettes ved næste skanning, som Allura. Desuden en knap til begge veje: *Move to work …* lægger en fil i et andet værks `Edits`, og *Make it a work of its own* skiller den ud igen, hvis reglen gætter forkert.
-- **Spørgsmålet om Apple Music.** macOS spurgte, om Stef G Art må få adgang til Apple Music og musikbiblioteket, da en mappe blev lagt i Import. Appen bruger ikke musik. Mappen kom fra en anden disk og havde kun billeder (CR2, PSD, PNG), så det er hverken Musik-mappen eller lyd og video. Mistanken er det program, der laver forhåndsvisningen af PSD og PNG (sips eller Quick Look). Find ud af hvilket, skriv i loggen hvilket værktøj der kører på hvilken fil, og få spørgsmålet væk, så appen aldrig spørger.
+Intet lige nu.
 
 ## Venter på en afklaring
 
