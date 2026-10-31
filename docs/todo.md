@@ -6,6 +6,8 @@ Det der venter. Stef siger "byg", før noget herfra bliver lavet.
 
 - **Crop: linjen "Every format is cropped or turned off." fjernes.** Knapperne siger det selv.
 - **Print: antallet på formatknapperne i en boble,** som tallene på fanerne Sort, Edit osv.
+- **Send flere værker til shoppen på én gang.** Markér flere værker i Product eller Shop (Cmd-klik, Skift-klik), og knappen hedder *Send 4 to shop*. De sendes ét ad gangen i rækkefølge. Har shoppen allerede et produkt med samme navn, springes værket over og nævnes til sidst, så der aldrig laves en dublet uden at spørge.
+- **Fremdriftslinje.** En bjælke for hele afsendelsen (værk 2 af 4) og én for værket, der sendes nu: hvert billede viser MB sendt af MB i alt, mens det uploades, og bagefter trinene (produktet, varianterne, serien). Der står tid brugt og cirka tid tilbage.
 
 ## Venter på en afklaring
 
