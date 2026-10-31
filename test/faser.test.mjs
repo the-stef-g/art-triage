@@ -363,6 +363,33 @@ describe('serier og print af sig selv', () => {
     expect(works.tekstUdenSerie()).toEqual([]);
   });
 
+  it('serier med tom intro og mindst to vaerker med tekster; tom skabelon bliver walkthrough', () => {
+    for (const n of ['Sol 1', 'Sol 2']) {
+      skriv(`Import/Ahl/${n}.tif`, n);
+    }
+    catalog.sync();
+    for (const n of ['Sol 1', 'Sol 2']) {
+      catalog.setRating([raekke(`Import/Ahl/${n}.tif`).version_id], 'godkendt');
+      skriv(`Approved/${n}/Master/${n}.tif`, `m${n}`);
+    }
+    catalog.sync();
+    const works = new Works(catalog);
+    works.autoSerier();
+    const a = raekke('Approved/Sol 1/Original/Sol 1.tif').image_id;
+    const b = raekke('Approved/Sol 2/Original/Sol 2.tif').image_id;
+    works.saveGeneratedTexts(a, { description: 'Warm light, part of the series Sol.' });
+    expect(works.serierUdenIntro()).toEqual([]); // kun ét vaerk med tekst
+    works.saveGeneratedTexts(b, { description: 'Cold light, part of the series Sol.' });
+    works.save(b, { section_colour: '#112233' });
+    const [sol] = works.serierUdenIntro();
+    expect(sol.navn).toBe('Sol');
+    expect(sol.vaerker.map((v) => v.farve)).toEqual([null, '#112233']);
+    expect(works.standardSkabelon()).toBe(1);
+    expect(catalog.listSeries()[0].template).toBe('walkthrough');
+    catalog.setSeriesShop(sol.id, { intro: 'The sun.' });
+    expect(works.serierUdenIntro()).toEqual([]);
+  });
+
   it('alle vaerker saelges som print, undtagen malerier og skulpturer', () => {
     catalog.setRating([raekke('Import/Ahl/x.cr2').version_id], 'godkendt');
     skriv('Approved/x/Master/x.tif', 'm');

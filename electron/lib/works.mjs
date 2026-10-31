@@ -375,6 +375,30 @@ export class Works {
     });
   }
 
+  // Serier med tom intro og mindst to vaerker med en beskrivelse: dem kan
+  // Claude skrive introen og vaelge farven til. Returnerer
+  // [{ id, navn, vaerker: [{ titel, beskrivelse, farve }] }].
+  serierUdenIntro() {
+    const serier = this.db.all(
+      "SELECT id, name FROM series WHERE intro IS NULL OR intro = '' ORDER BY id"
+    );
+    const ud = [];
+    for (const s of serier) {
+      const ids = this.db.all('SELECT id FROM images WHERE series_id=? ORDER BY id', s.id).map((r) => r.id);
+      const vaerker = ids.map((id) => this.get(id))
+        .filter((w) => w.description)
+        .map((w) => ({ titel: w.effective.title, beskrivelse: w.description, farve: w.sectionColour || null }));
+      if (vaerker.length >= 2) ud.push({ id: s.id, navn: s.name, vaerker });
+    }
+    return ud;
+  }
+
+  // En serie uden skabelon faar Walkthrough, som shoppen ogsaa giver en ny.
+  // Returnerer antallet af serier der fik den.
+  standardSkabelon() {
+    return this.db.run("UPDATE series SET template='walkthrough' WHERE template IS NULL OR template = ''").changes || 0;
+  }
+
   // Woo-produktets id gemmes, saa der aldrig laves dubletter.
   setWooProductId(imageId, id) {
     this._ensure(this._image(imageId));

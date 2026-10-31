@@ -8,7 +8,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
   TEXT_SYSTEM_PROMPT, buildTextRequest, workBrief, parseTexts, cleanText, lintTexts,
-  ClaudeWorkTexts, TEXT_IMAGE_SIZE,
+  ClaudeWorkTexts, TEXT_IMAGE_SIZE, SERIE_SYSTEM_PROMPT, serieBrief, parseSerie,
 } from '../electron/lib/workTexts.mjs';
 
 const work = {
@@ -147,3 +147,29 @@ describe('kaldet', () => {
     rmSync(dir, { recursive: true, force: true });
   });
 });
+
+describe('serien', () => {
+  const vaerker = [
+    { titel: 'Desert Canyon 01', beskrivelse: 'Light over the canyon.', farve: '#3b2a20' },
+    { titel: 'Desert Canyon 02', beskrivelse: 'Clouds over the plain.', farve: null },
+  ];
+
+  it('beder om en kort intro og en farve, uden noget der skifter fra serie til serie', () => {
+    expect(SERIE_SYSTEM_PROMPT).toMatch(/INTRO: 40 to 80 words/);
+    expect(SERIE_SYSTEM_PROMPT).not.toContain('Desert Canyon');
+    const brief = serieBrief('Desert Canyon', vaerker);
+    expect(brief).toContain('Series: Desert Canyon');
+    expect(brief).toContain('Section colour: #3b2a20');
+    expect(brief).toContain('Clouds over the plain.');
+  });
+
+  it('henter intro og farve ud af svaret, og renser tankestreger', async () => {
+    const kald = [];
+    const client = { messages: { create: async (req) => { kald.push(req); return svar({ intro: 'A canyon — at dawn.', colour: '#AA5533' }); } } };
+    const res = await new ClaudeWorkTexts({ apiKey: 'k', model: 'claude-haiku-4-5', client }).writeSeries('Desert Canyon', vaerker);
+    expect(res.serie).toEqual({ intro: 'A canyon, at dawn.', colour: '#aa5533' });
+    expect(kald[0].messages[0].content).toHaveLength(1);
+    expect(parseSerie(svar({ intro: '', colour: '#000000' }))).toBe(null);
+  });
+});
+

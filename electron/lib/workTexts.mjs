@@ -182,4 +182,76 @@ export class ClaudeWorkTexts {
       cost: costOf(svar.usage, this.model),
     };
   }
+
+  // Seriens intro og farve. Returnerer { serie: { intro, colour }, cost }.
+  async writeSeries(navn, vaerker) {
+    const client = await this._ensureClient();
+    const svar = await client.messages.create({
+      model: this.model,
+      max_tokens: 512,
+      system: [{ type: 'text', text: SERIE_SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
+      output_config: { format: { type: 'json_schema', schema: SERIE_SCHEMA } },
+      messages: [{ role: 'user', content: [{ type: 'text', text: serieBrief(navn, vaerker) }] }],
+    });
+    const serie = parseSerie(svar);
+    if (!serie) throw new Error('Claude did not return an intro for the series. Try again.');
+    return { serie, cost: costOf(svar.usage, this.model) };
+  }
+}
+
+// ---------- Serien ----------
+
+// Seriens intro og farve. Kun tekst, intet billede: introen bygger paa
+// vaerkernes titler og beskrivelser, og farven paa deres sektionsfarver.
+export const SERIE_SYSTEM_PROMPT = [
+  'You write the introduction for a series of artworks in an artist\'s own webshop. The artist',
+  'will read and correct your draft, so write plainly and do not decorate. Use British English.',
+  '',
+  'INTRO: 40 to 80 words about what the works in the series share: the place, the light, the',
+  'mood or the subject. Name the series exactly as given. Do not list the works one by one.',
+  '',
+  'COLOUR: one colour as a hex code (#rrggbb) for the series on the website. It must sit well',
+  'with the section colours of the works and set the series off; do not simply repeat one of them.',
+  '',
+  'Rules:',
+  '- No superlatives and no clichés: never "stunning", "unique", "one-of-a-kind" or "perfect',
+  '  gift". No sales tricks.',
+  '- No dashes of the em-dash kind. Use a comma, a full stop or "and" instead.',
+  '- Never mention AI, Photoshop or any other tool.',
+  '- Series names and titles are never translated.',
+].join('\n');
+
+export const SERIE_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    intro: { type: 'string' },
+    colour: { type: 'string' },
+  },
+  required: ['intro', 'colour'],
+};
+
+// vaerker: [{ titel, beskrivelse, farve }]
+export function serieBrief(navn, vaerker) {
+  const linjer = vaerker.map((v, i) => [
+    `${i + 1}. ${v.titel}`,
+    v.farve && `   Section colour: ${v.farve}`,
+    v.beskrivelse && `   ${v.beskrivelse}`,
+  ].filter(Boolean).join('\n'));
+  return `Series: ${navn}\n\nThe works:\n${linjer.join('\n')}\n\nWrite the intro and choose the colour for this series.`;
+}
+
+export function parseSerie(message) {
+  const raa = (message?.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('');
+  let json;
+  try {
+    json = JSON.parse(raa);
+  } catch {
+    return null;
+  }
+  if (typeof json?.intro !== 'string' || !json.intro.trim()) return null;
+  const ud = { intro: cleanText(json.intro) };
+  const farve = String(json?.colour ?? '').trim();
+  if (/^#[0-9a-f]{6}$/i.test(farve)) ud.colour = farve.toLowerCase();
+  return ud;
 }

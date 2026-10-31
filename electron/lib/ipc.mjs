@@ -150,8 +150,9 @@ export class AppSession {
         // En serie deler de ord de fleste af dens vaerker har.
         const ord = katalog.synkSerieOrd();
         if (ord) this.log(`series keywords: ${ord} added`);
-        // Teksterne skal naevne serien.
+        // Teksterne skal naevne serien, og serien skal have sine felter.
         this._serieTekster();
+        this._serieFelter();
       } catch (err) {
         this.log(`auto series failed: ${String(err?.message || err).slice(0, 200)}`);
       }
@@ -524,6 +525,55 @@ export class AppSession {
     }
   }
 
+  _tekstService(apiKey = this.settings.data.claudeKey) {
+    if (!this.textService || this.textService.model !== this.keywordModel() || this.textService.apiKey !== apiKey) {
+      this.textService = new ClaudeWorkTexts({ apiKey, model: this.keywordModel() });
+    }
+    return this.textService;
+  }
+
+  // Seriens felter: en tom skabelon bliver Walkthrough, og med en Claude-
+  // noegle skriver Claude introen og vaelger farven til serier med tom intro
+  // og mindst to vaerker med tekster. Koeres efter vaerkernes tekster i
+  // samme koe, saa introen bygger paa de nye beskrivelser. En farve Stef
+  // har valgt, roeres ikke. Hver serie proeves én gang pr. session.
+  _serieFelter() {
+    if (!this.works) return;
+    try {
+      const n = this.works.standardSkabelon();
+      if (n) this.log(`series: ${n} series got the template walkthrough`);
+    } catch (err) {
+      this.log(`series template failed: ${String(err?.message || err).slice(0, 200)}`);
+    }
+    if (!this.settings.data.claudeKey) return;
+    this.serieIntroForsoegt = this.serieIntroForsoegt || new Set();
+    this.autoTekstKoe = (this.autoTekstKoe || Promise.resolve()).then(async () => {
+      let serier;
+      try {
+        serier = this.requireWorks().serierUdenIntro().filter((x) => !this.serieIntroForsoegt.has(x.id));
+      } catch (err) {
+        this.log(`series intro failed: ${String(err?.message || err).slice(0, 200)}`);
+        return;
+      }
+      for (const serie of serier) {
+        this.serieIntroForsoegt.add(serie.id);
+        try {
+          const res = await this._arbejde('writing texts with Claude', () => this._tekstService().writeSeries(serie.navn, serie.vaerker));
+          const nu = this.requireCatalog().listSeries().find((x) => x.id === serie.id);
+          if (!nu || nu.intro) continue;
+          const patch = { intro: res.serie.intro };
+          if (res.serie.colour && !nu.colour) patch.colour = res.serie.colour;
+          this.requireCatalog().setSeriesShop(serie.id, patch);
+          this.log(`series intro written for ${serie.navn} ($${res.cost.toFixed(4)})`);
+          this.broadcast('besked', { tekst: `Intro written for the series ${serie.navn}` });
+          this.broadcast('changed');
+        } catch (err) {
+          this.log(`series intro failed for ${serie.navn}: ${String(err?.message || err).slice(0, 200)}`);
+        }
+      }
+    });
+  }
+
   // Printfilen var en PNG foer 0.41; naar JPEG'en er lavet, gaar den i
   // papirkurven, saa der kun er én printfil pr. beskaering.
   async _fjernGammelPrintfil(res) {
@@ -601,9 +651,7 @@ export class AppSession {
       throw new Error(`A preview of the image could not be made${grund}. The details are in the log under Help > Show AI log.`);
     }
     const thumbPath = preview.path;
-    if (!this.textService || this.textService.model !== this.keywordModel()) {
-      this.textService = new ClaudeWorkTexts({ apiKey, model: this.keywordModel() });
-    }
+    this._tekstService(apiKey);
     this.broadcast('wt', { phase: 'koerer', cost: null });
     try {
       const res = await this.textService.write(thumbPath, work);
@@ -1006,6 +1054,7 @@ export class AppSession {
       catalog.assignSeries(imageIds, seriesId ?? null);
       catalog.synkSerieOrd();
       this._serieTekster();
+      this._serieFelter();
     });
     handle('ser:setShop', ({ seriesId, patch }) => this.requireCatalog().setSeriesShop(seriesId, patch));
     handle('ser:rename', ({ seriesId, name }) => {
