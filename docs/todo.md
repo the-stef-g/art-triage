@@ -4,7 +4,7 @@ Det der venter. Stef siger "byg", før noget herfra bliver lavet.
 
 ## Venter på "byg"
 
-Intet lige nu.
+- **Kategorien følger serien.** Vælges Category på et værk i en serie, får alle seriens værker samme kategori. Et værk, der kommer ind i en serie, får seriens kategori, hvis det ikke selv har én.
 
 ## Venter på en afklaring
 
