@@ -711,7 +711,7 @@ describe('send til shop', () => {
     const trin = [];
     const shop = new ShopSync({ catalog, works, client: klient(fetchImpl), exporter, status: (t) => trin.push(t) });
     await shop.send(id);
-    expect(trin[0]).toBe('Uploading a.png (1 of 1)');
+    expect(trin[0]).toBe('Uploading a.jpg (1 of 1)');
     expect(trin).toContain('Creating the product');
     await shop.send(id);
     expect(trin.at(-1)).toBe('Saving the product');

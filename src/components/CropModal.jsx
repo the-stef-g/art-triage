@@ -73,6 +73,7 @@ function krymp(r, vinkel, A, ax, ay) {
 // knappen fjerner beskaeringen. meta og onFinder staar i toppen.
 export default function CropModal({
   row, onClose, onDone, onError, inline = false, crops = [], meta = null, onFinder = null, onSletCrop = null,
+  fra = [], onFra = null,
 }) {
   const [A, setA] = useState(1.5);
   const [format, setFormat] = useState('3:2');
@@ -94,8 +95,11 @@ export default function CropModal({
   const trak = useRef(null);
   const forhold = FORMATER.find(([f]) => f === format)[1];
   const findes = new Map(crops.map((c) => [c.format, c]));
-  const ledig = (f) => !findes.has(f);
-  const alleLavet = FORMATER.every(([f]) => findes.has(f));
+  // Formater der er slaaet fra for vaerket, skal ikke bruges og foreslaas
+  // ikke. Er alle beskaaret eller slaaet fra, er der intet at beskaere.
+  const slaaetFra = new Set(fra);
+  const optaget = new Set([...findes.keys(), ...slaaetFra]);
+  const intetAtBeskaere = FORMATER.every(([f]) => optaget.has(f));
 
   useEffect(() => {
     const maal = () => {
@@ -124,9 +128,9 @@ export default function CropModal({
 
   // Er formatet lige blevet beskaaret, gaar valget videre til det naeste
   // ledige, saa den naeste beskaering kan laves med det samme.
-  const cropNoegle = crops.map((c) => c.format).sort().join(',');
+  const cropNoegle = `${crops.map((c) => c.format).sort().join(',')}|${[...slaaetFra].sort().join(',')}`;
   useEffect(() => {
-    if (findes.has(format) && !alleLavet) vaelgFormat(naermeste(A, new Set(findes.keys())));
+    if (optaget.has(format) && !intetAtBeskaere) vaelgFormat(naermeste(A, optaget));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cropNoegle]);
 
@@ -297,12 +301,13 @@ export default function CropModal({
                 }}
                 onLoad={(e) => {
                   const nyA = e.currentTarget.naturalWidth / e.currentTarget.naturalHeight;
-                  const f = naermeste(nyA, new Set(findes.keys()));
+                  const f = naermeste(nyA, optaget);
                   setA(nyA);
                   setFormat(f);
                   setRect(stoersteInde(f, nyA));
                 }}
               />
+              {!intetAtBeskaere && (
               <div
                 className="crop-ramme"
                 style={{
@@ -313,7 +318,9 @@ export default function CropModal({
               >
                 {traekker && <Net format={format} bredde={rect.w * felt.w} />}
               </div>
+              )}
             </div>
+            {!intetAtBeskaere && (
             <div className="crop-greb-lag">
               <div
                 className="crop-greb-ramme"
@@ -327,6 +334,7 @@ export default function CropModal({
                 ))}
               </div>
             </div>
+            )}
           </div>
         </div>
         {/* Bunden: drejningen til venstre, formaterne og Gem til hoejre,
@@ -363,15 +371,30 @@ export default function CropModal({
           <span className="crop-formater">
             {FORMATER.map(([f]) => {
               const c = findes.get(f);
+              const af = !c && slaaetFra.has(f);
+              const valgt = !c && !af && f === format && !intetAtBeskaere;
+              // Klik paa det valgte format slaar det fra; klik paa et slaaet
+              // fra format slaar det til igen og vaelger det.
+              const klik = () => {
+                if (af) {
+                  onFra?.(f, false);
+                  vaelgFormat(f);
+                } else if (valgt && onFra) {
+                  onFra(f, true);
+                } else {
+                  vaelgFormat(f);
+                }
+              };
               return (
-                <span key={f} className={`crop-format ${c ? 'findes' : ''} ${c?.foraeldet ? 'foraeldet' : ''}`}>
+                <span key={f} className={`crop-format ${c ? 'findes' : ''} ${c?.foraeldet ? 'foraeldet' : ''} ${af ? 'fra' : ''}`}>
                   <button
-                    className={!c && f === format ? 'primaer' : ''}
+                    className={valgt ? 'primaer' : ''}
                     disabled={Boolean(c)}
-                    onClick={() => vaelgFormat(f)}
+                    onClick={klik}
                     title={c
                       ? (c.foraeldet ? `${f} is cropped, but from an older master. Remove it and crop again.` : `${f} is cropped`)
-                      : `Crop ${f}`}
+                      : af ? `${f} is not used for this work. Click to use it again.`
+                        : valgt && onFra ? `Click again to turn ${f} off for this work` : `Crop ${f}`}
                   >
                     {c ? `✓ ${f}` : f}
                   </button>
@@ -390,7 +413,8 @@ export default function CropModal({
             })}
           </span>
           {!inline && <button onClick={onClose}>Cancel</button>}
-          <button className="primaer" disabled={gemmer || findes.has(format)} onClick={gem}>{gemmer ? 'Saving …' : 'Save crop'}</button>
+          {intetAtBeskaere && <span className="tom crop-intet">Every format is cropped or turned off.</span>}
+          <button className="primaer" disabled={gemmer || optaget.has(format) || intetAtBeskaere} onClick={gem}>{gemmer ? 'Saving …' : 'Save crop'}</button>
         </div>
       </div>
     </div>

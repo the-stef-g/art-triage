@@ -294,6 +294,11 @@ export class Catalog extends EventEmitter {
     if (!vaerkKolonner.includes('woo_aftryk')) {
       this.db.exec('ALTER TABLE works ADD COLUMN woo_aftryk TEXT');
     }
+    // Formater Stef har slaaet fra i Crop for et vaerk (JSON-liste), saa
+    // appen ved, at de ikke skal bruges.
+    if (!vaerkKolonner.includes('formater_fra')) {
+      this.db.exec('ALTER TABLE works ADD COLUMN formater_fra TEXT');
+    }
     // Det program et billede senest blev aabnet i, saa en fil der dukker op i
     // Edits kan faa det som status.
     this.db.exec(`CREATE TABLE IF NOT EXISTS editor_log(
@@ -1442,9 +1447,85 @@ export class Catalog extends EventEmitter {
         for (const del of ['Edits', 'Masters', 'Print files']) {
           mkdirSync(join(this.root, arbejd, del), { recursive: true });
         }
+        // To filer med samme navn (fx en PNG fra AI og en PSD fra
+        // Photoshop) er ét vaerk: den aeldste er originalen.
+        this._enOriginal(arbejdsmappeFor(`${mal}/x`).work);
       }
     }
     return moves;
+  }
+
+  // Ét vaerk har én original. Ligger der i en vaerkmappes Original flere
+  // filer med samme navn og forskellig endelse (fx en PNG fra AI og en PSD
+  // fra Photoshop), bliver den aeldste, og de andre flyttes til Edits som
+  // redigeringer og flettes ind i originalens billede, som er godkendt. To
+  // filer med samme navn og endelse (to forskellige billeder, som det andet
+  // fik "2" bagpaa) roeres ikke. Returnerer antallet af filer der blev flyttet.
+  _enOriginal(work) {
+    const praefiks = `Approved/${work}/`;
+    const originaler = this.db.all(
+      "SELECT id, rel_path, mtime FROM files WHERE present=1 AND rel_path LIKE ? ESCAPE '\\'",
+      `${escapeLike(praefiks)}Original/%`
+    ).filter((f) => posix.dirname(f.rel_path) === `${praefiks}Original`);
+    const grupper = new Map();
+    for (const f of originaler) {
+      const stem = stemOf(posix.basename(f.rel_path)).toLowerCase();
+      if (!grupper.has(stem)) grupper.set(stem, []);
+      grupper.get(stem).push(f);
+    }
+    const billedeFor = (fileId) => this.db.get('SELECT id FROM images WHERE master_file_id=?', fileId)
+      || this.db.get('SELECT image_id AS id FROM versions WHERE file_id=?', fileId);
+    let flyttet = 0;
+    for (const filer of grupper.values()) {
+      if (filer.length < 2) continue;
+      const endelser = new Set(filer.map((f) => extname(f.rel_path).toLowerCase()));
+      if (endelser.size < filer.length) continue;
+      filer.sort((a, b) => a.mtime - b.mtime || a.id - b.id);
+      const ejer = billedeFor(filer[0].id);
+      if (!ejer) continue;
+      mkdirSync(join(this.root, praefiks, 'Edits'), { recursive: true });
+      for (const f of filer.slice(1)) {
+        const fra = billedeFor(f.id);
+        try {
+          flyttet += this.moveFiles([f.id], `${praefiks}Edits`).length;
+        } catch {
+          continue; // Kan filen ikke flyttes nu (fx aaben), proeves det igen naeste gang.
+        }
+        if (fra && fra.id !== ejer.id) this._flet(fra.id, ejer.id);
+      }
+      this.db.run("UPDATE versions SET rating='godkendt' WHERE image_id=? AND rating != 'godkendt'", ejer.id);
+      this.emit('changed');
+    }
+    return flyttet;
+  }
+
+  // Fletter et billede ind i et andet: dets versioner (ogsaa originalen,
+  // som nu er en almindelig version med sin egen fil) flyttes over, og det
+  // tomme billede fjernes. En serie flytter med, hvis det andet ingen har.
+  _flet(fraId, tilId) {
+    const fra = this.db.get('SELECT id, master_file_id, series_id FROM images WHERE id=?', fraId);
+    const til = this.db.get('SELECT id, series_id FROM images WHERE id=?', tilId);
+    if (!fra || !til || fraId === tilId) return;
+    this.db.transaction(() => {
+      this.db.run(
+        'UPDATE versions SET file_id=COALESCE(file_id, ?), is_master=0, image_id=? WHERE image_id=?',
+        fra.master_file_id, tilId, fraId
+      );
+      if (!til.series_id && fra.series_id) this.db.run('UPDATE images SET series_id=? WHERE id=?', fra.series_id, tilId);
+      this.db.run('UPDATE OR IGNORE work_crops SET image_id=? WHERE image_id=?', tilId, fraId);
+      this.db.run('DELETE FROM works WHERE image_id=?', fraId);
+      this.db.run('DELETE FROM images WHERE id=?', fraId);
+    });
+  }
+
+  // Alle vaerkmapper: én original hver. Koeres efter en skanning.
+  rydDobbelteOriginaler() {
+    const vaerker = new Set(this.db.all(
+      "SELECT rel_path FROM files WHERE present=1 AND rel_path LIKE 'Approved/%/Original/%'"
+    ).map((f) => arbejdsmappeFor(f.rel_path)?.work).filter(Boolean));
+    let antal = 0;
+    for (const w of vaerker) antal += this._enOriginal(w);
+    return antal;
   }
 
   // Mappen en fil skal ligge i for en bedoemmelse, eller null hvis den allerede

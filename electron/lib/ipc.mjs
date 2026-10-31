@@ -146,6 +146,9 @@ export class AppSession {
     // Vaerker med et nummer sidst i titlen samles i serier.
     if (!res.unavailable && katalog === this.catalog && this.works) {
       try {
+        // Ét vaerk, én original: to filer med samme navn i Original flettes.
+        const flyttet = katalog.rydDobbelteOriginaler();
+        if (flyttet) this.log(`one original per work: ${flyttet} file(s) moved to Edits`);
         const antal = this.works.autoSerier();
         if (antal) this.log(`auto series: ${antal} work(s)`);
         // En serie deler de ord de fleste af dens vaerker har.
@@ -1161,6 +1164,9 @@ export class AppSession {
     handle('work:get', ({ imageId }) => this._medShop(this.requireWorks().get(imageId)));
     handle('work:save', ({ imageId, patch }) => this._medShop(this.requireWorks().save(imageId, patch)));
     // Ny titel: hvad der vil blive omdoebt, og selve omdoebningen.
+    // Crop: formater der er slaaet fra for et vaerk.
+    handle('work:formaterFra', ({ imageId }) => this.requireWorks().formaterFra(imageId));
+    handle('work:saetFormatFra', ({ imageId, format, fra }) => this.requireWorks().saetFormatFra(imageId, format, Boolean(fra)));
     handle('work:omdoebPlan', ({ imageId, title }) => this.requireCatalog().omdoebPlan(imageId, title));
     handle('work:omdoeb', async ({ imageId, title }) => {
       const plan = this.requireCatalog().omdoeb(imageId, title);

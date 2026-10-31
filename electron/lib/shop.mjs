@@ -604,12 +604,14 @@ export class ShopSync {
     // Filnavnet staar i fremdriften, saa det kan ses, hvilket vaerk der er
     // i gang, naar flere sendes.
     const ialt = work.crops.length + 1;
-    this.status(`Uploading ${basename(mainFile.rel_path)} (1 of ${ialt})`);
+    // Det er webversionen (JPEG, ca. 3000 px), der sendes, aldrig TIFF'en.
+    const jpg = (rel) => basename(rel).replace(/\.[^.]+$/, '.jpg');
+    this.status(`Uploading ${jpg(mainFile.rel_path)} (1 of ${ialt})`);
     const media = { main: await this.media.ensure(imageId, 'main', mainFile, alt), crops: {}, video: null };
     for (const [i, crop] of work.crops.entries()) {
       const file = this.catalog.getFile(this.catalog.getVersion(crop.versionId).effective_file_id);
       if (!file?.present) throw new ShopError(`The ${crop.format} crop file is not available right now`);
-      this.status(`Uploading ${basename(file.rel_path)} (${i + 2} of ${ialt})`);
+      this.status(`Uploading ${jpg(file.rel_path)} (${i + 2} of ${ialt})`);
       media.crops[crop.format] = await this.media.ensure(imageId, crop.format, file, alt);
     }
     return media;

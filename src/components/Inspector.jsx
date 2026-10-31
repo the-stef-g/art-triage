@@ -18,6 +18,12 @@ export default function Inspector({
   const [nytOrd, setNytOrd] = useState('');
   // Beskaeringen der er ved at blive fjernet, med filerne i dens kaede.
   const [slet, setSlet] = useState(null);
+  // Crop: formaterne der er slaaet fra for vaerket.
+  const [formaterFra, setFormaterFra] = useState([]);
+  useEffect(() => {
+    if (fase !== 3 || !row?.image_id) return;
+    invoke('work:formaterFra', { imageId: row.image_id }).then(setFormaterFra).catch(() => setFormaterFra([]));
+  }, [fase, row?.image_id, dataRev]);
   // Bredden Gigapixel skal forstoerre den aktive beskaering til, i pixels.
   const [gigaBredde, setGigaBredde] = useState(null);
 
@@ -380,6 +386,12 @@ export default function Inspector({
               meta={meta}
               onFinder={() => invoke('img:openWorkFolder', { versionId: master.version_id }).catch(onError)}
               onSletCrop={sletCrop}
+              fra={formaterFra}
+              onFra={(f, af) => {
+                invoke('work:saetFormatFra', { imageId: row.image_id, format: f, fra: af })
+                  .then(setFormaterFra)
+                  .catch(onError);
+              }}
               onClose={() => {}}
               onDone={onError}
               onError={onError}

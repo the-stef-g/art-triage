@@ -4,10 +4,7 @@ Det der venter. Stef siger "byg", før noget herfra bliver lavet.
 
 ## Venter på "byg"
 
-- **Shop: upload-beskeden viser den JPEG, der sendes,** fx "Uploading Desert Canyon 02.jpg (1 of 6)", ikke kildefilen (.tif). Det er webversionen på ca. 3000 px, der uploades; TIFF og printfiler forlader aldrig Mac'en.
-- **Ét værk pr. navn.** Godkendes filer med samme navn og forskellig endelse (fx `Allura 02.png` fra AI og `Allura 02.psd` fra Photoshop), bliver de ét værk: den ældste i `Original`, de andre i `Edits` som redigeringer (navnet uændret). Masteren laves af den, man vælger (PSD'en), og værket går videre til Crop.
-- **Oprydning én gang:** værkmapper med flere filer med samme navn i `Original` (Allura 01, 02 og 03): den ældste bliver, de andre flyttes til `Edits`, og det hele hæftes på ét godkendt værk med sin master. I dag blev PNG'en et ubedømt billede med masteren hæftet på (står i Sort), og PSD'en et godkendt billede uden master (hænger i Edit).
-- **Crop: slå et format fra og til.** Klik på det valgte format slår det fra (gråt og overstreget, foreslås ikke igen); klik på et slået-fra format slår det til igen. Er alle formater beskåret eller slået fra, står der ingen ramme klar. Huskes pr. værk.
+Intet lige nu.
 
 ## Venter på en afklaring
 

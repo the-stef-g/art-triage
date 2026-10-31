@@ -95,7 +95,9 @@ try {
   await page.screenshot({ path: join(projectRoot, 'smoke-crop-net.png') });
   await page.mouse.up();
   await page.waitForSelector('.crop-net', { state: 'detached', timeout: 5000 });
-  // Et klik paa formatet giver den stoerste ramme igen.
+  // Et klik paa et format giver den stoerste ramme. (Et klik paa det valgte
+  // format slaar det fra, saa der skiftes til et andet og tilbage.)
+  await page.locator('.crop-formater button', { hasText: '2:3' }).click();
   await page.locator('.crop-formater button', { hasText: '1:1' }).click();
   const hoejdeFoer = await page.locator('.crop-ramme').evaluate((el) => el.getBoundingClientRect().height);
   await page.fill('.crop-vinkel-tal', '5');
@@ -137,6 +139,13 @@ try {
   if (await antalFilm() !== 2) throw new Error('Stakken aabnede ikke igen');
   await page.waitForSelector('.crop-strip .stak.aaben', { timeout: 5000 });
   // End gaar til det sidste i filmstriben (beskaeringen), Home til det foerste.
+  // Klik paa det valgte format slaar det fra (overstreget), og et klik til
+  // slaar det til igen.
+  const valgtFormat = (await page.locator('.crop-formater button.primaer').innerText()).trim();
+  await page.locator('.crop-formater button.primaer').click();
+  await page.waitForSelector(`.crop-format.fra button:has-text("${valgtFormat}")`, { timeout: 5000 });
+  await page.locator('.crop-format.fra button', { hasText: valgtFormat }).click();
+  await page.waitForSelector(`.crop-formater button.primaer:has-text("${valgtFormat}")`, { timeout: 5000 });
   await page.keyboard.press('End');
   await page.waitForSelector('.crop-visning', { timeout: 5000 });
   await page.keyboard.press('Home');

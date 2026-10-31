@@ -440,6 +440,65 @@ describe('tomme mapper i Import', () => {
   });
 });
 
+describe('ét vaerk pr. navn', () => {
+  const tid = (rel, sek) => { const t = new Date(sek * 1000); utimesSync(join(root, rel), t, t); };
+
+  it('en PNG og en PSD med samme navn bliver ét vaerk: den aeldste er originalen', () => {
+    skriv('Import/Allura/Allura 02.png', 'ai');
+    skriv('Import/Allura/Allura 02.psd', 'photoshop');
+    tid('Import/Allura/Allura 02.png', 1_700_000_000);
+    tid('Import/Allura/Allura 02.psd', 1_720_000_000);
+    catalog.sync();
+    // Begge godkendes på én gang, PSD'en foerst.
+    const ids = ['Import/Allura/Allura 02.psd', 'Import/Allura/Allura 02.png'].map((r) => raekke(r).version_id);
+    catalog.setRating(ids, 'godkendt');
+    catalog.sync();
+    expect(existsSync(join(root, 'Approved', 'Allura 02', 'Original', 'Allura 02.png'))).toBe(true);
+    expect(existsSync(join(root, 'Approved', 'Allura 02', 'Edits', 'Allura 02.psd'))).toBe(true);
+    const r = alle().filter((x) => x.rel_path.startsWith('Approved/Allura 02/'));
+    expect(new Set(r.map((x) => x.image_id)).size).toBe(1);
+    expect(r.every((x) => x.rating === 'godkendt')).toBe(true);
+    // I Edit, og ikke i Sort.
+    expect(fase(1).some((x) => x.includes('Allura'))).toBe(false);
+    expect(fase(2)).toContain('Approved/Allura 02/Edits/Allura 02.psd');
+    // Masteren goer vaerket faerdigt: det forlader Edit og staar i Crop.
+    skriv('Approved/Allura 02/Masters/Allura 02.tif', 'm');
+    catalog.sync();
+    expect(fase(2).some((x) => x.includes('Allura'))).toBe(false);
+    expect(fase(3)).toEqual(['Approved/Allura 02/Masters/Allura 02.tif']);
+  });
+
+  it('rydder op i en vaerkmappe med to originaler, som Allura 02 fra 0.46', () => {
+    skriv('Import/Allura/Allura 03.png', 'ai');
+    skriv('Import/Allura/Allura 03.psd', 'photoshop');
+    tid('Import/Allura/Allura 03.png', 1_700_000_000);
+    tid('Import/Allura/Allura 03.psd', 1_720_000_000);
+    catalog.sync();
+    // Som foer: hver fil sit eget billede, begge i Original.
+    catalog.mappestyring = false;
+    for (const n of ['png', 'psd']) {
+      catalog.moveFiles([raekke(`Import/Allura/Allura 03.${n}`).file_id], 'Approved/Allura 03/Original');
+    }
+    catalog.setRating([raekke('Approved/Allura 03/Original/Allura 03.psd').version_id], 'godkendt');
+    skriv('Approved/Allura 03/Masters/Allura 03.tif', 'm');
+    catalog.sync();
+    catalog.mappestyring = true;
+    expect(new Set(alle().filter((x) => x.rel_path.startsWith('Approved/Allura 03/')).map((x) => x.image_id)).size).toBe(2);
+
+    expect(catalog.rydDobbelteOriginaler()).toBe(1);
+    catalog.sync();
+    expect(existsSync(join(root, 'Approved', 'Allura 03', 'Edits', 'Allura 03.psd'))).toBe(true);
+    const r = alle().filter((x) => x.rel_path.startsWith('Approved/Allura 03/'));
+    expect(new Set(r.map((x) => x.image_id)).size).toBe(1);
+    expect(r.every((x) => x.rating === 'godkendt')).toBe(true);
+    expect(fase(1).some((x) => x.includes('Allura'))).toBe(false);
+    expect(fase(2).some((x) => x.includes('Allura'))).toBe(false);
+    expect(fase(3)).toEqual(['Approved/Allura 03/Masters/Allura 03.tif']);
+    // Én gang er nok.
+    expect(catalog.rydDobbelteOriginaler()).toBe(0);
+  });
+});
+
 describe('ny titel', () => {
   it('omdoeber vaerkmappen og de filer, der hedder som vaerket, og kataloget foelger med', () => {
     skriv('Import/Ahl/Desert 01.tif', 'o');

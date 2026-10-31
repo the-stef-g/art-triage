@@ -446,6 +446,26 @@ export class Works {
     return this.db.run("UPDATE series SET template='walkthrough' WHERE template IS NULL OR template = ''").changes || 0;
   }
 
+  // Formater der er slaaet fra i Crop for vaerket.
+  formaterFra(imageId) {
+    const row = this._ensure(this._image(imageId));
+    try {
+      const l = JSON.parse(row.formater_fra || '[]');
+      return Array.isArray(l) ? l.filter((f) => CROP_FORMATS.includes(f)) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  saetFormatFra(imageId, format, fra) {
+    if (!CROP_FORMATS.includes(format)) throw new Error(`Unknown crop format: ${format}`);
+    const nu = new Set(this.formaterFra(imageId));
+    if (fra) nu.add(format); else nu.delete(format);
+    const l = CROP_FORMATS.filter((f) => nu.has(f));
+    this.db.run('UPDATE works SET formater_fra=?, updated_at=? WHERE image_id=?', JSON.stringify(l), this.catalog.now(), imageId);
+    return l;
+  }
+
   // Woo-produktets id gemmes, saa der aldrig laves dubletter.
   setWooProductId(imageId, id) {
     this._ensure(this._image(imageId));
