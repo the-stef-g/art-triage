@@ -9,6 +9,7 @@ Det der venter. Stef siger "byg", før noget herfra bliver lavet.
 - **Crop: formaterne på masteren i stedet for tallet.** Mærket med antal beskæringer erstattes af de beskæringer, der er lavet (fx *1:1 2:3 3:2*), hver rød hvis den er ældre end masteren.
 - **Crop: minus-cirklerne præcist på hjørnet.** Cirklens midte skal ligge præcis på knappens øverste højre hjørne, både vandret og lodret, og minustegnet skal stå i midten af cirklen.
 - **Print: bredden til Gigapixel på udklipsholderen.** *Enlarge in Gigapixel* lægger selv tallet (kun tallet, fx `14173`) på udklipsholderen, så det kan sættes direkte ind i Gigapixel med Cmd+V. Tallet kan også klikkes for at kopiere det, og der står kort *Copied*. Med flere beskæringer valgt kopieres tallet for den aktive.
+- **Ingen retningsord som søgeord.** Appen holder op med at sætte *horizontal*, *vertical* og *square* på værkerne, og de automatiske ord fjernes én gang fra alle værker (ord Stef selv har skrevet, bliver). Claude må heller ikke foreslå dem. I shoppen filtrerer kunden på Format-attributten (Square 1:1, Portrait 2:3 osv.), som varianterne allerede har. Alle værker beskæres, også når formatet er det samme som originalen, så Format dækker alle.
 
 ## Venter på en afklaring
 
@@ -23,6 +24,7 @@ Det her ligger i WooCommerce, ikke i appen eller i sitets kode.
 - **Skjul de store canvas uden for Europa i shoppen.** Varianterne har metafeltet `ship_only_to` med de lande, de må sælges til, men WooCommerce læser det ikke selv. Kunden vælger varianten på shop.stefg.art, så det skal gøres der, fx med et lille plugin eller et snippet, der fjerner varianten for andre lande.
 - **Købsknappens tekst:** *Place order* skal hedde *Buy now* eller "Order with obligation to pay" (forbrugeraftaleloven § 12). Den kan ikke sættes fra appen; i kasseblokken rettes den direkte på knappen, i den klassiske kasse med et snippet.
 - **Tjek kassen efter Update shop texts:** teksten over købsknappen er WooCommerce' "checkout privacy policy text", som den klassiske kasse viser. Bruger shoppen kasseblokken, skal teksten måske sættes ind i blokken i stedet.
+- **Filter på format i shoppen:** kunden skal kunne vælge Format (Square 1:1, Portrait 2:3, Landscape 3:2, Tall 1:2, Wide 2:1) i shoppens filter, i stedet for at søge på horizontal, vertical og square.
 
 ## Til sitet (Astro)
 
