@@ -208,6 +208,16 @@ describe('noegler', () => {
     expect(p).toBe(1);
   });
 
+  it('giver op efter tidsgraensen i stedet for at haenge', async () => {
+    const haenger = (url, init) => new Promise((_, afvis) => {
+      init.signal.addEventListener('abort', () => afvis(init.signal.reason));
+    });
+    const c = klient(haenger);
+    c.timeoutMs = 20;
+    const err = await c.wc('GET', '/products/1').catch((e) => e);
+    expect(err.message).toMatch(/while reading the product \(no answer for 5 minutes, tried 3 times\)/);
+  });
+
   it('beder om noegleren der mangler, uden at kalde nettet', async () => {
     const { kald, fetchImpl } = attrapShop();
     const c = new ShopClient({ fetchImpl });
@@ -701,7 +711,7 @@ describe('send til shop', () => {
     const trin = [];
     const shop = new ShopSync({ catalog, works, client: klient(fetchImpl), exporter, status: (t) => trin.push(t) });
     await shop.send(id);
-    expect(trin[0]).toBe('Uploading the main picture');
+    expect(trin[0]).toBe('Uploading a.png (1 of 1)');
     expect(trin).toContain('Creating the product');
     await shop.send(id);
     expect(trin.at(-1)).toBe('Saving the product');

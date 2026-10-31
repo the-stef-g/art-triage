@@ -994,7 +994,7 @@ export default function App() {
             onOpenPreview={() => setShowPreview(true)}
             onColumns={(c) => { columnsRef.current = c; }}
             ankerRef={ankerRef}
-            columns={produktLayout || cropLayout ? 2 : kolonner}
+            columns={produktLayout ? 4 : cropLayout ? 2 : kolonner}
             thumbRev={thumbRev}
           />
           )}

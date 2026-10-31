@@ -72,6 +72,7 @@ function hvad(method, path) {
 
 // Den rigtige aarsag fra netvaerket (fetch gemmer den i err.cause).
 function aarsag(err) {
+  if (err?.name === 'TimeoutError') return 'no answer for 5 minutes';
   const kode = err?.cause?.code || err?.code;
   const ord = {
     ECONNRESET: 'the connection was reset', ETIMEDOUT: 'it timed out', UND_ERR_CONNECT_TIMEOUT: 'it timed out',
@@ -94,6 +95,8 @@ export class ShopClient {
     this.fetch = fetchImpl || globalThis.fetch;
     // Pausen mellem forsoegene; testene saetter den til 0.
     this.vent = (ms) => new Promise((r) => { setTimeout(r, ms); });
+    // En forespoergsel uden svar i 5 minutter gives op, i stedet for at haenge.
+    this.timeoutMs = 5 * 60 * 1000;
   }
 
   async _request(auth, kind, method, path, { json, body, headers = {} } = {}) {
@@ -118,7 +121,9 @@ export class ShopClient {
     let res;
     for (let i = 1; ; i += 1) {
       try {
-        res = await this.fetch(`${this.baseUrl}${prefix}${path}`, { method, headers: h, body: payload });
+        res = await this.fetch(`${this.baseUrl}${prefix}${path}`, {
+          method, headers: h, body: payload, signal: AbortSignal.timeout(this.timeoutMs),
+        });
         if (i < forsoeg && [502, 503, 504].includes(res.status)) {
           await this.vent(2000 * i);
           continue;
@@ -596,12 +601,15 @@ export class ShopSync {
     const mainFile = this.works.imageFile(imageId);
     if (!mainFile) throw new ShopError('The image file is not available right now');
     const alt = work.altText || '';
-    this.status('Uploading the main picture');
+    // Filnavnet staar i fremdriften, saa det kan ses, hvilket vaerk der er
+    // i gang, naar flere sendes.
+    const ialt = work.crops.length + 1;
+    this.status(`Uploading ${basename(mainFile.rel_path)} (1 of ${ialt})`);
     const media = { main: await this.media.ensure(imageId, 'main', mainFile, alt), crops: {}, video: null };
     for (const [i, crop] of work.crops.entries()) {
-      this.status(`Uploading the ${crop.format} crop (${i + 1} of ${work.crops.length})`);
       const file = this.catalog.getFile(this.catalog.getVersion(crop.versionId).effective_file_id);
       if (!file?.present) throw new ShopError(`The ${crop.format} crop file is not available right now`);
+      this.status(`Uploading ${basename(file.rel_path)} (${i + 2} of ${ialt})`);
       media.crops[crop.format] = await this.media.ensure(imageId, crop.format, file, alt);
     }
     return media;

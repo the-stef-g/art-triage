@@ -4,6 +4,23 @@ import { invoke, onEvent } from '../api';
 
 const CATEGORIES = ['Graphic Design', 'Photography', 'Paintings', 'Sculptures'];
 
+// Fremdriften i shoppen pr. vaerk (imageId), saa den staar ved det rigtige
+// vaerk, ogsaa naar man klikker videre, mens det sendes, og tilbage igen.
+// Én lytter for hele appen; panelet der viser vaerket, faar besked.
+const FREMDRIFT = new Map();
+const VISERE = new Map();
+let lytter = null;
+function saetFremdrift(imageId, vaerdi) {
+  if (vaerdi) FREMDRIFT.set(imageId, vaerdi); else FREMDRIFT.delete(imageId);
+  VISERE.get(imageId)?.(vaerdi);
+}
+function lytTilShoppen() {
+  if (lytter) return;
+  lytter = onEvent((evt) => {
+    if (evt.type === 'shopFremdrift' && evt.imageId != null) saetFremdrift(evt.imageId, { tekst: evt.tekst, igang: true });
+  });
+}
+
 const TEXT_LABELS = {
   description: 'Description',
   short_text: 'Short text',
@@ -20,13 +37,16 @@ export default function WorkPanel({ row, versions, tekstRev = 0, hasKey, shop, o
   const [busy, setBusy] = useState(false);
   const [warnings, setWarnings] = useState([]);
   // Hvad der sker i shoppen lige nu, og hvordan det endte.
-  const [fremdrift, setFremdrift] = useState(null);
+  const [fremdrift, setFremdriftLokal] = useState(() => FREMDRIFT.get(imageId) ?? null);
+  const setFremdrift = (v) => saetFremdrift(imageId, v);
   // Dialogen der spoerger, om en ny titel skal omdoebe filerne.
   const [omdoeb, setOmdoeb] = useState(null);
-  useEffect(() => onEvent((evt) => {
-    if (evt.type === 'shopFremdrift') setFremdrift({ tekst: evt.tekst, igang: true });
-  }), []);
-  useEffect(() => { setFremdrift(null); }, [imageId]);
+  useEffect(() => {
+    lytTilShoppen();
+    setFremdriftLokal(FREMDRIFT.get(imageId) ?? null);
+    VISERE.set(imageId, setFremdriftLokal);
+    return () => { if (VISERE.get(imageId) === setFremdriftLokal) VISERE.delete(imageId); };
+  }, [imageId]);
   const klokken = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
   const adopt = (w) => {
@@ -415,7 +435,7 @@ export default function WorkPanel({ row, versions, tekstRev = 0, hasKey, shop, o
       <div className="knapraekke">
         <button
           className={!work.wooProductId || work.shopAendret ? 'primaer' : ''}
-          disabled={busy || !work.eligible || !shop?.harWoo || !shop?.harWp || shop?.formatOk === false}
+          disabled={busy || fremdrift?.igang || !work.eligible || !shop?.harWoo || !shop?.harWp || shop?.formatOk === false}
           onClick={() => sendToShop()}
           title={!work.eligible ? 'The image must be Approved and Finished'
             : (!shop?.harWoo || !shop?.harWp) ? 'Add the WooCommerce key and the WordPress application password under Help'
@@ -424,10 +444,10 @@ export default function WorkPanel({ row, versions, tekstRev = 0, hasKey, shop, o
           {work.wooProductId ? 'Update shop' : 'Send to shop'}
         </button>
         {work.wooProductId && work.wooStatus !== 'publish' && (
-          <button disabled={busy} onClick={publish} title="Publish the draft in the shop. The work moves to Shop.">Publish</button>
+          <button disabled={busy || fremdrift?.igang} onClick={publish} title="Publish the draft in the shop. The work moves to Shop.">Publish</button>
         )}
         {work.wooProductId && work.wooStatus === 'publish' && (
-          <button disabled={busy} onClick={remove} title="Take the product off the site. It becomes a draft again.">Remove from shop</button>
+          <button disabled={busy || fremdrift?.igang} onClick={remove} title="Take the product off the site. It becomes a draft again.">Remove from shop</button>
         )}
       </div>
       {fremdrift && (
@@ -453,7 +473,8 @@ export default function WorkPanel({ row, versions, tekstRev = 0, hasKey, shop, o
           <p className="vaerk-note">Series «{work.series.name}» in the shop. Empty fields are left as they are there.</p>
           <label>Series intro
             <textarea
-              rows={2}
+              className="serie-intro"
+              rows={4}
               defaultValue={work.series.intro ?? ''}
               key={`intro-${work.series.id}`}
               onBlur={(e) => { if (e.target.value !== (work.series.intro ?? '')) saveSeries({ intro: e.target.value }); }}

@@ -510,6 +510,8 @@ app.whenReady().then(() => {
 function maaLukke() {
   if (app.lukAlligevel) return true;
   const igang = session?.igangListe?.() || [];
+  // I loggen, saa det bagefter kan ses, om noget var i gang ved lukning.
+  session?.log?.(igang.length ? `quit: still working on ${igang.join(', ')}; asking` : 'quit: nothing running');
   if (!igang.length) return true;
   const valg = dialog.showMessageBoxSync(mainWin && !mainWin.isDestroyed() ? mainWin : undefined, {
     type: 'warning',
@@ -519,6 +521,7 @@ function maaLukke() {
     message: 'Stef G Art is still working',
     detail: `Not finished yet: ${igang.join(', ')}. Quitting now can leave it half done.`,
   });
+  session?.log?.(valg === 1 ? 'quit: quit anyway' : 'quit: waiting');
   if (valg !== 1) return false;
   app.lukAlligevel = true;
   return true;

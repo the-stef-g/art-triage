@@ -742,7 +742,9 @@ button.stor {
    midten, billedet og shoppen til hoejre. */
 .hoved.produkt {
   display: grid;
-  grid-template-columns: 375px minmax(0, 1fr) 375px;
+  /* Vaerkerne til venstre i op til dobbelt bredde, saa flere kan ses ad
+     gangen; paa en mindre skaerm giver den plads til formularen. */
+  grid-template-columns: minmax(375px, 750px) minmax(560px, 1fr) 375px;
   grid-template-rows: auto minmax(0, 1fr);
 }
 .hoved.produkt > .sidebar { grid-column: 1; grid-row: 1; width: auto; min-width: 0; max-height: 40vh; border-bottom: 1px solid var(--kant); }
@@ -886,3 +888,10 @@ button.fare { background: var(--kasseret); border-color: var(--kasseret); color:
 ::-webkit-scrollbar-corner { background: transparent; }
 .omdoeb-dialog { width: min(680px, 92vw); }
 .omdoeb-dialog .dialog-filer { max-height: 40vh; overflow: auto; }
+
+/* Product: billedet i hoejre kolonne er kvadratisk, saa et staaende vaerk
+   ogsaa vises stort. */
+.produkt-hoejre .stor-preview { aspect-ratio: 1 / 1; width: 100%; padding: 0; max-height: none; }
+.produkt-hoejre .stor-preview img { width: 100%; height: 100%; max-height: none; object-fit: contain; }
+/* Seriens intro vokser med teksten, saa hele introen kan ses. */
+textarea.serie-intro { field-sizing: content; min-height: 4lh; resize: vertical; }

@@ -686,7 +686,8 @@ export class AppSession {
     };
   }
 
-  _shop() {
+  // imageId: vaerket fremdriften hoerer til, saa den vises ved det rigtige.
+  _shop(imageId = null) {
     const works = this.requireWorks();
     const d = this.settings.data;
     return new ShopSync({
@@ -696,7 +697,7 @@ export class AppSession {
         baseUrl: d.shopUrl || DEFAULT_SHOP_URL,
         wooKey: d.wooKey, wooSecret: d.wooSecret, wpUser: d.wpUser, wpPassword: d.wpPassword,
       }),
-      status: (tekst) => this.broadcast('shopFremdrift', { tekst }),
+      status: (tekst) => this.broadcast('shopFremdrift', { tekst, imageId }),
     });
   }
 
@@ -753,10 +754,10 @@ export class AppSession {
       .catch((err) => this.log(`shop status skipped: ${String(err?.message || err).slice(0, 200)}`));
   }
 
-  async _shopCall(fn) {
+  async _shopCall(fn, imageId = null) {
     this.broadcast('shop', { phase: 'koerer' });
     try {
-      const res = await fn(this._shop());
+      const res = await fn(this._shop(imageId));
       this.broadcast('shop', { phase: 'faerdig' });
       return res;
     } catch (err) {
@@ -1181,9 +1182,17 @@ export class AppSession {
     // listerne hentes igen bagefter.
     handle('shop:send', async ({ imageId, kobl = null }) => {
       this._requireFormat();
-      const res = await this._shopCall((shop) => shop.send(imageId, { kobl }));
-      this.broadcast('changed');
-      return res;
+      const titel = this.requireWorks().get(imageId).effective.title;
+      this.log(`shop: sending ${titel}`);
+      try {
+        const res = await this._shopCall((shop) => shop.send(imageId, { kobl }), imageId);
+        this.log(res.needsConfirm ? `shop: ${titel} waits for an answer (a product with the same name)` : `shop: ${titel} sent (product ${res.productId})`);
+        this.broadcast('changed');
+        return res;
+      } catch (err) {
+        this.log(`shop: ${titel} not sent: ${String(err?.message || err).slice(0, 200)}`);
+        throw err;
+      }
     });
     // Update all prints: varianter og priser paa alle printprodukter.
     handle('shop:updateAllPrints', async () => {
@@ -1194,12 +1203,14 @@ export class AppSession {
     });
     handle('shop:updateTexts', () => this._shopCall((shop) => shop.opdaterTekster()));
     handle('shop:remove', async ({ imageId }) => {
-      const res = await this._shopCall((shop) => shop.fjern(imageId));
+      const res = await this._shopCall((shop) => shop.fjern(imageId), imageId);
+      this.log(`shop: product of image ${imageId} made a draft again`);
       this.broadcast('changed');
       return res;
     });
     handle('shop:publish', async ({ imageId }) => {
-      const res = await this._shopCall((shop) => shop.publish(imageId));
+      const res = await this._shopCall((shop) => shop.publish(imageId), imageId);
+      this.log(`shop: product of image ${imageId} published`);
       this.broadcast('changed');
       return res;
     });
