@@ -7,6 +7,7 @@ Det der venter. Stef siger "byg", før noget herfra bliver lavet.
 - **Kategorien følger serien.** Vælges Category på et værk i en serie, får alle seriens værker samme kategori. Et værk, der kommer ind i en serie, får seriens kategori, hvis det ikke selv har én.
 - **Synlige rullebjælker.** Appen tegner sine egne rullebjælker, der altid er synlige: ca. 10 px brede, et lysegråt håndtag på en mørk skinne med god kontrast, og i fasens farve, når musen er over. De forsvinder ikke, når man holder op med at rulle.
 - **Print: kolonnetitlerne bliver stående øverst,** når listen rulles (Crop, Crop size, Gigapixel target, Enlarged, Print file). Linjen "The Gigapixel target is …" over listen fjernes.
+- **Page Up, Page Down, Home og End.** Page Up og Page Down flytter det aktive billede en skærmfuld op eller ned (i grid'et så mange rækker, som der er plads til; i listen i Print så mange linjer), og visningen ruller med. Home går til det første og End til det sidste. Med Skift udvides markeringen som med pilene. Det virker i alle faser (i Crop-filmstriben flytter Page Up og Page Down en skærmbredde), men ikke i tekstfelter.
 
 ## Venter på en afklaring
 
