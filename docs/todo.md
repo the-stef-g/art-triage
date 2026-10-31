@@ -4,7 +4,7 @@ Det der venter. Stef siger "byg", før noget herfra bliver lavet.
 
 ## Venter på "byg"
 
-Intet lige nu.
+- **Shop: upload-beskeden viser den JPEG, der sendes,** fx "Uploading Desert Canyon 02.jpg (1 of 6)", ikke kildefilen (.tif). Det er webversionen på ca. 3000 px, der uploades; TIFF og printfiler forlader aldrig Mac'en.
 
 ## Venter på en afklaring
 
