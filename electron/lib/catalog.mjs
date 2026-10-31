@@ -8,6 +8,9 @@ import {
 import { join, dirname, basename, extname, posix } from 'node:path';
 import { exifTid } from './exif.mjs';
 import { printfilNavn, gammelPrintfilNavn } from './printfil.mjs';
+import { FARVER } from './keywords.mjs';
+
+const FARVE_ORD = new Set(FARVER);
 import {
   walkImages, walkImagesAsync, walkDirs, findImportMappe, beskaeringFraSti, navnMedBeskaering,
   editorFraSti, masterNavn, quickHash, quickHashAsync, mapGraense, stemOf, slug, uniquePath, extOf, daCollator,
@@ -186,6 +189,25 @@ export class Catalog extends EventEmitter {
 
   // Skemamigreringer for biblioteker oprettet med aeldre versioner.
   _migrate() {
+    // Engangsoprydninger, der kraever kataloget som det er nu.
+    const engang = (noegle, fn) => {
+      if (this.db.get('SELECT value FROM meta WHERE key=?', noegle)?.value === '1') return;
+      fn();
+      this.db.run('INSERT OR REPLACE INTO meta(key, value) VALUES(?, ?)', noegle, '1');
+    };
+    // Farveord der kun kom paa et vaerk, fordi serien delte dem (score 500).
+    engang('delteFarverFjernet', () => {
+      if (!this.db.all('PRAGMA table_info(keywords)').length) return;
+      this.db.run(
+        `DELETE FROM keywords WHERE manual=0 AND score=500 AND word IN (${[...FARVE_ORD].map(() => '?').join(',')})`,
+        ...FARVE_ORD
+      );
+    });
+    // Aaret blev ikke fundet i store TIFF'er; de vaerker uden aar kigges paa igen.
+    engang('exifTiffIgen', () => {
+      if (!this.db.all('PRAGMA table_info(works)').length) return;
+      this.db.run('UPDATE works SET exif_checked=0 WHERE exif_year IS NULL');
+    });
     // Retningsordene (horizontal, vertical, square) satte appen selv. De
     // bruges ikke mere, for kunden filtrerer paa Format; de automatiske
     // fjernes, Stefs egne bliver.
@@ -2046,7 +2068,11 @@ export class Catalog extends EventEmitter {
       const ordPr = mastre.map((m) => new Set(this.keywordsForFile(m.id).map((k) => k.word)));
       const antal = new Map();
       for (const ord of ordPr) for (const w of ord) antal.set(w, (antal.get(w) || 0) + 1);
-      const faelles = [...antal].filter(([, n]) => n >= 2 && n * 2 >= mastre.length).map(([w]) => w);
+      // Farverne hoerer til det enkelte billede og deles ikke: ellers fik
+      // hele Desert Canyon red, fordi to af vaerkerne havde det.
+      const faelles = [...antal]
+        .filter(([w, n]) => n >= 2 && n * 2 >= mastre.length && !FARVE_ORD.has(w))
+        .map(([w]) => w);
       mastre.forEach((m, i) => {
         for (const w of faelles) {
           if (ordPr[i].has(w)) continue;

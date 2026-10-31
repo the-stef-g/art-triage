@@ -202,12 +202,62 @@ export function exifYear(absPath) {
     fd = openSync(absPath, 'r');
     const buf = Buffer.alloc(LAES_BYTES);
     const n = readSync(fd, buf, 0, LAES_BYTES, 0);
-    return exifYearFromBuffer(buf.subarray(0, n));
+    const aar = exifYearFromBuffer(buf.subarray(0, n));
+    if (aar) return aar;
+    // En stor TIFF har ofte sine IFD'er til sidst i filen, langt efter den
+    // foerste megabyte. Saa laeses de der, hvor filen siger de ligger.
+    return erTiff(buf) ? tiffAarFraFil(fd) : null;
   } catch {
     return null;
   } finally {
     if (fd !== undefined) closeSync(fd);
   }
+}
+
+function erTiff(buf) {
+  return buf.length >= 8 && ((buf[0] === 0x49 && buf[1] === 0x49 && buf[2] === 0x2a && buf[3] === 0)
+    || (buf[0] === 0x4d && buf[1] === 0x4d && buf[2] === 0 && buf[3] === 0x2a));
+}
+
+// Aaret fra en TIFF med laesninger dér, hvor IFD'erne og deres tekster
+// ligger, uanset hvor stor filen er.
+function tiffAarFraFil(fd) {
+  const les = (pos, len) => {
+    const b = Buffer.alloc(len);
+    const n = readSync(fd, b, 0, len, pos);
+    return b.subarray(0, n);
+  };
+  const hoved = les(0, 8);
+  if (!erTiff(hoved)) return null;
+  const le = hoved[0] === 0x49;
+  const u16 = (b, p) => (le ? b.readUInt16LE(p) : b.readUInt16BE(p));
+  const u32 = (b, p) => (le ? b.readUInt32LE(p) : b.readUInt32BE(p));
+  const ifd = (offset) => {
+    const ud = new Map();
+    const nb = les(offset, 2);
+    if (nb.length < 2) return ud;
+    const n = Math.min(u16(nb, 0), 512);
+    const poster = les(offset + 2, n * 12);
+    for (let i = 0; i + 12 <= poster.length; i += 12) {
+      ud.set(u16(poster, i), {
+        type: u16(poster, i + 2), count: u32(poster, i + 4), vaerdi: u32(poster, i + 8), inline: poster.subarray(i + 8, i + 12),
+      });
+    }
+    return ud;
+  };
+  const tekst = (e) => {
+    if (!e || e.type !== 2) return null;
+    const raa = e.count <= 4 ? e.inline.subarray(0, e.count) : les(e.vaerdi, Math.min(e.count, 64));
+    return raa.toString('latin1').replace(/\0.*$/, '');
+  };
+  const ifd0 = ifd(u32(hoved, 4));
+  const exifPtr = ifd0.get(TAG_EXIF_IFD);
+  const exif = exifPtr ? ifd(exifPtr.vaerdi) : new Map();
+  for (const t of [tekst(exif.get(TAG_DATETIME_ORIGINAL)), tekst(exif.get(TAG_DATETIME_DIGITIZED)), tekst(ifd0.get(TAG_DATETIME))]) {
+    const aar = yearFromExifDate(t);
+    if (aar) return aar;
+  }
+  return null;
 }
 
 // Optagetidspunktet som et tal der kan sorteres paa (millisekunder, uden

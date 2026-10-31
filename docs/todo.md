@@ -4,8 +4,7 @@ Det der venter. Stef siger "byg", før noget herfra bliver lavet.
 
 ## Venter på "byg"
 
-- **Fejl: årstallet findes ikke i store TIFF-originaler** (Desert Canyon 01). Appen læser kun den første 1 MB, og i en stor TIFF ligger EXIF ofte til sidst. For TIFF læses IFD'erne der, hvor filen siger de ligger. Værker uden årstal, der allerede er tjekket, får ét nyt forsøg.
-- **Farveord deles ikke i en serie.** Serieordene deles kun for motiv og årstid, ikke for farverne (fra farvelisten). Farveord, der kun er kommet på et værk ved deling, fjernes én gang. (*red* endte på hele Desert Canyon.)
+Intet lige nu.
 
 ## Venter på en afklaring
 

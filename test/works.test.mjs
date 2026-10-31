@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import { openDatabase } from '../electron/lib/db.mjs';
 import { Catalog } from '../electron/lib/catalog.mjs';
 import { Works, defaultTitle, trailingNumber } from '../electron/lib/works.mjs';
-import { exifYearFromBuffer, yearFromExifDate } from '../electron/lib/exif.mjs';
+import { exifYear, exifYearFromBuffer, yearFromExifDate } from '../electron/lib/exif.mjs';
 
 let root;
 let db;
@@ -113,6 +113,26 @@ describe('EXIF-laeseren', () => {
     expect(yearFromExifDate('i gaar')).toBeNull();
     expect(exifYearFromBuffer(Buffer.from('ikke et billede'))).toBeNull();
     expect(exifYearFromBuffer(jpegMedExif('0000:00:00 00:00:00'))).toBeNull();
+  });
+
+  it('finder aaret i en stor TIFF, hvor IFD\'en ligger efter den foerste megabyte', () => {
+    // Header, 2 MB "billeddata", og saa IFD0 med en ExifIFD og DateTimeOriginal.
+    const data = 2 * 1024 * 1024;
+    const ifd0 = 8 + data;
+    const exifIfd = ifd0 + 2 + 12 + 4;
+    const dato = exifIfd + 2 + 12 + 4;
+    const buf = Buffer.alloc(dato + 20);
+    buf.write('II*\0', 0, 'latin1');
+    buf.writeUInt32LE(ifd0, 4);
+    buf.writeUInt16LE(1, ifd0);
+    buf.writeUInt16LE(0x8769, ifd0 + 2); buf.writeUInt16LE(4, ifd0 + 4); buf.writeUInt32LE(1, ifd0 + 6); buf.writeUInt32LE(exifIfd, ifd0 + 10);
+    buf.writeUInt16LE(1, exifIfd);
+    buf.writeUInt16LE(0x9003, exifIfd + 2); buf.writeUInt16LE(2, exifIfd + 4); buf.writeUInt32LE(20, exifIfd + 6); buf.writeUInt32LE(dato, exifIfd + 10);
+    buf.write('2019:07:03 12:00:00\0', dato, 'latin1');
+    const fil = join(root, 'stor.tif');
+    writeFileSync(fil, buf);
+    expect(exifYearFromBuffer(buf.subarray(0, 1024 * 1024))).toBeNull();
+    expect(exifYear(fil)).toBe(2019);
   });
 
   it('taaler en afkortet fil', () => {
@@ -358,15 +378,22 @@ describe('serien deler soegeord', () => {
     const ids = orig.map((r) => r.image_id);
     catalog.assignSeries(ids, serie.id ?? serie);
     const m = ids.map((id) => catalog.masterFil(id));
-    catalog.saveKeywords(m[0].id, [{ word: 'desert', score: 900 }, { word: 'yellow', score: 899 }]);
-    catalog.saveKeywords(m[1].id, [{ word: 'desert', score: 900 }, { word: 'camel', score: 899 }]);
+    catalog.saveKeywords(m[0].id, [{ word: 'desert', score: 900 }, { word: 'yellow', score: 899 }, { word: 'red', score: 898 }]);
+    catalog.saveKeywords(m[1].id, [{ word: 'desert', score: 900 }, { word: 'camel', score: 899 }, { word: 'red', score: 898 }]);
     catalog.saveKeywords(m[2].id, [{ word: 'dune', score: 900 }]);
     catalog.synkSerieOrd();
     const ord = (i) => catalog.keywordsForFile(m[i].id).map((k) => k.word).sort();
     // desert har to af tre; camel og yellow kun én, og bliver hvor de er.
+    // red har ogsaa to af tre, men farver deles ikke.
     expect(ord(2)).toEqual(['desert', 'dune']);
-    expect(ord(0)).toEqual(['desert', 'yellow']);
-    expect(ord(1)).toEqual(['camel', 'desert']);
+    expect(ord(0)).toEqual(['desert', 'red', 'yellow']);
+    expect(ord(1)).toEqual(['camel', 'desert', 'red']);
+    // En farve der tidligere blev delt (score 500), fjernes én gang.
+    catalog.db.run("INSERT INTO keywords(file_id, word, score, manual) VALUES(?, 'red', 500, 0)", m[2].id);
+    catalog.db.run("DELETE FROM meta WHERE key='delteFarverFjernet'");
+    catalog._migrate();
+    expect(ord(2)).toEqual(['desert', 'dune']);
+    expect(ord(0)).toEqual(['desert', 'red', 'yellow']);
 
     // At fjerne et faelles ord fra ét vaerk advarer: det ville komme igen.
     const info = catalog.serieOrd(m[2].id, 'desert');
