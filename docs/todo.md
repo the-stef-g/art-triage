@@ -4,7 +4,8 @@ Det der venter. Stef siger "byg", før noget herfra bliver lavet.
 
 ## Venter på "byg"
 
-Intet lige nu.
+- **Crop: stakke som i Lightroom.** En master og dens beskæringer er en stak i filmstriben, der kan åbnes og lukkes. Lukket ses kun masteren; åben står beskæringerne lige efter den. Stakken kan ses som en ramme om master og beskæringer, og tallet eller en lille pil på masteren åbner og lukker den. Om stakken er åben, huskes pr. værk.
+- **Crop: formaterne på masteren i stedet for tallet.** Mærket med antal beskæringer erstattes af de beskæringer, der er lavet (fx *1:1 2:3 3:2*), hver rød hvis den er ældre end masteren.
 
 ## Venter på en afklaring
 
