@@ -231,8 +231,11 @@ export class Works {
 
   // Samler vaerker i serier ud fra titlen: alle vaerker med en master og
   // ingen serie, hvis titel ender paa et nummer, kommer i serien med
-  // titlens navn uden nummeret. En serie Stef selv har givet, roeres ikke.
-  // Returnerer antallet af vaerker der fik en serie.
+  // titlens navn uden nummeret. En ny serie laves kun, naar mindst to vaerker
+  // deler navnet; en serie der findes, kan ogsaa et enkelt vaerk komme i. En
+  // automatisk serie med kun ét vaerk (fx "Mur" til "Mur 2") fjernes igen.
+  // En serie Stef selv har givet, roeres ikke. Returnerer antallet af vaerker
+  // der fik en serie.
   autoSerier() {
     const rows = this.db.all(
       `SELECT i.id AS image_id, f.rel_path, w.title FROM images i
@@ -252,10 +255,36 @@ export class Works {
     let antal = 0;
     for (const [navn, ids] of grupper) {
       const findes = this.db.get('SELECT id FROM series WHERE name=? COLLATE NOCASE', navn);
-      this.catalog.assignSeries(ids, findes ? findes.id : this.catalog.createSeries(navn));
+      if (!findes && ids.length < 2) continue;
+      this.catalog.assignSeries(ids, findes ? findes.id : this.catalog.createSeries(navn, { auto: true }));
       antal += ids.length;
     }
+    this._rydEnligeSerier();
     return antal;
+  }
+
+  // Automatiske serier med ét eller ingen vaerk. Kun naar serien hedder det
+  // samme som vaerkets titel uden nummer, saa en serie med et andet navn
+  // bliver staaende.
+  _rydEnligeSerier() {
+    const serier = this.db.all(
+      `SELECT s.id, s.name, COUNT(i.id) AS antal, MIN(i.id) AS image_id FROM series s
+       LEFT JOIN images i ON i.series_id = s.id
+       WHERE s.auto = 1 GROUP BY s.id HAVING COUNT(i.id) <= 1`
+    );
+    for (const s of serier) {
+      if (s.antal === 1) {
+        const r = this.db.get(
+          `SELECT w.title, f.rel_path FROM images i JOIN files f ON f.id = i.master_file_id
+           LEFT JOIN works w ON w.image_id = i.id WHERE i.id=?`,
+          s.image_id
+        );
+        const navn = r ? serieNavnFraTitel(r.title || defaultTitle(r.rel_path)) : null;
+        if (!navn || navn.toLowerCase() !== s.name.toLowerCase()) continue;
+        this.catalog.assignSeries([s.image_id], null);
+      }
+      this.catalog.deleteSeries(s.id);
+    }
   }
 
   // patch bruger de samme navne som kolonnerne. Ukendte felter afvises.

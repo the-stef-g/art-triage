@@ -197,6 +197,13 @@ export class Catalog extends EventEmitter {
     for (const kol of ['intro', 'template', 'colour']) {
       if (!serieKolonner.includes(kol)) this.db.exec(`ALTER TABLE series ADD COLUMN ${kol} TEXT`);
     }
+    // auto: serien er lavet af appen ud fra titlerne (autoSerier). Serier fra
+    // foer kolonnen fandtes, og som ingen felter har, regnes for automatiske,
+    // saa en serie paa ét vaerk som "Mur" kan ryddes op.
+    if (!serieKolonner.includes('auto')) {
+      this.db.exec('ALTER TABLE series ADD COLUMN auto INTEGER NOT NULL DEFAULT 0');
+      this.db.exec('UPDATE series SET auto=1 WHERE intro IS NULL AND template IS NULL AND colour IS NULL');
+    }
     // En drejning man selv har lagt paa et billede, naar automatikken
     // tager fejl: 0, 90, 180 eller 270 grader med uret.
     const filKolonner = this.db.all('PRAGMA table_info(files)').map((k) => k.name);
@@ -1548,12 +1555,16 @@ export class Catalog extends EventEmitter {
     );
   }
 
-  createSeries(name) {
+  createSeries(name, { auto = false } = {}) {
     const trimmed = String(name || '').trim();
     if (!trimmed) throw new Error('The series needs a name');
     const existing = this.db.get('SELECT id FROM series WHERE name=?', trimmed);
-    if (existing) return existing.id;
-    return this.db.run('INSERT INTO series(name) VALUES(?)', trimmed).lastInsertRowid;
+    if (existing) {
+      // Stef vaelger eller laver selv en serie, appen lavede: nu er den hans.
+      if (!auto) this.db.run('UPDATE series SET auto=0 WHERE id=?', existing.id);
+      return existing.id;
+    }
+    return this.db.run('INSERT INTO series(name, auto) VALUES(?, ?)', trimmed, auto ? 1 : 0).lastInsertRowid;
   }
 
   assignSeries(imageIds, seriesId) {

@@ -298,6 +298,42 @@ describe('serier og print af sig selv', () => {
     expect(works.autoSerier()).toBe(0);
   });
 
+  it('laver ikke en serie til ét vaerk, og fjerner en automatisk serie paa ét vaerk', () => {
+    for (const n of ['Mur 2', 'Sand 1', 'Sand 2']) {
+      skriv(`Import/Ahl/${n}.tif`, n);
+    }
+    catalog.sync();
+    for (const n of ['Mur 2', 'Sand 1', 'Sand 2']) {
+      catalog.setRating([raekke(`Import/Ahl/${n}.tif`).version_id], 'godkendt');
+      skriv(`Approved/${n}/Master/${n}.tif`, `m${n}`);
+    }
+    catalog.sync();
+    const works = new Works(catalog);
+    expect(works.autoSerier()).toBe(2);
+    const serie = (n) => raekke(`Approved/${n}/Original/${n}.tif`).series_name;
+    expect(serie('Mur 2')).toBe(null);
+    expect(serie('Sand 1')).toBe('Sand');
+    // En gammel automatisk serie paa ét vaerk (som Mur foer) ryddes op.
+    const mur = catalog.createSeries('Mur', { auto: true });
+    catalog.assignSeries([raekke('Approved/Mur 2/Original/Mur 2.tif').image_id], mur);
+    works.autoSerier();
+    expect(serie('Mur 2')).toBe(null);
+    expect(catalog.listSeries().map((s) => s.name)).toEqual(['Sand']);
+    // En serie Stef selv laver til ét vaerk, bliver staaende.
+    const egen = catalog.createSeries('Mur');
+    catalog.assignSeries([raekke('Approved/Mur 2/Original/Mur 2.tif').image_id], egen);
+    works.autoSerier();
+    expect(serie('Mur 2')).toBe('Mur');
+    // Et nyt vaerk kan komme ind i en serie der findes, ogsaa alene.
+    skriv('Import/Ahl/Sand 3.tif', 'Sand 3');
+    catalog.sync();
+    catalog.setRating([raekke('Import/Ahl/Sand 3.tif').version_id], 'godkendt');
+    skriv('Approved/Sand 3/Master/Sand 3.tif', 'mSand 3');
+    catalog.sync();
+    expect(works.autoSerier()).toBe(1);
+    expect(serie('Sand 3')).toBe('Sand');
+  });
+
   it('alle vaerker saelges som print, undtagen malerier og skulpturer', () => {
     catalog.setRating([raekke('Import/Ahl/x.cr2').version_id], 'godkendt');
     skriv('Approved/x/Master/x.tif', 'm');
