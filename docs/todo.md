@@ -4,7 +4,8 @@ Det der venter. Stef siger "byg", før noget herfra bliver lavet.
 
 ## Venter på "byg"
 
-Intet lige nu.
+- **Sort: filmstriben følger hovedvinduets rækkefølge.** Den viser i dag importen i den rækkefølge, billederne er taget, så den ikke passer med grid'et, når det er sorteret efter navn (*Fishy Fish.png* står før *Fishy Fish sketch+pencil.psd* i striben, men efter i grid'et). Striben skal sortere som grid'et, også når sorteringen skiftes.
+- **Spørgsmålet om Apple Music.** macOS spurgte, om Stef G Art må få adgang til Apple Music og musikbiblioteket, da en mappe blev lagt i Import. Appen bruger ikke musik. Find ud af, hvad der udløser det (en fil eller mappe fra Musik-mappen, en video eller lyd i mappen, eller Quick Look), og få det væk, så appen aldrig spørger.
 
 ## Venter på en afklaring
 
