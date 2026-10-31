@@ -1560,7 +1560,7 @@ export class Catalog extends EventEmitter {
     if (!trimmed) throw new Error('The series needs a name');
     const existing = this.db.get('SELECT id FROM series WHERE name=?', trimmed);
     if (existing) {
-      // Stef vaelger eller laver selv en serie, appen lavede: nu er den hans.
+      // Stef vaelger eller laver selv en serie, appen lavede: nu er den Stefs.
       if (!auto) this.db.run('UPDATE series SET auto=0 WHERE id=?', existing.id);
       return existing.id;
     }
