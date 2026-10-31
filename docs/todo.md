@@ -4,7 +4,8 @@ Det der venter. Stef siger "byg", før noget herfra bliver lavet.
 
 ## Venter på "byg"
 
-Intet lige nu.
+- **Shop: filnavnet i fremdriften.** I stedet for "Uploading the 2:3 crop (2 of 5)" står filens navn, fx "Uploading Desert Canyon 01 2-3.tif (2 of 5)", så det kan ses hvilket værk det er, når flere sendes.
+- **Product: venstre kolonne dobbelt så bred** (750 px i stedet for 375), med plads til flere billeder i bredden.
 
 ## Venter på en afklaring
 
