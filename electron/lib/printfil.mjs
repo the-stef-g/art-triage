@@ -2,18 +2,30 @@
 // ICC-profiler er kun til proevetryk og maa ikke lægges i filen. Filen
 // laves derfor i sRGB, 8 bit, maerket 300 DPI, i fuld opløsning: Prodigi
 // skalerer selv til den størrelse der bestilles. Masteren roeres ikke.
+// Den er en JPEG i hoej kvalitet: Prodigi tager hoejst 300 MB, og en PNG
+// paa 120 x 120 cm ved 300 DPI blev over 500 MB.
 import { existsSync, mkdirSync, renameSync, rmSync, statSync } from 'node:fs';
 import { join, basename } from 'node:path';
 
 export const PRINT_DPI = 300;
 
 // Printfilens navn har altid formatet med, ogsaa naar der kun er ét:
-// "Desert 2-3.png". Det er det format Prodigi printer i.
+// "Desert 2-3.jpg". Det er det format Prodigi printer i.
 export const PRINTFORMATER = { '1-1': 1, '2-3': 2 / 3, '3-2': 3 / 2, '1-2': 1 / 2, '2-1': 2 };
 
 export function printfilNavn(base, token) {
+  return `${base} ${token}.jpg`;
+}
+
+// Navnet fra foer 0.41, da printfilen var en PNG.
+export function gammelPrintfilNavn(base, token) {
   return `${base} ${token}.png`;
 }
+
+// Prodigis graense for en fil, regnet lavt (1 MB = 1.000.000 bytes).
+export const MAKS_BYTES = 300 * 1000 * 1000;
+// Kvaliteten foerst, og de trin der proeves, hvis filen bliver for stor.
+export const JPEG_KVALITETER = [95, 92, 90, 85, 80];
 
 // Billedets maal som det vises: EXIF-retning og egen drejning med.
 async function vistStoerrelse(sharp, fil, rotation = 0) {
@@ -65,8 +77,11 @@ export async function pixelAreal(fil) {
 // format: en fil der er en pixel eller to skaev (fx efter en forstoerrelse),
 // skaeres til i midten; en der er mere end 1 % skaev, afvises. rotation er
 // brugerens egen drejning af beskaeringen. En eksisterende printfil med samme
-// navn erstattes. Returnerer { path, bytes, token, kilde, bredde, hoejde }.
-export async function lavPrintfil({ kilde, mappe, base, token, forstoerrelser = [], rotation = 0 }) {
+// navn erstattes. Returnerer { path, bytes, token, kilde, bredde, hoejde,
+// kvalitet, gammel }; gammel er en PNG fra foer, som kalderen fjerner.
+export async function lavPrintfil({
+  kilde, mappe, base, token, forstoerrelser = [], rotation = 0, maksBytes = MAKS_BYTES,
+}) {
   if (!PRINTFORMATER[token]) {
     throw new Error('Only a crop in one of the five print formats (1:1, 2:3, 3:2, 1:2, 2:1) can be printed');
   }
@@ -102,26 +117,40 @@ export async function lavPrintfil({ kilde, mappe, base, token, forstoerrelser = 
 
   mkdirSync(mappe, { recursive: true });
   const dest = join(mappe, printfilNavn(base, token));
-  const tmp = `${dest}.tmp.png`;
+  const tmp = `${dest}.tmp.jpg`;
+  let kvalitet = null;
   try {
     let img = sharp(valgt.fil, { failOn: 'none', limitInputPixels: false }).rotate();
     if (valgt.rot) img = sharp(await img.toBuffer(), { limitInputPixels: false }).rotate(valgt.rot);
     if (udsnit) img = sharp(await img.toBuffer(), { limitInputPixels: false }).extract(udsnit);
     // Den indlejrede profil (fx Adobe RGB, ProPhoto eller en CMYK-profil)
     // bruges til at regne farverne om til sRGB, og sRGB lægges i filen.
-    await img
-      .toColourspace('srgb')
-      .withIccProfile('srgb')
-      .withMetadata({ density: PRINT_DPI })
-      .png({ compressionLevel: 9 })
-      .toFile(tmp);
+    // Fuld farveoploesning (4:4:4), saa farvekanter ikke bliver bloede.
+    const pixels = await img.toColourspace('srgb').raw().toBuffer({ resolveWithObject: true });
+    for (const q of JPEG_KVALITETER) {
+      await sharp(pixels.data, { raw: pixels.info, limitInputPixels: false })
+        .withIccProfile('srgb')
+        .withMetadata({ density: PRINT_DPI })
+        .jpeg({ quality: q, chromaSubsampling: '4:4:4' })
+        .toFile(tmp);
+      if (statSync(tmp).size <= maksBytes) {
+        kvalitet = q;
+        break;
+      }
+    }
+    if (kvalitet === null) {
+      throw new Error(`it is over ${Math.round(maksBytes / 1e6)} MB even at quality ${JPEG_KVALITETER[JPEG_KVALITETER.length - 1]}`);
+    }
     renameSync(tmp, dest);
   } catch (err) {
     rmSync(tmp, { force: true });
     throw new Error(`The print file could not be made: ${String(err?.message || err).trim().slice(0, 200)}`);
   }
+  const gammel = join(mappe, gammelPrintfilNavn(base, token));
   return {
     path: dest,
+    kvalitet,
+    gammel: existsSync(gammel) ? gammel : null,
     bytes: statSync(dest).size,
     token,
     kilde: valgt.fil,

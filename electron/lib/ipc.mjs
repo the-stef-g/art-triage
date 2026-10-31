@@ -1,7 +1,7 @@
 // Session-laget: ejer det aabne bibliotek (database, katalog, thumbnails,
 // watcher, indeksering) og registrerer alle IPC-handlers som UI'et kalder.
 import { ipcMain, dialog, shell, clipboard } from 'electron';
-import { join } from 'node:path';
+import { join, basename } from 'node:path';
 import { existsSync, statSync } from 'node:fs';
 import { cropMaster } from './crop.mjs';
 import { lavMaster } from './master.mjs';
@@ -159,6 +159,9 @@ export class AppSession {
     if (!res.unavailable && katalog === this.catalog) {
       this._autoPrint().catch((err) => this.log(`auto print failed: ${String(err?.message || err).slice(0, 200)}`));
     }
+    if (!res.unavailable && katalog === this.catalog) {
+      this._rydGiga().catch((err) => this.log(`-giga clean-up failed: ${String(err?.message || err).slice(0, 200)}`));
+    }
     return { ...res, skipped: false, reason, varighed: this.lastScanMs };
   }
 
@@ -232,6 +235,7 @@ export class AppSession {
         const navn = k.rel.split('/').pop();
         try {
           const res = await this._arbejde('making print files', () => lavPrintfil(maal));
+          await this._fjernGammelPrintfil(res);
           const rel = res.path.slice(catalog.root.length + 1);
           this.log(`auto print: ${rel} from ${navn}`);
           this.broadcast('besked', { tekst: `Print file made from ${navn}: ${rel.split('/').pop()} (${res.bredde} × ${res.hoejde} px)` });
@@ -507,6 +511,29 @@ export class AppSession {
         this.broadcast('besked', { tekst: `The texts could not be written: ${String(err?.message || err).slice(0, 160)}` });
       }
     });
+  }
+
+  // -giga-kopier, som Gigapixel aldrig forstoerrede paa et doegn, i
+  // papirkurven. Den naeste faste skanning fjerner dem fra kataloget.
+  async _rydGiga() {
+    const filer = this.catalog.uforstoerredeGiga();
+    if (!filer.length) return;
+    for (const f of filer) {
+      await shell.trashItem(f);
+      this.log(`-giga: ${f.slice(this.catalog.root.length + 1)} was never enlarged; moved to the Trash`);
+    }
+  }
+
+  // Printfilen var en PNG foer 0.41; naar JPEG'en er lavet, gaar den i
+  // papirkurven, saa der kun er én printfil pr. beskaering.
+  async _fjernGammelPrintfil(res) {
+    if (!res?.gammel) return;
+    try {
+      await shell.trashItem(res.gammel);
+      this.log(`print: old PNG ${basename(res.gammel)} to the Trash`);
+    } catch (err) {
+      this.log(`print: could not remove the old PNG: ${String(err?.message || err).slice(0, 160)}`);
+    }
   }
 
   // Vaerker i en serie, hvis tekster ikke er skrevet til den serie (og som
@@ -886,6 +913,7 @@ export class AppSession {
       for (const id of ids) {
         const maal = catalog.printMaal(id);
         const res = await lavPrintfil(maal);
+        await this._fjernGammelPrintfil(res);
         lavet.push({
           rel: res.path.slice(catalog.root.length + 1),
           bytes: res.bytes,

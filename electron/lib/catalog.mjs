@@ -7,7 +7,7 @@ import {
 } from 'node:fs';
 import { join, dirname, basename, extname, posix } from 'node:path';
 import { exifTid } from './exif.mjs';
-import { printfilNavn } from './printfil.mjs';
+import { printfilNavn, gammelPrintfilNavn } from './printfil.mjs';
 import {
   walkImages, walkImagesAsync, walkDirs, findImportMappe, beskaeringFraSti, navnMedBeskaering,
   editorFraSti, masterNavn, quickHash, quickHashAsync, mapGraense, stemOf, slug, uniquePath, extOf, daCollator,
@@ -910,6 +910,9 @@ export class Catalog extends EventEmitter {
     for (const g of d.forstoerrelser) filer.push({ rel: g.rel_path, art: 'giga' });
     const print = this._printfilInfo(f.rel_path);
     if (print) filer.push({ rel: print.rel, art: 'print' });
+    // En printfil fra foer 0.41, da den var en PNG.
+    const png = `Approved/${d.work}/Print files/${gammelPrintfilNavn(d.base, d.token)}`;
+    if (existsSync(this.abs(png))) filer.push({ rel: png, art: 'print' });
     return filer;
   }
 
@@ -1175,9 +1178,37 @@ export class Catalog extends EventEmitter {
     const stem = stemOf(basename(f.rel_path));
     const mappe = join(this.root, 'Approved', vaerk.work, 'Edits');
     mkdirSync(mappe, { recursive: true });
-    const dest = uniquePath(join(mappe, `${stem}-${suffiks}${ext}`));
+    const navn = join(mappe, `${stem}-${suffiks}${ext}`);
+    // En -giga-kopi der aldrig blev forstoerret (samme stoerrelse som
+    // beskaeringen), genbruges i stedet for at lave "… -giga 2".
+    if (suffiks === 'giga' && existsSync(navn) && statSync(navn).size <= statSync(this.abs(f.rel_path)).size) {
+      copyFileSync(this.abs(f.rel_path), navn);
+      return navn;
+    }
+    const dest = uniquePath(navn);
     copyFileSync(this.abs(f.rel_path), dest);
     return dest;
+  }
+
+  // -giga-kopier i Edits, der er aeldre end alderMs og stadig ikke stoerre end
+  // beskaeringen: Gigapixel forstoerrede dem aldrig. Returnerer de absolutte
+  // stier; kalderen flytter dem i papirkurven.
+  uforstoerredeGiga(alderMs = 24 * 60 * 60 * 1000, nu = Date.now()) {
+    const ud = [];
+    const edits = this.db.all(
+      "SELECT rel_path, size, mtime FROM files WHERE present=1 AND rel_path LIKE 'Approved/%/Edits/%'"
+    );
+    for (const e of edits) {
+      const g = this._gigaDele(e.rel_path);
+      if (!g || nu - e.mtime < alderMs) continue;
+      const start = `${g.base} ${g.token}`.toLowerCase();
+      const krop = this.db.all(
+        "SELECT rel_path, size FROM files WHERE present=1 AND rel_path LIKE ? ESCAPE '\\'",
+        `Approved/${escapeLike(g.work)}/Master/%`
+      ).find((x) => stemOf(posix.basename(x.rel_path)).toLowerCase() === start);
+      if (krop && e.size <= krop.size) ud.push(this.abs(e.rel_path));
+    }
+    return ud;
   }
 
   // Hvor en master af filen skal ligge, og hvad den skal hedde: vaerkets

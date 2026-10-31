@@ -212,7 +212,7 @@ try {
   await page.locator('button', { hasText: 'Scan again' }).click();
   await page.waitForSelector('text=/is not 3:2/', { timeout: 30000 });
   if (await page.locator('.print-linje:not(.hoved)').count() !== 1) throw new Error('-giga-filen staar paa sin egen linje');
-  if (existsSync(join(lib, 'Approved', 'blaa', 'Print files', 'blaa master 3-2.png'))) {
+  if (existsSync(join(lib, 'Approved', 'blaa', 'Print files', 'blaa master 3-2.jpg'))) {
     throw new Error('Der blev lavet en printfil i et forkert format');
   }
 
@@ -220,13 +220,13 @@ try {
   renameSync(kilde, join(lib, 'Approved', 'blaa', 'Master', 'blaa master 1-1.png'));
   renameSync(join(edits, 'blaa master 3-2-giga.png'), join(edits, 'blaa master 1-1-giga.png'));
   await page.locator('button', { hasText: 'Scan again' }).click();
-  const printfil = join(lib, 'Approved', 'blaa', 'Print files', 'blaa master 1-1.png');
+  const printfil = join(lib, 'Approved', 'blaa', 'Print files', 'blaa master 1-1.jpg');
   const t0 = Date.now() + 30_000;
   while (!existsSync(printfil) && Date.now() < t0) await page.waitForTimeout(250);
   if (!existsSync(printfil)) throw new Error('Printfilen blev ikke lavet');
   const pm = await sharp(printfil).metadata();
-  if (pm.format !== 'png' || pm.density !== 300) throw new Error(`Printfilen er ${pm.format} paa ${pm.density} DPI`);
-  await page.waitForSelector('.print-linje:not(.hoved) >> text=✓ blaa master 1-1.png', { timeout: 20000 });
+  if (pm.format !== 'jpeg' || pm.density !== 300) throw new Error(`Printfilen er ${pm.format} paa ${pm.density} DPI`);
+  await page.waitForSelector('.print-linje:not(.hoved) >> text=✓ blaa master 1-1.jpg', { timeout: 20000 });
   // Og den kan laves igen i haanden fra beskaeringens linje.
   await page.locator('.print-linje:not(.hoved)').first().click();
   await page.locator('button', { hasText: 'Make print file again' }).click();

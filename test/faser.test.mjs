@@ -105,7 +105,7 @@ describe('fasen foelger af mapperne', () => {
     expect(fase(6)).toEqual(['Approved/y/Master/y.tif']);
     expect(catalog.faseTal()).toEqual({ 1: 2, 2: 0, 3: 0, 4: 0, 5: 0, 6: 1 });
 
-    skriv('Approved/y/Print files/y 2-3.png', 'p');
+    skriv('Approved/y/Print files/y 2-3.jpg', 'p');
     expect(fase(4)).toEqual([]);
   });
 

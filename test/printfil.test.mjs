@@ -45,13 +45,15 @@ afterEach(() => {
 });
 
 describe('lavPrintfil', () => {
-  it('laver en 8 bit sRGB PNG paa 300 DPI i fuld stoerrelse, med farverne regnet om', async () => {
+  it('laver en 8 bit sRGB JPEG paa 300 DPI i fuld stoerrelse, med farverne regnet om', async () => {
     const kilde = join(root, 'k.tif');
     await p3Tiff(kilde, 60, 40);
     const res = await lavPrintfil({ kilde, mappe: join(root, 'Print files'), base: 'Desert', token: '3-2' });
-    expect(res.path).toBe(join(root, 'Print files', 'Desert 3-2.png'));
+    expect(res.path).toBe(join(root, 'Print files', 'Desert 3-2.jpg'));
     const m = await sharp(res.path).metadata();
-    expect(m.format).toBe('png');
+    expect(m.format).toBe('jpeg');
+    expect(m.chromaSubsampling).toBe('4:4:4');
+    expect(res.kvalitet).toBe(95);
     expect([m.width, m.height]).toEqual([60, 40]);
     expect(m.depth).toBe('uchar');
     expect(m.space).toBe('srgb');
@@ -90,6 +92,29 @@ describe('lavPrintfil', () => {
     const drejet = await lavPrintfil({ kilde, mappe, base: 'y', token: '2-3', rotation: 90 });
     expect(drejet.kilde).toBe(kilde);
     expect([drejet.bredde, drejet.hoejde]).toEqual([40, 60]);
+  });
+
+  it('saenker kvaliteten, hvis filen er over graensen, og siger nej, hvis den stadig er', async () => {
+    const mappe = join(root, 'Print files');
+    const kilde = join(root, 'stoej.png');
+    const stoej = Buffer.alloc(300 * 200 * 3);
+    for (let i = 0; i < stoej.length; i += 1) stoej[i] = (i * 2654435761) % 251;
+    await sharp(stoej, { raw: { width: 300, height: 200, channels: 3 } }).png().toFile(kilde);
+    const fuld = await lavPrintfil({ kilde, mappe, base: 's', token: '3-2' });
+    const lavere = await lavPrintfil({ kilde, mappe, base: 't', token: '3-2', maksBytes: fuld.bytes - 1 });
+    expect(lavere.kvalitet).toBeLessThan(95);
+    expect(lavere.bytes).toBeLessThan(fuld.bytes);
+    await expect(lavPrintfil({ kilde, mappe, base: 'u', token: '3-2', maksBytes: 100 })).rejects.toThrow(/over 0 MB/);
+  });
+
+  it('melder en gammel PNG-printfil med samme navn, saa den kan fjernes', async () => {
+    const mappe = join(root, 'Print files');
+    const kilde = join(root, 'k.tif');
+    await p3Tiff(kilde, 60, 40);
+    mkdirSync(mappe, { recursive: true });
+    writeFileSync(join(mappe, 'Desert 3-2.png'), 'gammel');
+    const res = await lavPrintfil({ kilde, mappe, base: 'Desert', token: '3-2' });
+    expect(res.gammel).toBe(join(mappe, 'Desert 3-2.png'));
   });
 
   it('kun de fem printformater', async () => {
@@ -135,7 +160,7 @@ describe('printfiler i kataloget', () => {
     expect([res.bredde, res.hoejde]).toEqual([120, 180]);
 
     liste = catalog.listVersions({ fase: 4 });
-    for (const r of liste) expect(r.printfil.rel).toBe('Approved/Desert/Print files/Desert 2-3.png');
+    for (const r of liste) expect(r.printfil.rel).toBe('Approved/Desert/Print files/Desert 2-3.jpg');
     // Print files skannes ikke: printfilen bliver ikke en version af vaerket.
     catalog.sync();
     expect(alle().some((x) => x.rel_path.includes('Print files'))).toBe(false);
@@ -148,7 +173,7 @@ describe('printfiler i kataloget', () => {
     const giga = catalog.listVersions({ fase: 4 }).find((r) => r.giga);
     expect(giga.rel_path).toBe('Approved/Desert/Edits/Desert 3-2-giga-gigapixel-standard-4x.tif');
     const res = await lavPrintfil(catalog.printMaal(giga.version_id));
-    expect(res.path).toBe(join(root, 'Approved', 'Desert', 'Print files', 'Desert 3-2.png'));
+    expect(res.path).toBe(join(root, 'Approved', 'Desert', 'Print files', 'Desert 3-2.jpg'));
   });
 
   it('cropKaede: beskaeringen, dens -giga-filer og dens printfil, ikke de andre formaters', async () => {
@@ -163,8 +188,28 @@ describe('printfiler i kataloget', () => {
     expect(catalog.cropKaede(krop.version_id)).toEqual([
       { rel: 'Approved/Desert/Master/Desert 3-2.tif', art: 'crop' },
       { rel: 'Approved/Desert/Edits/Desert 3-2-giga.tif', art: 'giga' },
-      { rel: 'Approved/Desert/Print files/Desert 3-2.png', art: 'print' },
+      { rel: 'Approved/Desert/Print files/Desert 3-2.jpg', art: 'print' },
     ]);
+  });
+
+  it('-giga-kopier der aldrig blev forstoerret: genbruges, og ryddes efter et doegn', async () => {
+    await p3Tiff(join(root, 'Approved', 'Desert', 'Master', 'Desert 3-2.tif'), 60, 40);
+    catalog.sync();
+    const krop = catalog.listVersions({ fase: 4 }).find((r) => r.rel_path.endsWith('Desert 3-2.tif'));
+    const foerste = catalog.kopiTilEdits(krop.version_id, 'giga');
+    expect(foerste).toBe(join(root, 'Approved', 'Desert', 'Edits', 'Desert 3-2-giga.tif'));
+    // Sendt igen uden at Gigapixel gemte: den samme kopi, ingen "-giga 2".
+    expect(catalog.kopiTilEdits(krop.version_id, 'giga')).toBe(foerste);
+    catalog.sync();
+    const nu = Date.now();
+    expect(catalog.uforstoerredeGiga(24 * 3600 * 1000, nu)).toEqual([]);
+    expect(catalog.uforstoerredeGiga(24 * 3600 * 1000, nu + 25 * 3600 * 1000)).toEqual([foerste]);
+    // En rigtig forstoerrelse bliver.
+    await p3Tiff(foerste, 240, 160);
+    catalog.sync();
+    expect(catalog.uforstoerredeGiga(24 * 3600 * 1000, nu + 25 * 3600 * 1000)).toEqual([]);
+    // Og den genbruges ikke: en ny kopi faar sit eget navn.
+    expect(catalog.kopiTilEdits(krop.version_id, 'giga')).not.toBe(foerste);
   });
 
   it('autoPrintKandidater: -giga-filer uden en nyere printfil', async () => {
@@ -209,7 +254,7 @@ describe('printfiler i kataloget', () => {
     const krop = () => catalog.listVersions({ fase: 4 }).find((r) => r.rel_path.endsWith('Desert 3-2.tif'));
     expect(krop().foraeldet).toBe(null);
     await lavPrintfil(catalog.printMaal(krop().version_id));
-    tid('Approved/Desert/Print files/Desert 3-2.png', 4000);
+    tid('Approved/Desert/Print files/Desert 3-2.jpg', 4000);
     expect(krop().foraeldet).toBe(null);
 
     // Masteren gemmes igen: beskaeringen er lavet af en gammel udgave.

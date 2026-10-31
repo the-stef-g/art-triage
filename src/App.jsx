@@ -451,10 +451,11 @@ export default function App() {
   // Crop: vaerkerne smalt til venstre og beskaeringen i midten.
   const cropLayout = filter.fase === 3;
   const [cropNode, setCropNode] = useState(null);
-  // Filmstriben i Crop er én raekke: op og ned flytter ogsaa ét vaerk.
+  // Filmstriben i Crop og listen i Print er én raekke eller kolonne: op og
+  // ned flytter ogsaa ét. Grid'et saetter selv tallet, naar det vises igen.
   useEffect(() => {
-    if (cropLayout) columnsRef.current = 1;
-  }, [cropLayout]);
+    if (cropLayout || filter.fase === 4) columnsRef.current = 1;
+  }, [cropLayout, filter.fase]);
 
   // Slaar det aktive billede op via refs, saa tastaturgenvejene
   // (registreret en gang) altid ser den aktuelle tilstand.

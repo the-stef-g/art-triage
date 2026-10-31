@@ -1,9 +1,12 @@
+// Som Finder: 1 MB er 1.000.000 bytes, og decimalen er et komma. Ellers
+// viste appen 522,2 MB, hvor Finder viste 547,5 MB for den samme fil.
 export function formatBytes(n) {
   if (n == null) return '';
-  if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`;
-  if (n < 1024 * 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(1)} MB`;
-  return `${(n / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+  const tal = (x, d) => x.toLocaleString('da-DK', { minimumFractionDigits: d, maximumFractionDigits: d });
+  if (n < 1000) return `${n} bytes`;
+  if (n < 1e6) return `${tal(n / 1e3, 0)} KB`;
+  if (n < 1e9) return `${tal(n / 1e6, 1)} MB`;
+  return `${tal(n / 1e9, 2)} GB`;
 }
 
 export function formatDate(ms) {
