@@ -506,7 +506,11 @@ export class Catalog extends EventEmitter {
       for (const row of dbFiles) {
         const d = disk.get(row.rel_path);
         if (!d) {
-          if (row.present) missing.push(row);
+          // Listen over disken kan vaere aeldre end databasen: er filen
+          // flyttet af appen, mens der blev skannet (fx en bedoemmelse),
+          // staar den paa sin nye plads i databasen og paa disken, bare ikke
+          // i listen. Den er ikke forsvundet.
+          if (row.present && !existsSync(this.abs(row.rel_path))) missing.push(row);
           continue;
         }
         disk.delete(row.rel_path);
@@ -538,6 +542,12 @@ export class Catalog extends EventEmitter {
       const newEntries = [...disk.values()];
       const newBySig = new Map();
       for (const n of newEntries) {
+        // Det samme den anden vej: en fil i listen, som appen har flyttet
+        // siden, er ikke en ny fil.
+        if (!existsSync(this.abs(n.rel))) {
+          disk.delete(n.rel);
+          continue;
+        }
         let hash;
         try {
           hash = hashAf(n.rel, n.size);

@@ -3,6 +3,7 @@
 // RAW-fil uden JPEG skal ende i "N previews failed" med en Retry-knap.
 // Koeres i CI under Xvfb: `xvfb-run npm run smoke:previews`.
 import { _electron as electron } from 'playwright-core';
+import { fejlKode } from './smoke-glib.mjs';
 import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -54,6 +55,7 @@ proc.stdout?.on('data', (d) => process.stdout.write(`[app] ${d}`));
 proc.stderr?.on('data', (d) => process.stderr.write(`[app] ${d}`));
 
 let succes = false;
+let kode = 1;
 try {
   const page = await app.firstWindow({ timeout: 60000 });
   await page.waitForFunction(() => document.visibilityState === 'visible', null, { timeout: 60000 });
@@ -111,6 +113,7 @@ try {
   succes = true;
 } catch (err) {
   console.error('SMOKE FEJL:', err.message);
+  kode = await fejlKode(proc);
   try {
     const page = await app.firstWindow({ timeout: 5000 });
     await page.screenshot({ path: 'smoke-previews-fejl.png' });
@@ -118,4 +121,4 @@ try {
 } finally {
   await app.close().catch(() => {});
 }
-process.exit(succes ? 0 : 1);
+process.exit(succes ? 0 : kode);

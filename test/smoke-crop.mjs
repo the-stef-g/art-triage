@@ -1,6 +1,8 @@
 // Smoke test af beskaering i den byggede app: godkend et billede, laeg en
 // masterfil i Master, beskaer den, og se at der kommer en ny fil i Master.
 import { _electron as electron } from 'playwright-core';
+import { fejlKode } from './smoke-glib.mjs';
+import { writeSync } from 'node:fs';
 import { mkdtempSync, rmSync, existsSync, readdirSync, renameSync, copyFileSync, utimesSync } from 'node:fs';
 import { mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -33,9 +35,41 @@ const app = await electron.launch({
   },
 });
 
+// Appens egen output og hvordan den sluttede, saa et nedbrud kan ses.
+const proc = app.process();
+proc.stdout?.on('data', (d) => process.stdout.write(`[app] ${d}`));
+proc.stderr?.on('data', (d) => process.stderr.write(`[app] ${d}`));
+// Synkront, saa linjen kommer med, selv om testen slutter lige efter.
+proc.on('exit', (code, signal) => writeSync(2, `[app] exited: code=${code} signal=${signal}\n`));
+
 let succes = false;
+let kode = 1;
 try {
   const page = await app.firstWindow({ timeout: 60000 });
+  page.on('crash', () => console.error('[side] the renderer crashed'));
+  page.on('close', () => console.error('[side] the window closed'));
+  page.on('pageerror', (e) => console.error(`[side] pageerror: ${e.message}`));
+  page.on('console', (m) => { if (m.type() === 'error') console.error(`[side] console: ${m.text()}`); });
+  // Alle beskeder bundlinjen viser, i raekkefoelge. En besked kan afloeses
+  // af den naeste efter et oejeblik; testen ser efter den i historikken.
+  await page.waitForLoadState('domcontentloaded');
+  await page.evaluate(() => {
+    window.__beskeder = [];
+    const kig = () => {
+      for (const el of document.querySelectorAll('.statusbar > .fejl')) {
+        const t = el.textContent;
+        if (t && !window.__beskeder.includes(t)) window.__beskeder.push(t);
+      }
+    };
+    new MutationObserver(kig).observe(document.documentElement, { subtree: true, childList: true, characterData: true });
+  });
+  const glemBeskeder = () => page.evaluate(() => { window.__beskeder = []; });
+  const ventBesked = (re, timeout) => page.waitForFunction(
+    (kilde) => window.__beskeder.some((t) => new RegExp(kilde).test(t)), re.source, { timeout },
+  ).catch(async (err) => {
+    const set = await page.evaluate(() => window.__beskeder).catch(() => []);
+    throw new Error(`${err.message.split('\n')[0]}: ingen besked som ${re} (set: ${JSON.stringify(set.slice(-6))})`);
+  });
   await page.waitForFunction(() => document.visibilityState === 'visible', null, { timeout: 60000 });
   // Fasen huskes fra sidste koersel, saa testen starter selv i fase 1.
   await page.locator('.fase', { hasText: 'Sort' }).click({ timeout: 60000 });
@@ -228,8 +262,9 @@ try {
   await sharp(kilde).resize(km.width * 2, km.height * 2).png().toFile(join(edits, 'blaa master 3-2-giga.png'));
   const foer = new Date(Date.now() - 10_000);
   utimesSync(join(edits, 'blaa master 3-2-giga.png'), foer, foer);
+  await glemBeskeder();
   await page.locator('button', { hasText: 'Scan again' }).click();
-  await page.waitForSelector('text=/is not 3:2/', { timeout: 30000 });
+  await ventBesked(/is not 3:2/, 30000);
   if (await page.locator('.print-linje:not(.hoved)').count() !== 1) throw new Error('-giga-filen staar paa sin egen linje');
   if (existsSync(join(lib, 'Approved', 'blaa', 'Print files', 'blaa master 3-2.jpg'))) {
     throw new Error('Der blev lavet en printfil i et forkert format');
@@ -248,8 +283,9 @@ try {
   await page.waitForSelector('.print-linje:not(.hoved) >> text=✓ blaa master 1-1.jpg', { timeout: 20000 });
   // Og den kan laves igen i haanden fra beskaeringens linje.
   await page.locator('.print-linje:not(.hoved)').first().click();
+  await glemBeskeder();
   await page.locator('button', { hasText: 'Make print file again' }).click();
-  await page.waitForSelector('text=/Print file saved as/', { timeout: 20000 });
+  await ventBesked(/Print file saved as/, 20000);
   await page.screenshot({ path: join(projectRoot, 'smoke-print.png') });
 
   // Gemmer Gigapixel en stoerre fil oven i -giga-filen, laver appen selv
@@ -273,10 +309,11 @@ try {
 } catch (err) {
   console.error(`SMOKE FEJL: ${err?.message || err}`);
   if (err?.stack) console.error(String(err.stack).split('\n').filter((l) => l.includes('smoke-crop.mjs')).join('\n'));
+  kode = await fejlKode(proc);
   const win = app.windows()[0];
   if (win) await win.screenshot({ path: join(projectRoot, 'smoke-crop-fejl.png') }).catch(() => {});
 } finally {
   await Promise.race([app.close().catch(() => {}), new Promise((r) => setTimeout(r, 10000))]);
   rmSync(lib, { recursive: true, force: true });
-  process.exit(succes ? 0 : 1);
+  process.exit(succes ? 0 : kode);
 }

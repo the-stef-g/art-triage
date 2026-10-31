@@ -2,6 +2,8 @@
 // foerst), aabner et testbibliotek og gennemgaar kerneflowet i UI'et.
 // Koeres i CI under Xvfb: `xvfb-run npm run smoke`.
 import { _electron as electron } from 'playwright-core';
+import { fejlKode } from './smoke-glib.mjs';
+import { writeSync } from 'node:fs';
 import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -54,10 +56,17 @@ const app = await electron.launch({
 const proc = app.process();
 proc.stdout?.on('data', (d) => process.stdout.write(`[app] ${d}`));
 proc.stderr?.on('data', (d) => process.stderr.write(`[app] ${d}`));
+// Synkront, saa linjen kommer med, selv om testen slutter lige efter.
+proc.on('exit', (code, signal) => writeSync(2, `[app] exited: code=${code} signal=${signal}\n`));
 
 let succes = false;
+let kode = 1;
 try {
   const page = await app.firstWindow({ timeout: 60000 });
+  page.on('crash', () => console.error('[side] the renderer crashed'));
+  page.on('close', () => console.error('[side] the window closed'));
+  page.on('pageerror', (e) => console.error(`[side] pageerror: ${e.message}`));
+  page.on('console', (m) => { if (m.type() === 'error') console.error(`[side] console: ${m.text()}`); });
   await page.waitForLoadState('domcontentloaded');
 
   // Hovedvinduet oprettes med show: false og vises foerst paa ready-to-show.
@@ -484,6 +493,7 @@ try {
 } catch (err) {
   console.error(`SMOKE FEJL: ${err?.message || err}`);
   if (err?.stack) console.error(String(err.stack).split('\n').filter((l) => l.includes('smoke.mjs')).join('\n'));
+  kode = await fejlKode(proc);
   const win = app.windows()[0];
   if (win) {
     await win.screenshot({ path: join(projectRoot, 'smoke-fejl.png') }).catch(() => {});
@@ -494,5 +504,5 @@ try {
     new Promise((r) => setTimeout(r, 10000)),
   ]);
   rmSync(lib, { recursive: true, force: true });
-  process.exit(succes ? 0 : 1);
+  process.exit(succes ? 0 : kode);
 }

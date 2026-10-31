@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { openDatabase } from '../electron/lib/db.mjs';
 import { Catalog } from '../electron/lib/catalog.mjs';
-import { editorFraSti, udenEditorSuffiks, masterNavn } from '../electron/lib/util.mjs';
+import { editorFraSti, udenEditorSuffiks, masterNavn, walkImages } from '../electron/lib/util.mjs';
 import { exifTidFromBuffer } from '../electron/lib/exif.mjs';
 import { lavMaster } from '../electron/lib/master.mjs';
 import { Works, serieNavnFraTitel } from '../electron/lib/works.mjs';
@@ -642,6 +642,25 @@ describe('gamle mappenavne', () => {
     expect(raekke('Approved/x/Original/x.cr2').rating).toBe('godkendt');
     expect(raekke('Approved/x/Masters/x 2-3.tif').crop).toBe('2:3');
     expect(alle().some((r) => /Originals|\/Master\//.test(r.rel_path))).toBe(false);
+  });
+});
+
+describe('skanning mens appen flytter en fil', () => {
+  it('en fil der flyttes af en bedoemmelse midt i en skanning, forsvinder ikke', () => {
+    skriv('Import/Serie/a.jpg', 'a');
+    skriv('Import/Serie/b.jpg', 'b');
+    catalog.sync();
+    // Skanningen har laest disken ...
+    const liste = new Map(walkImages(root, catalog.inkluder).map((f) => [f.rel, f]));
+    // ... og saa flytter en bedoemmelse filen til Candidate.
+    catalog.setRating([raekke('Import/Serie/a.jpg').version_id], 'kandidat');
+    catalog._afstem(liste, null);
+    const r = raekke('Candidate/Serie/a.jpg');
+    expect(r).toBeTruthy();
+    expect(r.rating).toBe('kandidat');
+    // Og den gamle plads bliver ikke en ny fil.
+    expect(raekke('Import/Serie/a.jpg')).toBeUndefined();
+    expect(alle().filter((x) => x.rel_path.endsWith('/a.jpg'))).toHaveLength(1);
   });
 });
 

@@ -113,10 +113,17 @@ export default function App() {
   // i filmstrimlen paa et billede fra en anden mappe end den man star i.
   const ventendeValgRef = useRef(null);
 
-  const visFejl = useCallback((err) => {
-    setFejl(String(err?.message || err));
-    setTimeout(() => setFejl(null), 6000);
+  // Beskeden i bundlinjen. Én timer: en ny besked fjerner den gamles timer,
+  // saa en aeldre besked aldrig visker en nyere ud efter et oejeblik.
+  // ms = 0 bliver staaende til naeste besked.
+  const beskedTimer = useRef(null);
+  const visBesked = useCallback((tekst, ms = 6000) => {
+    clearTimeout(beskedTimer.current);
+    beskedTimer.current = null;
+    setFejl(tekst);
+    if (tekst != null && ms) beskedTimer.current = setTimeout(() => setFejl(null), ms);
   }, []);
+  const visFejl = useCallback((err) => visBesked(String(err?.message || err)), [visBesked]);
 
   // Crop: alle raekker (master og beskaeringer) og de lukkede stakke. En
   // lukket stak viser kun masteren, saa pilene springer beskaeringerne over.
@@ -422,8 +429,7 @@ export default function App() {
       const { type: _type, ...status } = evt;
       setShop(status);
     } else if (evt.type === 'besked') {
-      setFejl(evt.tekst);
-      setTimeout(() => setFejl(null), 6000);
+      visBesked(evt.tekst, 6000);
     } else if (evt.type === 'library') {
       setLibrary({ root: evt.root });
     }
@@ -536,10 +542,9 @@ export default function App() {
       }
       try {
         const res = await invoke('edit:send', { versionIds: ids, program });
-        setFejl(res.antal > 1
+        visBesked(res.antal > 1
           ? `Copied ${res.antal} crops to Edits and opened them in ${program}`
-          : `Copied to ${res.rel} and opened in ${program}`);
-        setTimeout(() => setFejl(null), 5000);
+          : `Copied to ${res.rel} and opened in ${program}`, 5000);
       } catch (err) { visFejl(err); }
     },
     // Det sidste i fase 2: den markerede fil bliver vaerkets master, og
@@ -549,8 +554,7 @@ export default function App() {
       if (!f) return;
       try {
         const res = await invoke('edit:makeMaster', { versionId: f.version_id });
-        setFejl(`Master saved as ${res.rel}${res.konverteret ? ' (converted to TIFF)' : ''}. The work is now in Crop.`);
-        setTimeout(() => setFejl(null), 7000);
+        visBesked(`Master saved as ${res.rel}${res.konverteret ? ' (converted to TIFF)' : ''}. The work is now in Crop.`, 7000);
       } catch (err) { visFejl(err); }
     },
     // Fase 4: en printfil til Prodigi for hver markeret -giga-fil, ellers den aktive.
@@ -558,7 +562,7 @@ export default function App() {
       const f = getFocused();
       if (!f) return;
       const valgte = selectedRef.current.length > 1 ? selectedRef.current : [f.version_id];
-      setFejl(`Making ${valgte.length} print file${valgte.length === 1 ? '' : 's'} …`);
+      visBesked(`Making ${valgte.length} print file${valgte.length === 1 ? '' : 's'} …`, 0);
       try {
         const res = await invoke('print:make', { versionIds: valgte });
         const bytes = res.reduce((sum, r) => sum + r.bytes, 0);
@@ -568,10 +572,9 @@ export default function App() {
         const advarsel = ikke.length
           ? ` Not larger than the crop, so not enlarged yet: ${ikke.map((r) => r.rel.split('/').pop()).join(', ')}.`
           : '';
-        setFejl((res.length === 1
+        visBesked((res.length === 1
           ? `Print file saved as ${res[0].rel} (${res[0].bredde} × ${res[0].hoejde} px, ${formatBytes(bytes)})`
-          : `${res.length} print files saved in Print files (${formatBytes(bytes)} in all)`) + advarsel);
-        setTimeout(() => setFejl(null), ikke.length ? 10000 : 7000);
+          : `${res.length} print files saved in Print files (${formatBytes(bytes)} in all)`) + advarsel, ikke.length ? 10000 : 7000);
       } catch (err) { visFejl(err); }
     },
     // Fase 2: kassér hele vaerket. Originalen gaar til Discarded, og
@@ -587,8 +590,7 @@ export default function App() {
       try {
         const res = await invoke('work:discard', { versionId: f.version_id });
         const n = res?.edits ?? 0;
-        setFejl(n ? `Discarded. ${n} edit file${n === 1 ? '' : 's'} moved to the Trash.` : 'Discarded.');
-        setTimeout(() => setFejl(null), 5000);
+        visBesked(n ? `Discarded. ${n} edit file${n === 1 ? '' : 's'} moved to the Trash.` : 'Discarded.', 5000);
       } catch (err) { visFejl(err); }
     },
     editIn: async (appPath, versionId = getFocused()?.version_id) => {
@@ -638,20 +640,18 @@ export default function App() {
       try {
         const res = await invoke('lib:rescan');
         if (res?.unavailable) {
-          setFejl('The drive is not connected. Your images are not gone, the catalogue is untouched.');
+          visBesked('The drive is not connected. Your images are not gone, the catalogue is untouched.', 5000);
         } else if (res?.skipped) {
-          setFejl('A scan is already running');
+          visBesked('A scan is already running', 5000);
         } else {
-          setFejl(res?.changed ? `Found ${res.changed} new or changed files` : 'No changes found');
+          visBesked(res?.changed ? `Found ${res.changed} new or changed files` : 'No changes found', 5000);
         }
-        setTimeout(() => setFejl(null), 5000);
       } catch (err) { visFejl(err); } finally { setSkanner(false); }
     },
     cleanup: async () => {
       try {
         const n = await invoke('fold:cleanup');
-        setFejl(n ? `Moved ${n} discarded files to Discarded` : 'No files to move');
-        setTimeout(() => setFejl(null), 4000);
+        visBesked(n ? `Moved ${n} discarded files to Discarded` : 'No files to move', 4000);
       } catch (err) { visFejl(err); }
     },
     assignSeries: (seriesId) => {
@@ -704,14 +704,12 @@ export default function App() {
         .filter((r) => selectedRef.current.includes(r.version_id))
         .map((r) => r.file_id))];
       if (!fileIds.length) {
-        setFejl(`Select the images «${word}» is wrong for first. Cmd+A selects them all.`);
-        setTimeout(() => setFejl(null), 6000);
+        visBesked(`Select the images «${word}» is wrong for first. Cmd+A selects them all.`, 6000);
         return;
       }
       try {
         const antal = await invoke('kw:removeFromFiles', { fileIds, word });
-        setFejl(`Removed «${word}» from ${antal} images`);
-        setTimeout(() => setFejl(null), 4000);
+        visBesked(`Removed «${word}» from ${antal} images`, 4000);
       } catch (err) { visFejl(err); }
     },
     // ---- Cloud-noegleord ----
@@ -739,8 +737,7 @@ export default function App() {
       try {
         const res = await invoke('kw:reanalyse');
         setKwStatus(res);
-        setFejl(`${res.antal} images are queued again`);
-        setTimeout(() => setFejl(null), 6000);
+        visBesked(`${res.antal} images are queued again`, 6000);
       } catch (err) { visFejl(err); }
     },
   };
