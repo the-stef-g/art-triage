@@ -19,7 +19,7 @@ const RULLEBREDDE = 14;
 
 // En fil i Master er per definition godkendt og faerdig, saa de to maerker
 // siger ikke noget dér.
-const iMaster = (rel) => /^Approved\/[^/]+\/Master\//.test(rel);
+const iMaster = (rel) => /^Approved\/[^/]+\/Masters\//.test(rel);
 // Alt under Approved er godkendt; maerket siger kun noget i Import.
 const iApproved = (rel) => rel.startsWith('Approved/');
 

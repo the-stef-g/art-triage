@@ -424,10 +424,13 @@ try {
   await page.locator('.fase', { hasText: 'Product' }).click();
   await page.waitForFunction(
     () => document.querySelectorAll('.tile').length === 1
-      && document.querySelector('.tile-navn')?.title.includes('/Master/'),
+      && document.querySelector('.tile-navn')?.title.includes('/Masters/'),
     null,
     { timeout: 10000 }
-  );
+  ).catch(async (err) => {
+    const t = await page.locator('.tile-navn').evaluateAll((e) => e.map((x) => x.title));
+    throw new Error(`Product viser ${JSON.stringify(t)}: ${err.message}`);
+  });
   // Fase 5 har serier og noegleord i sidepanelet. Uden API-noegle skal
   // noegleordspanelet sige hvor noeglen saettes, ikke bare vaere tomt.
   await page.waitForSelector('.kw-koe', { timeout: 10000 });
@@ -443,6 +446,18 @@ try {
     throw new Error('Send to shop staar stadig i formularen');
   }
   await page.screenshot({ path: join(projectRoot, 'smoke-product.png') });
+  // En ny titel spoerger, om filerne skal omdoebes, og goer det.
+  const titel = page.locator('label', { hasText: /^Title/ }).locator('input');
+  await titel.fill('Roed 1');
+  await page.locator('label', { hasText: /^Year/ }).locator('input').click();
+  await page.waitForSelector('.omdoeb-dialog', { timeout: 5000 });
+  await page.screenshot({ path: join(projectRoot, 'smoke-omdoeb.png') });
+  await page.locator('.omdoeb-dialog button', { hasText: 'Rename files' }).click();
+  await page.waitForFunction(
+    () => document.querySelector('.tile-navn')?.title.startsWith('Approved/Roed 1/Masters/Roed 1'),
+    null,
+    { timeout: 15000 }
+  );
   await page.locator('.fase', { hasText: 'Sort' }).click();
 
   // Cmd+6 gaar til 6 Shop, ogsaa fra et tekstfelt, og Cmd+1 tilbage.

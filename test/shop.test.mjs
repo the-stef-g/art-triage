@@ -127,11 +127,13 @@ function attrapShop(opts = {}) {
 const exporter = async () => Buffer.from('jpeg');
 
 function klient(fetchImpl) {
-  return new ShopClient({
+  const c = new ShopClient({
     baseUrl: 'https://shop.stefg.art/',
     wooKey: 'ck_hemmelig', wooSecret: 'cs_hemmelig', wpUser: 'stef', wpPassword: 'abcd efgh',
     fetchImpl,
   });
+  c.vent = async () => {};
+  return c;
 }
 
 function imageIdFor(rel) {
@@ -186,6 +188,24 @@ describe('noegler', () => {
       expect(err).toBeInstanceOf(ShopError);
       expect(err.message).not.toMatch(/ck_|cs_|hemmelig|abcd/);
     }
+  });
+
+  it('proever igen ved en ustabil forbindelse og siger den rigtige aarsag', async () => {
+    const svar = { ok: true, status: 201, text: async () => JSON.stringify({ id: 9 }) };
+    const nulstillet = () => Object.assign(new TypeError('fetch failed'), { cause: { code: 'ECONNRESET' } });
+    let n = 0;
+    const ustabil = async () => { n += 1; if (n < 3) throw nulstillet(); return svar; };
+    expect((await klient(ustabil).uploadMedia(Buffer.from('x'), 'a.jpg', 'image/jpeg')).id).toBe(9);
+    expect(n).toBe(3);
+    // Giver op efter 3 forsoeg, med aarsagen og hvad der var i gang.
+    const doed = async () => { throw nulstillet(); };
+    const err = await klient(doed).uploadMedia(Buffer.from('x'), 'a.jpg', 'image/jpeg').catch((e) => e);
+    expect(err.message).toMatch(/while uploading a picture \(the connection was reset, ECONNRESET, tried 3 times\)/);
+    // Et nyt produkt proeves kun én gang, saa der aldrig kommer en dublet.
+    let p = 0;
+    const tael = async () => { p += 1; throw nulstillet(); };
+    await klient(tael).wc('POST', '/products', {}).catch(() => {});
+    expect(p).toBe(1);
   });
 
   it('beder om noegleren der mangler, uden at kalde nettet', async () => {

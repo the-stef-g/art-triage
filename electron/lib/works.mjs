@@ -263,7 +263,7 @@ export class Works {
        LEFT JOIN works w ON w.image_id = i.id
        WHERE i.series_id IS NULL AND f.present=1
          AND EXISTS (SELECT 1 FROM versions v JOIN files mf ON mf.id = v.file_id
-                     WHERE v.image_id = i.id AND mf.present=1 AND mf.rel_path LIKE 'Approved/%/Master/%')`
+                     WHERE v.image_id = i.id AND mf.present=1 AND mf.rel_path LIKE 'Approved/%/Masters/%')`
     );
     const grupper = new Map();
     for (const r of rows) {
@@ -324,7 +324,39 @@ export class Works {
       params.push(this.catalog.now(), imageId);
       this.db.run(`UPDATE works SET ${sets.join(', ')} WHERE image_id=?`, ...params);
     }
+    // Kategorien foelger serien: alle seriens vaerker faar den samme.
+    if (patch && 'category' in patch && img.series_id) {
+      const kategori = FELTER.category(patch.category);
+      for (const { id } of this.db.all('SELECT id FROM images WHERE series_id=? AND id != ?', img.series_id, imageId)) {
+        this._ensure(this._image(id));
+        this.db.run('UPDATE works SET category=?, updated_at=? WHERE image_id=?', kategori, this.catalog.now(), id);
+      }
+    }
     return this.get(imageId);
+  }
+
+  // Vaerker i en serie uden kategori faar seriens (den de fleste af dens
+  // vaerker har). Returnerer antallet der fik en.
+  synkSerieKategori() {
+    let antal = 0;
+    const serier = this.db.all('SELECT DISTINCT series_id AS id FROM images WHERE series_id IS NOT NULL');
+    for (const { id } of serier) {
+      const ids = this.db.all('SELECT id FROM images WHERE series_id=?', id).map((r) => r.id);
+      for (const i of ids) this._ensure(this._image(i));
+      const rk = this.db.all(
+        `SELECT image_id, category FROM works WHERE image_id IN (${ids.map(() => '?').join(',')})`, ...ids
+      );
+      const tal = new Map();
+      for (const r of rk) if (r.category) tal.set(r.category, (tal.get(r.category) || 0) + 1);
+      if (!tal.size) continue;
+      const kategori = [...tal].sort((a, b) => b[1] - a[1])[0][0];
+      for (const r of rk) {
+        if (r.category) continue;
+        this.db.run('UPDATE works SET category=?, updated_at=? WHERE image_id=?', kategori, this.catalog.now(), r.image_id);
+        antal += 1;
+      }
+    }
+    return antal;
   }
 
   // Markerer en version som en beskaering, eller fjerner markeringen med

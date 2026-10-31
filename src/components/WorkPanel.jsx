@@ -21,6 +21,8 @@ export default function WorkPanel({ row, versions, tekstRev = 0, hasKey, shop, o
   const [warnings, setWarnings] = useState([]);
   // Hvad der sker i shoppen lige nu, og hvordan det endte.
   const [fremdrift, setFremdrift] = useState(null);
+  // Dialogen der spoerger, om en ny titel skal omdoebe filerne.
+  const [omdoeb, setOmdoeb] = useState(null);
   useEffect(() => onEvent((evt) => {
     if (evt.type === 'shopFremdrift') setFremdrift({ tekst: evt.tekst, igang: true });
   }), []);
@@ -84,6 +86,44 @@ export default function WorkPanel({ row, versions, tekstRev = 0, hasKey, shop, o
   // skriver noget.
   const blurSave = (draftKey, column, saved) => () => {
     if (String(draft[draftKey] ?? '') !== String(saved ?? '')) commit({ [column]: draft[draftKey] });
+  };
+
+  // En ny titel kan omdoebe vaerkets filer. Foerst en plan; har den noget
+  // at omdoebe, spoerger en dialog, ellers gemmes titlen bare.
+  const gemTitel = async () => {
+    const ny = String(draft.title ?? '').trim();
+    if (ny === String(work.title ?? '')) return;
+    if (!ny) {
+      commit({ title: draft.title });
+      return;
+    }
+    try {
+      const plan = await invoke('work:omdoebPlan', { imageId, title: ny });
+      if (plan && plan.til !== plan.fra) setOmdoeb({ ...plan, titel: ny });
+      else commit({ title: ny });
+    } catch (err) {
+      onError(err);
+      commit({ title: ny });
+    }
+  };
+  const udfoerOmdoeb = async () => {
+    const { titel } = omdoeb;
+    setOmdoeb(null);
+    try {
+      adopt(await invoke('work:omdoeb', { imageId, title: titel }));
+    } catch (err) {
+      onError(err);
+      adopt(work);
+    }
+  };
+  const kunTitel = () => {
+    const { titel } = omdoeb;
+    setOmdoeb(null);
+    commit({ title: titel });
+  };
+  const fortryd = () => {
+    setOmdoeb(null);
+    adopt(work);
   };
 
   const writeTexts = async (overwrite = false) => {
@@ -195,7 +235,7 @@ export default function WorkPanel({ row, versions, tekstRev = 0, hasKey, shop, o
           value={draft.title}
           placeholder={work.effective.title}
           onChange={set('title')}
-          onBlur={blurSave('title', 'title', work.title)}
+          onBlur={gemTitel}
         />
       </label>
       <div className="vaerk-raekke">
@@ -445,6 +485,48 @@ export default function WorkPanel({ row, versions, tekstRev = 0, hasKey, shop, o
     <>
       {form}
       {shopNode ? createPortal(shopDel, shopNode) : shopDel}
+      {omdoeb && createPortal(
+        <OmdoebDialog plan={omdoeb} onRename={udfoerOmdoeb} onTitle={kunTitel} onCancel={fortryd} />,
+        document.body
+      )}
     </>
+  );
+}
+
+// Dialogen naar titlen aendres: hvad der omdoebes, og et valg.
+function OmdoebDialog({ plan, onRename, onTitle, onCancel }) {
+  useEffect(() => {
+    const taste = (e) => {
+      e.stopImmediatePropagation();
+      if (e.key === 'Escape') onCancel();
+    };
+    window.addEventListener('keydown', taste, true);
+    return () => window.removeEventListener('keydown', taste, true);
+  }, [onCancel]);
+  const kan = !plan.problemer.length;
+  return (
+    <div className="dialog-bag" onClick={onCancel}>
+      <div className="dialog omdoeb-dialog" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+        <h3>Rename the files to «{plan.til}»?</h3>
+        <p>The work folder and {plan.filer.length} file{plan.filer.length === 1 ? '' : 's'}:</p>
+        <ul className="dialog-filer">
+          <li><span className="tom">Folder</span> {plan.mappe.fra} → {plan.mappe.til}</li>
+          {plan.filer.map((f) => (
+            <li key={f.fra} title={`${f.fra} → ${f.til}`}>{f.fra} → {f.til.split('/').pop()}</li>
+          ))}
+        </ul>
+        {plan.problemer.length > 0 && (
+          <ul className="vaerk-advarsler">{plan.problemer.map((p) => <li key={p}>{p}</li>)}</ul>
+        )}
+        <p className="tom">
+          The series, texts, crops and the link to the shop stay as they are. The product in the shop gets the new title the next time you update the shop.
+        </p>
+        <div className="knapraekke dialog-knapper">
+          <button onClick={onCancel}>Cancel</button>
+          <button onClick={onTitle}>Only the title</button>
+          <button className="primaer" disabled={!kan} onClick={onRename}>Rename files</button>
+        </div>
+      </div>
+    </div>
   );
 }

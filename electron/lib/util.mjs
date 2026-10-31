@@ -219,7 +219,7 @@ export function walkDirs(root, inkluder = null) {
 export const BESKAERING_I_NAVN = { '1-1': '1:1', '2-3': '2:3', '3-2': '3:2', '1-2': '1:2', '2-1': '2:1' };
 
 export function beskaeringFraSti(rel) {
-  if (!/^Approved\/[^/]+\/Master\//.test(rel)) return null;
+  if (!/^Approved\/[^/]+\/Masters\//.test(rel)) return null;
   const stem = stemOf(basename(rel));
   const m = /[ _](1-1|2-3|3-2|1-2|2-1)$/.exec(stem);
   if (m) return BESKAERING_I_NAVN[m[1]];

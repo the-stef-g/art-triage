@@ -58,6 +58,7 @@ const ARBEJDE = {
   'print:make': 'making print files',
   'crop:save': 'saving a crop',
   'crop:delete': 'removing a crop',
+  'work:omdoeb': 'renaming the files of a work',
   'edit:makeMaster': 'making a master',
   'edit:send': 'copying to an editor',
   'work:writeTexts': 'writing texts with Claude',
@@ -150,6 +151,8 @@ export class AppSession {
         // En serie deler de ord de fleste af dens vaerker har.
         const ord = katalog.synkSerieOrd();
         if (ord) this.log(`series keywords: ${ord} added`);
+        // Et vaerk i en serie faar seriens kategori.
+        this.works.synkSerieKategori();
         // Teksterne skal naevne serien, og serien skal have sine felter.
         this._serieTekster();
         this._serieFelter();
@@ -1004,8 +1007,8 @@ export class AppSession {
       const v = catalog.getVersion(versionId);
       const f = v ? catalog.getFile(v.effective_file_id) : null;
       if (!f || !f.present) throw new Error('The file is not available right now');
-      if (!/^Approved\/[^/]+\/Master\//.test(f.rel_path)) {
-        throw new Error('Only finished works can be cropped: the file must be in the Master folder');
+      if (!/^Approved\/[^/]+\/Masters\//.test(f.rel_path)) {
+        throw new Error('Only finished works can be cropped: the file must be in the Masters folder');
       }
       if (!rect || ![rect.x, rect.y, rect.w, rect.h].every(Number.isFinite) || rect.w <= 0 || rect.h <= 0) {
         throw new Error('The crop is empty');
@@ -1053,6 +1056,7 @@ export class AppSession {
       this.undoMgr.beforeSeries(imageIds);
       catalog.assignSeries(imageIds, seriesId ?? null);
       catalog.synkSerieOrd();
+      this.works?.synkSerieKategori();
       this._serieTekster();
       this._serieFelter();
     });
@@ -1155,6 +1159,15 @@ export class AppSession {
     // Vaerket: tekster og shop-felter pr. billede (docs/plan-shop.md).
     handle('work:get', ({ imageId }) => this._medShop(this.requireWorks().get(imageId)));
     handle('work:save', ({ imageId, patch }) => this._medShop(this.requireWorks().save(imageId, patch)));
+    // Ny titel: hvad der vil blive omdoebt, og selve omdoebningen.
+    handle('work:omdoebPlan', ({ imageId, title }) => this.requireCatalog().omdoebPlan(imageId, title));
+    handle('work:omdoeb', async ({ imageId, title }) => {
+      const plan = this.requireCatalog().omdoeb(imageId, title);
+      this.log(`rename: Approved/${plan.fra} -> Approved/${plan.til} (${plan.filer.length} file(s))`);
+      const work = this.requireWorks().save(imageId, { title });
+      await this.runSync('omdoebt');
+      return this._medShop(this.requireWorks().get(imageId) || work);
+    });
     handle('work:pickVideo', async () => {
       const res = await dialog.showOpenDialog(this.win, {
         title: 'Choose video',

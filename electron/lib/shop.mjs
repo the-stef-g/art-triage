@@ -60,6 +60,28 @@ export class ShopError extends Error {
   }
 }
 
+// Hvad der var i gang, med ord.
+function hvad(method, path) {
+  if (method === 'POST' && path.startsWith('/media')) return 'while uploading a picture';
+  if (path.startsWith('/products') && path.includes('/variations')) return 'while saving the print variants';
+  if (path.startsWith('/products')) return method === 'GET' ? 'while reading the product' : 'while saving the product';
+  if (path.startsWith('/pages')) return 'while saving a page';
+  if (path.startsWith('/settings')) return 'while saving a shop setting';
+  return 'while talking to the shop';
+}
+
+// Den rigtige aarsag fra netvaerket (fetch gemmer den i err.cause).
+function aarsag(err) {
+  const kode = err?.cause?.code || err?.code;
+  const ord = {
+    ECONNRESET: 'the connection was reset', ETIMEDOUT: 'it timed out', UND_ERR_CONNECT_TIMEOUT: 'it timed out',
+    UND_ERR_SOCKET: 'the connection was cut', ENOTFOUND: 'the address was not found', EAI_AGAIN: 'no answer from DNS',
+    ECONNREFUSED: 'the connection was refused', ENETUNREACH: 'no network',
+  }[kode];
+  if (ord) return `${ord}, ${kode}`;
+  return String(err?.cause?.message || err?.message || 'unknown error').slice(0, 120);
+}
+
 function basic(user, secret) {
   return `Basic ${Buffer.from(`${user}:${secret}`).toString('base64')}`;
 }
@@ -70,6 +92,8 @@ export class ShopClient {
     this.woo = wooKey && wooSecret ? basic(wooKey, wooSecret) : null;
     this.wp = wpUser && wpPassword ? basic(wpUser, wpPassword) : null;
     this.fetch = fetchImpl || globalThis.fetch;
+    // Pausen mellem forsoegene; testene saetter den til 0.
+    this.vent = (ms) => new Promise((r) => { setTimeout(r, ms); });
   }
 
   async _request(auth, kind, method, path, { json, body, headers = {} } = {}) {
@@ -85,11 +109,28 @@ export class ShopClient {
       payload = JSON.stringify(json);
     }
     const prefix = kind === 'woo' ? '/wp-json/wc/v3' : '/wp-json/wp/v2';
+    // En ustabil forbindelse (fx 5G med svag upload) proeves op til 3 gange.
+    // Kun hvor et ekstra forsoeg ikke kan lave en dublet: hentninger,
+    // opdateringer og billeder (et billede for meget i mediebiblioteket er
+    // ufarligt). Et nyt produkt oprettes aldrig to gange.
+    const maaGentages = method !== 'POST' || path.startsWith('/media');
+    const forsoeg = maaGentages ? 3 : 1;
     let res;
-    try {
-      res = await this.fetch(`${this.baseUrl}${prefix}${path}`, { method, headers: h, body: payload });
-    } catch {
-      throw new ShopError('Could not reach the shop. Check the connection and try again.');
+    for (let i = 1; ; i += 1) {
+      try {
+        res = await this.fetch(`${this.baseUrl}${prefix}${path}`, { method, headers: h, body: payload });
+        if (i < forsoeg && [502, 503, 504].includes(res.status)) {
+          await this.vent(2000 * i);
+          continue;
+        }
+        break;
+      } catch (err) {
+        if (i < forsoeg) {
+          await this.vent(2000 * i);
+          continue;
+        }
+        throw new ShopError(`Could not reach the shop ${hvad(method, path)} (${aarsag(err)}${forsoeg > 1 ? `, tried ${forsoeg} times` : ''}). Check the connection and try again.`);
+      }
     }
     let data = null;
     const text = await res.text();

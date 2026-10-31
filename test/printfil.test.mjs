@@ -126,10 +126,10 @@ describe('lavPrintfil', () => {
 
 describe('printfiler i kataloget', () => {
   it('fase 4 viser beskaeringen og dens -giga-fil, og printfilen laves af -giga-filen', async () => {
-    await p3Tiff(join(root, 'Approved', 'Desert', 'Master', 'Desert 2-3.tif'), 40, 60);
+    await p3Tiff(join(root, 'Approved', 'Desert', 'Masters', 'Desert 2-3.tif'), 40, 60);
     catalog.sync();
     let liste = catalog.listVersions({ fase: 4 });
-    expect(liste.map((r) => r.rel_path)).toEqual(['Approved/Desert/Master/Desert 2-3.tif']);
+    expect(liste.map((r) => r.rel_path)).toEqual(['Approved/Desert/Masters/Desert 2-3.tif']);
     const krop = liste[0];
     expect(krop.printfil).toBe(null);
     expect(krop.giga).toBe(false);
@@ -142,7 +142,7 @@ describe('printfiler i kataloget', () => {
     liste = catalog.listVersions({ fase: 4 });
     expect(liste.map((r) => r.rel_path).sort()).toEqual([
       'Approved/Desert/Edits/Desert 2-3-Giga.tif',
-      'Approved/Desert/Master/Desert 2-3.tif',
+      'Approved/Desert/Masters/Desert 2-3.tif',
     ]);
     expect(liste.find((r) => !r.giga).forstoerrelse).toBe('Approved/Desert/Edits/Desert 2-3-Giga.tif');
     const giga = liste.find((r) => r.giga);
@@ -155,7 +155,7 @@ describe('printfiler i kataloget', () => {
     expect(maal.mappe).toBe(join(root, 'Approved', 'Desert', 'Print files'));
     expect(maal.base).toBe('Desert');
     expect(maal.token).toBe('2-3');
-    expect(maal.beskaering).toBe(join(root, 'Approved', 'Desert', 'Master', 'Desert 2-3.tif'));
+    expect(maal.beskaering).toBe(join(root, 'Approved', 'Desert', 'Masters', 'Desert 2-3.tif'));
     const res = await lavPrintfil(maal);
     expect([res.bredde, res.hoejde]).toEqual([120, 180]);
 
@@ -167,7 +167,7 @@ describe('printfiler i kataloget', () => {
   });
 
   it('det Gigapixel selv kalder filen, kan ogsaa bruges', async () => {
-    await p3Tiff(join(root, 'Approved', 'Desert', 'Master', 'Desert 3-2.tif'), 60, 40);
+    await p3Tiff(join(root, 'Approved', 'Desert', 'Masters', 'Desert 3-2.tif'), 60, 40);
     await p3Tiff(join(root, 'Approved', 'Desert', 'Edits', 'Desert 3-2-giga-gigapixel-standard-4x.tif'), 240, 160);
     catalog.sync();
     const giga = catalog.listVersions({ fase: 4 }).find((r) => r.giga);
@@ -177,8 +177,8 @@ describe('printfiler i kataloget', () => {
   });
 
   it('cropKaede: beskaeringen, dens -giga-filer og dens printfil, ikke de andre formaters', async () => {
-    await p3Tiff(join(root, 'Approved', 'Desert', 'Master', 'Desert 3-2.tif'), 60, 40);
-    await p3Tiff(join(root, 'Approved', 'Desert', 'Master', 'Desert 2-3.tif'), 40, 60);
+    await p3Tiff(join(root, 'Approved', 'Desert', 'Masters', 'Desert 3-2.tif'), 60, 40);
+    await p3Tiff(join(root, 'Approved', 'Desert', 'Masters', 'Desert 2-3.tif'), 40, 60);
     await p3Tiff(join(root, 'Approved', 'Desert', 'Edits', 'Desert 3-2-giga.tif'), 240, 160);
     await p3Tiff(join(root, 'Approved', 'Desert', 'Edits', 'Desert 2-3-giga.tif'), 160, 240);
     catalog.sync();
@@ -186,14 +186,14 @@ describe('printfiler i kataloget', () => {
     await lavPrintfil(catalog.printMaal(giga.version_id));
     const krop = catalog.listVersions({ fase: 3 }).find((r) => r.crop === '3:2');
     expect(catalog.cropKaede(krop.version_id)).toEqual([
-      { rel: 'Approved/Desert/Master/Desert 3-2.tif', art: 'crop' },
+      { rel: 'Approved/Desert/Masters/Desert 3-2.tif', art: 'crop' },
       { rel: 'Approved/Desert/Edits/Desert 3-2-giga.tif', art: 'giga' },
       { rel: 'Approved/Desert/Print files/Desert 3-2.jpg', art: 'print' },
     ]);
   });
 
   it('-giga-kopier der aldrig blev forstoerret: genbruges, og ryddes efter et doegn', async () => {
-    await p3Tiff(join(root, 'Approved', 'Desert', 'Master', 'Desert 3-2.tif'), 60, 40);
+    await p3Tiff(join(root, 'Approved', 'Desert', 'Masters', 'Desert 3-2.tif'), 60, 40);
     catalog.sync();
     const krop = catalog.listVersions({ fase: 4 }).find((r) => r.rel_path.endsWith('Desert 3-2.tif'));
     const foerste = catalog.kopiTilEdits(krop.version_id, 'giga');
@@ -213,7 +213,7 @@ describe('printfiler i kataloget', () => {
   });
 
   it('autoPrintKandidater: -giga-filer uden en nyere printfil', async () => {
-    await p3Tiff(join(root, 'Approved', 'Desert', 'Master', 'Desert 3-2.tif'), 60, 40);
+    await p3Tiff(join(root, 'Approved', 'Desert', 'Masters', 'Desert 3-2.tif'), 60, 40);
     await p3Tiff(join(root, 'Approved', 'Desert', 'Edits', 'Desert 3-2-giga.tif'), 240, 160);
     catalog.sync();
     const k = catalog.autoPrintKandidater();
@@ -233,7 +233,7 @@ describe('printfiler i kataloget', () => {
   });
 
   it('printfilen til en beskaering laves af dens stoerste -giga-fil', async () => {
-    await p3Tiff(join(root, 'Approved', 'Desert', 'Master', 'Desert 3-2.tif'), 60, 40);
+    await p3Tiff(join(root, 'Approved', 'Desert', 'Masters', 'Desert 3-2.tif'), 60, 40);
     await p3Tiff(join(root, 'Approved', 'Desert', 'Edits', 'Desert 3-2-giga.tif'), 240, 160);
     catalog.sync();
     const krop = catalog.listVersions({ fase: 4 }).find((r) => !r.giga);
@@ -244,11 +244,11 @@ describe('printfiler i kataloget', () => {
 
   it('kaeden: en beskaering af en gammel master, en gammel -giga og en gammel printfil ses', async () => {
     const tid = (rel, s) => { const t = new Date(s * 1000); utimesSync(join(root, rel), t, t); };
-    await p3Tiff(join(root, 'Approved', 'Desert', 'Master', 'Desert.tif'), 60, 40);
-    await p3Tiff(join(root, 'Approved', 'Desert', 'Master', 'Desert 3-2.tif'), 60, 40);
+    await p3Tiff(join(root, 'Approved', 'Desert', 'Masters', 'Desert.tif'), 60, 40);
+    await p3Tiff(join(root, 'Approved', 'Desert', 'Masters', 'Desert 3-2.tif'), 60, 40);
     await p3Tiff(join(root, 'Approved', 'Desert', 'Edits', 'Desert 3-2-giga.tif'), 240, 160);
-    tid('Approved/Desert/Master/Desert.tif', 1000);
-    tid('Approved/Desert/Master/Desert 3-2.tif', 2000);
+    tid('Approved/Desert/Masters/Desert.tif', 1000);
+    tid('Approved/Desert/Masters/Desert 3-2.tif', 2000);
     tid('Approved/Desert/Edits/Desert 3-2-giga.tif', 3000);
     catalog.sync();
     const krop = () => catalog.listVersions({ fase: 4 }).find((r) => r.rel_path.endsWith('Desert 3-2.tif'));
@@ -258,13 +258,13 @@ describe('printfiler i kataloget', () => {
     expect(krop().foraeldet).toBe(null);
 
     // Masteren gemmes igen: beskaeringen er lavet af en gammel udgave.
-    tid('Approved/Desert/Master/Desert.tif', 5000);
+    tid('Approved/Desert/Masters/Desert.tif', 5000);
     catalog.sync();
     expect(krop().foraeldet.led).toEqual(['master']);
     expect(catalog.listVersions({ fase: 3 }).find((r) => r.rel_path.endsWith('Desert 3-2.tif')).foraeldet.led).toEqual(['master']);
 
     // Beskaeringen laves igen: nu er -giga-filen og printfilen de gamle.
-    tid('Approved/Desert/Master/Desert 3-2.tif', 6000);
+    tid('Approved/Desert/Masters/Desert 3-2.tif', 6000);
     catalog.sync();
     expect(krop().foraeldet.led).toEqual(['giga', 'print']);
   });

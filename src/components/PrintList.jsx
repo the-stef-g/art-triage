@@ -60,13 +60,6 @@ export default function PrintList({ rows, selected, active, setSelected, setActi
 
   return (
     <div className="print-liste" ref={listeRef}>
-      <div className="print-indstilling">
-        <span className="tom">
-          The Gigapixel target is the largest print in each format in the price list, at 300 DPI:
-          {' '}1:1 {langsider['1-1'] ?? '…'} cm, 2:3 and 3:2 {langsider['2-3'] ?? '…'} cm,
-          {' '}1:2 and 2:1 {langsider['1-2'] ?? '…'} cm on the long side.
-        </span>
-      </div>
       <div className="print-linje hoved" role="row">
         <span />
         <span>Crop</span>

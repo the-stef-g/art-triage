@@ -4,13 +4,7 @@ Det der venter. Stef siger "byg", før noget herfra bliver lavet.
 
 ## Venter på "byg"
 
-- **Kategorien følger serien.** Vælges Category på et værk i en serie, får alle seriens værker samme kategori. Et værk, der kommer ind i en serie, får seriens kategori, hvis det ikke selv har én.
-- **Synlige rullebjælker.** Appen tegner sine egne rullebjælker, der altid er synlige: ca. 10 px brede, et lysegråt håndtag på en mørk skinne med god kontrast, og i fasens farve, når musen er over. De forsvinder ikke, når man holder op med at rulle.
-- **Print: kolonnetitlerne bliver stående øverst,** når listen rulles (Crop, Crop size, Gigapixel target, Enlarged, Print file). Linjen "The Gigapixel target is …" over listen fjernes.
-- **Page Up, Page Down, Home og End.** Page Up og Page Down flytter det aktive billede en skærmfuld op eller ned (i grid'et så mange rækker, som der er plads til; i listen i Print så mange linjer), og visningen ruller med. Home går til det første og End til det sidste. Med Skift udvides markeringen som med pilene. Det virker i alle faser (i Crop-filmstriben flytter Page Up og Page Down en skærmbredde), men ikke i tekstfelter.
-- **Mappen Master hedder Masters,** for den har masteren og alle dens beskæringer. Nye værkmapper får `Masters`. Eksisterende `Master`-mapper omdøbes én gang, når biblioteket åbnes (kun mappen; filerne og deres navne er de samme), og kataloget følger med. Appen læser begge navne, så en mappe, der ikke kunne omdøbes (fx et drev der ikke var koblet på), virker stadig. Labelen *Master* på selve masterfilen bliver.
-- **Ny titel omdøber filerne.** Ændres titlen, viser en dialog alle omdøbninger: værkmappen under Approved, originalen, redigeringerne og -giga-filerne i Edits (med deres endelser), masteren og beskæringerne i Masters, og printfilerne. *Rename files* omdøber det hele, *Only the title* ændrer kun titlen. Kataloget følger med (serie, tekster, beskæringer, stakke, shop-kobling). Kan én fil ikke omdøbes (åben i et program, navnet findes), omdøbes intet. Produktet i shoppen får den nye titel ved næste *Update shop*.
-- **Shop: en ustabil forbindelse klarer sig selv.** Hver forespørgsel til shoppen prøves op til 3 gange med en kort pause, før appen giver op, og fejlbeskeden siger den rigtige årsag og hvad der var i gang (fx "connection reset while uploading the 2:3 crop") i stedet for kun "Could not reach the shop".
+Intet lige nu.
 
 ## Venter på en afklaring
 

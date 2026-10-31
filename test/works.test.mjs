@@ -262,9 +262,9 @@ describe('beskaeringer fra filnavnene', () => {
     catalog.sync();
     const id = imageIdFor('Blue Door 02.cr2');
     catalog.setRating([catalog.listVersions({}).find((r) => r.image_id === id).version_id], 'godkendt');
-    skriv('Approved/Blue Door 02/Master/Blue Door 02 3-2.tif');
-    skriv('Approved/Blue Door 02/Master/Blue Door 02 1-1.tif');
-    skriv('Approved/Blue Door 02/Master/Blue Door 02 uden.tif');
+    skriv('Approved/Blue Door 02/Masters/Blue Door 02 3-2.tif');
+    skriv('Approved/Blue Door 02/Masters/Blue Door 02 1-1.tif');
+    skriv('Approved/Blue Door 02/Masters/Blue Door 02 uden.tif');
     catalog.sync();
     const rows = catalog.listVersions({}).filter((r) => r.image_id === id);
     const vid = (navn) => rows.find((r) => r.rel_path.endsWith(navn)).version_id;
@@ -359,10 +359,10 @@ describe('vaerkets billede', () => {
     catalog.sync();
     const orig = catalog.listVersions({}).find((r) => r.rel_path === 'Import/Ahl/Mur.cr2');
     catalog.setRating([orig.version_id], 'godkendt');
-    skriv('Approved/Mur/Master/Mur 2-3.tif', 'beskaering');
-    skriv('Approved/Mur/Master/Mur.tif', 'master');
+    skriv('Approved/Mur/Masters/Mur 2-3.tif', 'beskaering');
+    skriv('Approved/Mur/Masters/Mur.tif', 'master');
     catalog.sync();
-    expect(works.imageFile(orig.image_id).rel_path).toBe('Approved/Mur/Master/Mur.tif');
+    expect(works.imageFile(orig.image_id).rel_path).toBe('Approved/Mur/Masters/Mur.tif');
   });
 });
 
@@ -374,7 +374,7 @@ describe('serien deler soegeord', () => {
     catalog.sync();
     const orig = catalog.listVersions({}).filter((r) => r.rel_path.startsWith('Import/'));
     catalog.setRating(orig.map((r) => r.version_id), 'godkendt');
-    for (const n of ['1', '2', '3']) skriv(`Approved/Sand ${n}/Master/Sand ${n}.tif`, `m${n}`);
+    for (const n of ['1', '2', '3']) skriv(`Approved/Sand ${n}/Masters/Sand ${n}.tif`, `m${n}`);
     catalog.sync();
     const serie = catalog.createSeries('Sand');
     const ids = orig.map((r) => r.image_id);

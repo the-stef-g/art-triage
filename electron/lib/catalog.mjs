@@ -36,16 +36,18 @@ export function erRedigeretUdgave(suffiks, ext, masterExt) {
 export const BEDOEMMELSESMAPPE = {
   ubedomt: 'Import', godkendt: 'Approved', kandidat: 'Candidate', kasseret: 'Discarded',
 };
-export const ARBEJDSMAPPER = ['Original', 'Edits', 'Master', 'Print files'];
+export const ARBEJDSMAPPER = ['Original', 'Edits', 'Masters', 'Print files'];
 // Navnene foer 0.16: Originals blev til Original og Masters til Master.
 // En tom mappe i Import slettes ved en skanning, naar den har staaet
 // uroert saa laenge.
 const TOM_MAPPE_ALDER_MS = 10 * 60 * 1000;
-const GAMLE_ARBEJDSMAPPER = [['Originals', 'Original'], ['Masters', 'Master']];
+// Foer 0.16 hed mapperne Originals og Masters; fra 0.16 til 0.44 Master.
+// Masters har masteren og alle dens beskaeringer, saa det er Masters igen.
+const GAMLE_ARBEJDSMAPPER = [['Originals', 'Original'], ['Master', 'Masters']];
 
 // "Approved/Desert/Edits/x.tif" -> { work: 'Desert', del: 'Edits' }, ellers null.
 export function arbejdsmappeFor(rel) {
-  const m = /^Approved\/([^/]+)\/(Original|Edits|Master|Print files)\//.exec(rel);
+  const m = /^Approved\/([^/]+)\/(Original|Edits|Masters|Print files)\//.exec(rel);
   return m ? { work: m[1], del: m[2] } : null;
 }
 
@@ -684,7 +686,7 @@ export class Catalog extends EventEmitter {
   _tilknytArbejdsmapper() {
     const filer = this.db.all(
       `SELECT id, rel_path FROM files WHERE present=1
-         AND (rel_path LIKE 'Approved/%/Edits/%' OR rel_path LIKE 'Approved/%/Master/%')`
+         AND (rel_path LIKE 'Approved/%/Edits/%' OR rel_path LIKE 'Approved/%/Masters/%')`
     );
     let antal = 0;
     for (const f of filer) {
@@ -710,7 +712,7 @@ export class Catalog extends EventEmitter {
   // samme arbejdsmappes Original, uanset hvad den hedder.
   _arbejdsmappeMaal(rel, indeks) {
     const am = arbejdsmappeFor(rel);
-    if (!am || (am.del !== 'Edits' && am.del !== 'Master')) return null;
+    if (!am || (am.del !== 'Edits' && am.del !== 'Masters')) return null;
     const originalDir = `Approved/${am.work}/Original`;
     const kandidater = indeks
       ? (indeks.get(originalDir) || [])
@@ -724,8 +726,8 @@ export class Catalog extends EventEmitter {
       const stem = stemOf(posix.basename(rel));
       const arbejdStem = am.work;
       const rest = stem.startsWith(arbejdStem) ? stem.slice(arbejdStem.length).replace(/^[-_. ()]+|[)]+$/g, '') : '';
-      const versionName = am.del === 'Master' ? 'Master' : (rest || stem);
-      return { imageId: owner.imageId, versionName, kind: am.del === 'Master' ? 'master' : 'edit' };
+      const versionName = am.del === 'Masters' ? 'Master' : (rest || stem);
+      return { imageId: owner.imageId, versionName, kind: am.del === 'Masters' ? 'master' : 'edit' };
     }
     return null;
   }
@@ -906,7 +908,7 @@ export class Catalog extends EventEmitter {
   // Gigapixel, med eller uden bindestreg, store eller smaa bogstaver),
   // stoerste fil foerst. En fri beskaering har intet printformat.
   _printDele(rel) {
-    const m = /^Approved\/([^/]+)\/Master\/([^/]+)$/.exec(rel);
+    const m = /^Approved\/([^/]+)\/Masters\/([^/]+)$/.exec(rel);
     if (!m) return null;
     const crop = beskaeringFraSti(rel);
     const token = crop && crop !== 'free' ? crop.replace(':', '-') : null;
@@ -932,7 +934,7 @@ export class Catalog extends EventEmitter {
     const f = v ? this.getFile(v.effective_file_id) : null;
     if (!f || !f.present) throw new Error('The crop is not available right now');
     const d = this._printDele(f.rel_path);
-    if (!d || !d.token) throw new Error('Only crops in the Master folder can be removed here');
+    if (!d || !d.token) throw new Error('Only crops in the Masters folder can be removed here');
     const filer = [{ rel: f.rel_path, art: 'crop' }];
     for (const g of d.forstoerrelser) filer.push({ rel: g.rel_path, art: 'giga' });
     const print = this._printfilInfo(f.rel_path);
@@ -990,7 +992,7 @@ export class Catalog extends EventEmitter {
       const start = `${g.base} ${g.token}`.toLowerCase();
       const krop = this.db.all(
         "SELECT rel_path FROM files WHERE present=1 AND rel_path LIKE ? ESCAPE '\\'",
-        `Approved/${escapeLike(g.work)}/Master/%`
+        `Approved/${escapeLike(g.work)}/Masters/%`
       ).find((x) => stemOf(posix.basename(x.rel_path)).toLowerCase() === start);
       return {
         kilde: this.abs(f.rel_path),
@@ -1030,12 +1032,12 @@ export class Catalog extends EventEmitter {
   _mastersInfo() {
     const rows = this.db.all(
       `SELECT v.image_id, f.rel_path FROM versions v JOIN files f ON f.id = v.file_id
-       WHERE f.present=1 AND f.rel_path LIKE 'Approved/%/Master/%'`
+       WHERE f.present=1 AND f.rel_path LIKE 'Approved/%/Masters/%'`
     );
     const medMaster = new Set();
     const medBeskaering = new Set();
     for (const r of rows) {
-      if (!/^Approved\/[^/]+\/Master\//.test(r.rel_path)) continue;
+      if (!/^Approved\/[^/]+\/Masters\//.test(r.rel_path)) continue;
       medMaster.add(r.image_id);
       if (beskaeringFraSti(r.rel_path)) medBeskaering.add(r.image_id);
     }
@@ -1050,7 +1052,7 @@ export class Catalog extends EventEmitter {
   _filtrerFase(rows, fase) {
     const { medMaster } = this._mastersInfo();
     const shop = this._iShoppen();
-    const iMaster = (r) => /^Approved\/[^/]+\/Master\//.test(r.rel_path);
+    const iMaster = (r) => /^Approved\/[^/]+\/Masters\//.test(r.rel_path);
     const godk = (r) => r.rating === 'godkendt';
     switch (fase) {
       case 1: return rows.filter((r) => !godk(r));
@@ -1110,7 +1112,7 @@ export class Catalog extends EventEmitter {
   masterFil(imageId) {
     const filer = this.db.all(
       `SELECT f.id, f.rel_path, f.rotation, f.mtime FROM versions v JOIN files f ON f.id = v.file_id
-       WHERE v.image_id=? AND f.present=1 AND f.rel_path LIKE 'Approved/%/Master/%'
+       WHERE v.image_id=? AND f.present=1 AND f.rel_path LIKE 'Approved/%/Masters/%'
        ORDER BY f.id`,
       imageId
     );
@@ -1193,6 +1195,82 @@ export class Catalog extends EventEmitter {
     return am ? { imageId: v.image_id, work: am.work, v } : null;
   }
 
+  // Ny titel: vaerkmappen og alle filer i den, hvis navn begynder med
+  // vaerkets navn, faar den nye titel i stedet ("Desert 01 2-3.tif" ->
+  // "Red 01 2-3.tif"). Planen viser, hvad der vil ske, og hvad der staar i
+  // vejen; intet roeres. Returnerer null for et vaerk uden vaerkmappe.
+  omdoebPlan(imageId, nyTitel) {
+    const master = this.db.get(
+      'SELECT f.rel_path FROM images i JOIN files f ON f.id = i.master_file_id WHERE i.id=?', imageId
+    );
+    const am = master ? arbejdsmappeFor(master.rel_path) : null;
+    if (!am) return null;
+    const work = am.work;
+    const navn = String(nyTitel ?? '').replace(/[/\\:]/g, '-').replace(/\s+/g, ' ').trim();
+    const plan = { fra: work, til: navn, mappe: { fra: `Approved/${work}`, til: `Approved/${navn}` }, filer: [], problemer: [] };
+    if (!navn || navn === work) return { ...plan, filer: [] };
+    const rod = join(this.root, 'Approved', work);
+    if (!existsSync(rod)) {
+      plan.problemer.push(`The folder Approved/${work} is not there`);
+      return plan;
+    }
+    if (navn.toLowerCase() !== work.toLowerCase() && existsSync(join(this.root, 'Approved', navn))) {
+      plan.problemer.push(`A work folder named ${navn} already exists`);
+    }
+    const gaa = (dir, rel) => {
+      for (const e of readdirSync(dir, { withFileTypes: true })) {
+        if (e.name === '.DS_Store') continue;
+        const r = rel ? `${rel}/${e.name}` : e.name;
+        if (e.isDirectory()) gaa(join(dir, e.name), r);
+        else if (e.name.startsWith(work)) {
+          const nyNavn = navn + e.name.slice(work.length);
+          const ny = rel ? `${rel}/${nyNavn}` : nyNavn;
+          if (nyNavn.toLowerCase() !== e.name.toLowerCase() && existsSync(join(dir, nyNavn))) {
+            plan.problemer.push(`${r.split('/').slice(0, -1).concat(nyNavn).join('/')} already exists`);
+          }
+          plan.filer.push({ fra: r, til: ny });
+        }
+      }
+    };
+    gaa(rod, '');
+    return plan;
+  }
+
+  // Udfoerer planen: foerst filerne inde i mappen, saa mappen, saa
+  // kataloget. Gaar noget galt undervejs, rulles det tilbage, saa der aldrig
+  // ligger halvt omdoebte filer. Returnerer planen.
+  omdoeb(imageId, nyTitel) {
+    const plan = this.omdoebPlan(imageId, nyTitel);
+    if (!plan) throw new Error('This work has no work folder');
+    if (plan.problemer.length) throw new Error(plan.problemer.join('. '));
+    if (plan.til === plan.fra) return plan;
+    const rod = join(this.root, 'Approved', plan.fra);
+    const gjort = [];
+    try {
+      for (const f of plan.filer) {
+        renameSync(join(rod, f.fra), join(rod, f.til));
+        gjort.push(f);
+      }
+      renameSync(rod, join(this.root, 'Approved', plan.til));
+    } catch (err) {
+      for (const f of gjort.reverse()) {
+        try { renameSync(join(rod, f.til), join(rod, f.fra)); } catch { /* bedste forsoeg */ }
+      }
+      throw new Error(`Nothing was renamed: ${String(err?.message || err).slice(0, 160)}`);
+    }
+    const nye = new Map(plan.filer.map((f) => [f.fra, f.til]));
+    const praefiks = `Approved/${plan.fra}/`;
+    const rows = this.db.all("SELECT id, rel_path FROM files WHERE rel_path LIKE ? ESCAPE '\\'", `${escapeLike(praefiks)}%`);
+    this.db.transaction(() => {
+      for (const r of rows) {
+        const inde = r.rel_path.slice(praefiks.length);
+        this.db.run('UPDATE files SET rel_path=? WHERE id=?', `Approved/${plan.til}/${nye.get(inde) ?? inde}`, r.id);
+      }
+    });
+    this.emit('changed');
+    return plan;
+  }
+
   // En kopi af filen i vaerkets Edits, med programmets endelse:
   // "Desert.cr2" -> "Edits/Desert-neo.cr2". Returnerer den nye sti.
   kopiTilEdits(versionId, suffiks) {
@@ -1231,7 +1309,7 @@ export class Catalog extends EventEmitter {
       const start = `${g.base} ${g.token}`.toLowerCase();
       const krop = this.db.all(
         "SELECT rel_path, size FROM files WHERE present=1 AND rel_path LIKE ? ESCAPE '\\'",
-        `Approved/${escapeLike(g.work)}/Master/%`
+        `Approved/${escapeLike(g.work)}/Masters/%`
       ).find((x) => stemOf(posix.basename(x.rel_path)).toLowerCase() === start);
       if (krop && e.size <= krop.size) ud.push(this.abs(e.rel_path));
     }
@@ -1247,7 +1325,7 @@ export class Catalog extends EventEmitter {
     if (!f || !f.present) throw new Error('The file is not available right now');
     return {
       kilde: this.abs(f.rel_path),
-      mappe: join(this.root, 'Approved', vaerk.work, 'Master'),
+      mappe: join(this.root, 'Approved', vaerk.work, 'Masters'),
       stem: masterNavn(stemOf(basename(f.rel_path)), vaerk.work),
     };
   }
@@ -1260,7 +1338,7 @@ export class Catalog extends EventEmitter {
     if (!vaerk) throw new Error('Only Approved works can be discarded here');
     const harMaster = this.db.get(
       `SELECT 1 AS ok FROM versions v JOIN files f ON f.id = v.file_id
-       WHERE v.image_id=? AND f.present=1 AND f.rel_path LIKE 'Approved/%/Master/%' LIMIT 1`,
+       WHERE v.image_id=? AND f.present=1 AND f.rel_path LIKE 'Approved/%/Masters/%' LIMIT 1`,
       vaerk.imageId
     );
     if (harMaster) throw new Error('This work already has a master and is no longer in Edit');
@@ -1361,7 +1439,7 @@ export class Catalog extends EventEmitter {
       moves.push(...this.moveFiles([f.id], mal));
       if (v.rating === 'godkendt') {
         const arbejd = posix.dirname(mal);
-        for (const del of ['Edits', 'Master', 'Print files']) {
+        for (const del of ['Edits', 'Masters', 'Print files']) {
           mkdirSync(join(this.root, arbejd, del), { recursive: true });
         }
       }
@@ -1492,8 +1570,8 @@ export class Catalog extends EventEmitter {
     const v = this.getVersion(versionId);
     const f = v ? this.getFile(v.effective_file_id) : null;
     if (!f || !f.present) throw new Error('The file is not available right now');
-    if (!/^Approved\/[^/]+\/Master\//.test(f.rel_path)) {
-      throw new Error('Only files in the Master folder have a crop');
+    if (!/^Approved\/[^/]+\/Masters\//.test(f.rel_path)) {
+      throw new Error('Only files in the Masters folder have a crop');
     }
     const nyt = navnMedBeskaering(basename(f.rel_path), crop ?? null);
     if (nyt === basename(f.rel_path)) return f.rel_path;
@@ -1911,7 +1989,7 @@ export class Catalog extends EventEmitter {
   // redigering og original undervejs ville koste uden at blive brugt. Et
   // bibliotek uden mappestyring (kun i aeldre tests) har ingen Master-mapper.
   _kunMastre() {
-    return this.mappestyring ? "AND f.rel_path LIKE 'Approved/%/Master/%'" : '';
+    return this.mappestyring ? "AND f.rel_path LIKE 'Approved/%/Masters/%'" : '';
   }
 
   filesNeedingKeywords(limit = 5000) {

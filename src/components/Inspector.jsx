@@ -85,7 +85,7 @@ export default function Inspector({
 
   // Det der kan beskaeres er værkets master: den valgte fil hvis den ligger i
   // Master, ellers den foerste fil i Master. Uden en er vaerket ikke faerdigt.
-  const iMaster = (rel) => /^Approved\/[^/]+\/Master\//.test(rel);
+  const iMaster = (rel) => /^Approved\/[^/]+\/Masters\//.test(rel);
   const iMappen = versions.filter((v) => v.present !== 0 && iMaster(v.rel_path));
   const masterVersion = iMaster(row.rel_path) && !row.crop
     ? row
@@ -264,7 +264,7 @@ export default function Inspector({
           <h4>Master</h4>
           <p className="tom">The last step here: make the finished edit the work&apos;s master. The work then moves on to Crop.</p>
           <div className="knapraekke">
-            <button className="primaer" onClick={act.makeMaster} title="Copies the selected file to Master, named after the work">Make master</button>
+            <button className="primaer" onClick={act.makeMaster} title="Copies the selected file to Masters, named after the work">Make master</button>
           </div>
 
           <h4>Discard</h4>
@@ -517,7 +517,7 @@ function GigapixelMaal({ row, dataRev, onBredde, onError }) {
 
 // Dialogen foer minus fjerner en beskaering: hvilke filer der gaar i
 // papirkurven, og hvad det betyder.
-const ART = { crop: 'The crop in Master', giga: 'Enlargement in Edits', print: 'Print file' };
+const ART = { crop: 'The crop in Masters', giga: 'Enlargement in Edits', print: 'Print file' };
 function SletCropDialog({ slet, onCancel, onOk }) {
   useEffect(() => {
     // Escape fortryder, Enter bekraefter, og ingen anden genvej slipper igennem.

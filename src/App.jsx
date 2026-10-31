@@ -822,6 +822,39 @@ export default function App() {
         setSelected([rs[next].version_id]);
         setActive(rs[next].version_id);
       };
+      // Hop til et bestemt sted, uden at gaa rundt ved enderne. Med Skift
+      // udvides markeringen fra ankeret, som med pilene.
+      const fraIdx = () => (idx < 0 ? 0 : idx);
+      const hop = (til, udvid = false) => {
+        e.preventDefault();
+        if (!rs.length) return;
+        const maal = Math.max(0, Math.min(rs.length - 1, til));
+        if (udvid) {
+          const anker = Math.max(0, Math.min(rs.length - 1, ankerRef.current));
+          setSelected(rs.slice(Math.min(anker, maal), Math.max(anker, maal) + 1).map((r) => r.version_id));
+        } else {
+          ankerRef.current = maal;
+          setSelected([rs[maal].version_id]);
+        }
+        setActive(rs[maal].version_id);
+      };
+      // Hvor mange der staar paa en skaerm: i grid'et hele raekker, i
+      // Print-listen linjer, i Crop-filmstriben en bredde.
+      const sideStoerrelse = () => {
+        const maal = (felt, enhed, akse) => {
+          const f = document.querySelector(felt);
+          const en = document.querySelector(enhed);
+          if (!f || !en) return null;
+          const fs = akse === 'x' ? f.clientWidth : f.clientHeight;
+          const es = akse === 'x' ? en.offsetWidth : en.offsetHeight;
+          return es ? Math.max(1, Math.floor(fs / es)) : null;
+        };
+        const f = filterRef.current.fase;
+        if (f === 3) return maal('.crop-strip', '.crop-strip .film-billede', 'x') || 5;
+        if (f === 4) return maal('.print-liste', '.print-linje:not(.hoved)', 'y') || 10;
+        const raekker = maal('.grid-omraade', '.grid-omraade .tile', 'y') || 3;
+        return raekker * (columnsRef.current || 1);
+      };
       const fase = filterRef.current.fase;
       // Bogstaverne foelger de engelske ord paa knapperne: A approve,
       // C candidate, X discard, U unrated. Bedoemmelsen hoerer til fase 1;
@@ -870,6 +903,11 @@ export default function App() {
         case 'arrowright': move(1, e.shiftKey); break;
         case 'arrowup': move(-columnsRef.current, e.shiftKey); break;
         case 'arrowdown': move(columnsRef.current, e.shiftKey); break;
+        // Page Up og Page Down: en skaermfuld; Home og End: foerste og sidste.
+        case 'pageup': hop(fraIdx() - sideStoerrelse(), e.shiftKey); break;
+        case 'pagedown': hop(fraIdx() + sideStoerrelse(), e.shiftKey); break;
+        case 'home': hop(0, e.shiftKey); break;
+        case 'end': hop(rs.length - 1, e.shiftKey); break;
         default: break;
       }
     };

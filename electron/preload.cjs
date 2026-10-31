@@ -11,7 +11,7 @@ const CHANNELS = new Set([
   'ed:list', 'ed:statusNames', 'ed:open', 'ed:pick',
   'kw:top', 'kw:forFile', 'kw:add', 'kw:remove', 'kw:removeFromFiles', 'kw:serieOrd',
   'kw:status', 'kw:run', 'kw:stop', 'kw:setModel', 'kw:reanalyse',
-  'work:get', 'work:save', 'work:setCrop', 'work:writeTexts', 'work:pickVideo',
+  'work:get', 'work:save', 'work:omdoebPlan', 'work:omdoeb', 'work:setCrop', 'work:writeTexts', 'work:pickVideo',
   'shop:status', 'shop:send', 'shop:publish', 'shop:remove', 'shop:updateAllPrints', 'shop:updateTexts', 'shop:checkFormat',
   'thumbs:status', 'thumbs:retry',
   'search:status', 'app:counts', 'app:undo', 'app:redo',

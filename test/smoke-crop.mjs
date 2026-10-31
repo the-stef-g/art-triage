@@ -48,13 +48,13 @@ try {
   await page.waitForFunction(() => document.querySelectorAll('.tile').length === 0, null, { timeout: 15000 });
   await page.locator('.fase', { hasText: 'Edit' }).click();
   await page.waitForSelector('.tile-navn[title^="Approved/blaa/Original/"]', { timeout: 15000 });
-  if (!existsSync(join(lib, 'Approved', 'blaa', 'Master'))) throw new Error('Master-mappen blev ikke oprettet');
+  if (!existsSync(join(lib, 'Approved', 'blaa', 'Masters'))) throw new Error('Master-mappen blev ikke oprettet');
   await page.locator('.tile').first().click();
   await page.waitForSelector('button:has-text("Make master")', { timeout: 10000 });
 
   // En masterfil lægges i Master, og appen finder den. Vaerket forlader
   // fase 2 og staar i fase 3 (Crops).
-  await billede(join(lib, 'Approved', 'blaa', 'Master', 'blaa master.png'));
+  await billede(join(lib, 'Approved', 'blaa', 'Masters', 'blaa master.png'));
   await page.locator('button', { hasText: 'Scan again' }).click();
   await page.waitForFunction(() => document.querySelectorAll('.tile').length === 0, null, { timeout: 20000 });
   await page.locator('.fase', { hasText: 'Crop' }).click();
@@ -136,15 +136,20 @@ try {
   await page.waitForFunction(() => document.querySelectorAll('.crop-strip .film-billede').length === 2, null, { timeout: 5000 });
   if (await antalFilm() !== 2) throw new Error('Stakken aabnede ikke igen');
   await page.waitForSelector('.crop-strip .stak.aaben', { timeout: 5000 });
+  // End gaar til det sidste i filmstriben (beskaeringen), Home til det foerste.
+  await page.keyboard.press('End');
+  await page.waitForSelector('.crop-visning', { timeout: 5000 });
+  await page.keyboard.press('Home');
+  await page.waitForSelector('button:has-text("Save crop")', { timeout: 5000 });
   await page.waitForFunction(() => document.querySelector('.crop-flade img')?.naturalWidth > 0, null, { timeout: 10000 });
 
-  const filer = readdirSync(join(lib, 'Approved', 'blaa', 'Master'));
+  const filer = readdirSync(join(lib, 'Approved', 'blaa', 'Masters'));
   if (!filer.includes('blaa master 1-1.png') || !filer.includes('blaa master.png')) {
     throw new Error(`Master indeholder ${filer.join(', ')}`);
   }
-  const m = await sharp(join(lib, 'Approved', 'blaa', 'Master', 'blaa master 1-1.png')).metadata();
+  const m = await sharp(join(lib, 'Approved', 'blaa', 'Masters', 'blaa master 1-1.png')).metadata();
   if (m.width !== m.height) throw new Error(`Beskaeringen er ikke kvadratisk: ${m.width} x ${m.height}`);
-  const hjoerne = await sharp(join(lib, 'Approved', 'blaa', 'Master', 'blaa master 1-1.png'))
+  const hjoerne = await sharp(join(lib, 'Approved', 'blaa', 'Masters', 'blaa master 1-1.png'))
     .ensureAlpha().extract({ left: 0, top: 0, width: 1, height: 1 }).raw().toBuffer();
   if (hjoerne[3] !== 255) throw new Error(`Den drejede beskaering har et tomt hjoerne (alpha ${hjoerne[3]})`);
   if (await page.locator('.badge.kasseret').count() !== 0) throw new Error('X ramte et billede bag beskaeringsvinduet');
@@ -158,7 +163,7 @@ try {
   // dialog, der viser filerne.
   mkdirSync(join(lib, 'Approved', 'blaa', 'Edits'), { recursive: true });
   const giga21 = join(lib, 'Approved', 'blaa', 'Edits', 'blaa master 2-1-giga.png');
-  copyFileSync(join(lib, 'Approved', 'blaa', 'Master', 'blaa master 2-1.png'), giga21);
+  copyFileSync(join(lib, 'Approved', 'blaa', 'Masters', 'blaa master 2-1.png'), giga21);
   await page.locator('button', { hasText: 'Scan again' }).click();
   await page.waitForTimeout(1500);
   await page.locator('.crop-format.findes:has-text("2:1") .crop-minus').click();
@@ -166,12 +171,12 @@ try {
   await page.screenshot({ path: join(projectRoot, 'smoke-crop-slet.png') });
   await page.locator('.dialog button', { hasText: 'Move to Trash' }).click();
   await page.waitForSelector('.crop-format:not(.findes) button:has-text("2:1")', { timeout: 20000 });
-  if (existsSync(join(lib, 'Approved', 'blaa', 'Master', 'blaa master 2-1.png'))) throw new Error('Minus fjernede ikke beskaeringen');
+  if (existsSync(join(lib, 'Approved', 'blaa', 'Masters', 'blaa master 2-1.png'))) throw new Error('Minus fjernede ikke beskaeringen');
   if (existsSync(giga21)) throw new Error('Minus fjernede ikke forstoerrelsen');
-  if (!existsSync(join(lib, 'Approved', 'blaa', 'Master', 'blaa master 1-1.png'))) throw new Error('Minus fjernede den forkerte beskaering');
+  if (!existsSync(join(lib, 'Approved', 'blaa', 'Masters', 'blaa master 1-1.png'))) throw new Error('Minus fjernede den forkerte beskaering');
 
   // Omdoeber man den selv i Finder, foelger appen med efter en genscanning.
-  renameSync(join(lib, 'Approved', 'blaa', 'Master', 'blaa master 1-1.png'), join(lib, 'Approved', 'blaa', 'Master', 'blaa master 3-2.png'));
+  renameSync(join(lib, 'Approved', 'blaa', 'Masters', 'blaa master 1-1.png'), join(lib, 'Approved', 'blaa', 'Masters', 'blaa master 3-2.png'));
   await page.locator('button', { hasText: 'Scan again' }).click();
   await page.waitForSelector('.crop-format.findes button:has-text("3:2")', { timeout: 20000 });
   await page.waitForSelector('.crop-format:not(.findes) button:has-text("1:1")', { timeout: 20000 });
@@ -209,7 +214,7 @@ try {
   // vaere praecis i sit format: appen proever selv og siger nej.
   const edits = join(lib, 'Approved', 'blaa', 'Edits');
   mkdirSync(edits, { recursive: true });
-  const kilde = join(lib, 'Approved', 'blaa', 'Master', 'blaa master 3-2.png');
+  const kilde = join(lib, 'Approved', 'blaa', 'Masters', 'blaa master 3-2.png');
   const km = await sharp(kilde).metadata();
   await sharp(kilde).resize(km.width * 2, km.height * 2).png().toFile(join(edits, 'blaa master 3-2-giga.png'));
   const foer = new Date(Date.now() - 10_000);
@@ -222,7 +227,7 @@ try {
   }
 
   // Med det rigtige format i navnet laver appen selv printfilen.
-  renameSync(kilde, join(lib, 'Approved', 'blaa', 'Master', 'blaa master 1-1.png'));
+  renameSync(kilde, join(lib, 'Approved', 'blaa', 'Masters', 'blaa master 1-1.png'));
   renameSync(join(edits, 'blaa master 3-2-giga.png'), join(edits, 'blaa master 1-1-giga.png'));
   await page.locator('button', { hasText: 'Scan again' }).click();
   const printfil = join(lib, 'Approved', 'blaa', 'Print files', 'blaa master 1-1.jpg');

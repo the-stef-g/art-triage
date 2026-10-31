@@ -873,3 +873,16 @@ button.fare { background: var(--kasseret); border-color: var(--kasseret); color:
 .print-linje .for-stor { color: var(--kasseret); }
 .print-linje .for-stor .stoerrelse { color: var(--kasseret); }
 .format-valg .antal { color: var(--tekst-svag); font-size: 11px; }
+
+/* Print: kolonnetitlerne bliver staaende oeverst, naar listen rulles. */
+.print-linje.hoved { position: sticky; top: -12px; z-index: 2; background: var(--bg); border-radius: 0; border-bottom: 1px solid var(--kant); }
+
+/* Rullebjaelkerne tegnes af appen, saa de altid kan ses og ikke forsvinder,
+   naar man holder op med at rulle (macOS' egne er tynde og skjuler sig). */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.04); }
+::-webkit-scrollbar-thumb { background: #8a8a90; border-radius: 5px; border: 2px solid transparent; background-clip: padding-box; min-height: 40px; }
+::-webkit-scrollbar-thumb:hover { background: var(--accent); background-clip: padding-box; }
+::-webkit-scrollbar-corner { background: transparent; }
+.omdoeb-dialog { width: min(680px, 92vw); }
+.omdoeb-dialog .dialog-filer { max-height: 40vh; overflow: auto; }
