@@ -5,6 +5,9 @@ Det der venter. Stef siger "byg", før noget herfra bliver lavet.
 ## Venter på "byg"
 
 - **Fejl: pil op og ned i Print springer hver anden fil over.** Listen i Print er én kolonne, men pilene bruger stadig grid'ets antal kolonner fra den fase, man kom fra (fx 2 fra Product). I Print skal op og ned flytte én linje, som i Crop.
+- **Printfilen som JPEG i stedet for PNG.** Prodigi har en grænse på 300 MB, og en PNG på 120 × 120 cm ved 300 DPI blev 547,5 MB. Samme pixels, 300 DPI og sRGB, men JPEG i kvalitet 95 med fuld farveopløsning (4:4:4). Er filen alligevel over 300 MB, sænkes kvaliteten et trin ad gangen. Navnet bliver `Desert 2-3.jpg`; en gammel PNG med samme navn går i papirkurven.
+- **MB som i Finder.** Appen regner 1 MB som 1.048.576 bytes, Finder som 1.000.000, så appen viste 522,2 MB, hvor Finder viste 547,5 MB. Appen skal regne som Finder.
+- **-giga-kopier der aldrig blev forstørret.** Sendes en beskæring til Gigapixel igen, genbruges en gammel -giga-kopi, der ikke er større end beskæringen, i stedet for at lave `… -giga 2`. En -giga-kopi, der efter 24 timer stadig ikke er større end beskæringen, flyttes i papirkurven ved næste skanning, og det står i loggen.
 
 ## Venter på en afklaring
 
