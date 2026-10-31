@@ -1,3 +1,5 @@
+import KoeKnap from './ShopKoe';
+
 export const MIN_KOLONNER = 3;
 export const MAX_KOLONNER = 10;
 
@@ -76,6 +78,7 @@ export default function StatusBar({
           Drive not connected
         </span>
       )}
+      <KoeKnap />
       {kwTekst && <span className="kw-status">{kwTekst}</span>}
       {textTekst && <span className="kw-status">{textTekst}</span>}
       {thumbStatus?.failed > 0 && (

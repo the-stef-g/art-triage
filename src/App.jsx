@@ -1035,6 +1035,9 @@ export default function App() {
           row={focusedRow}
           fase={filter.fase}
           selectedCount={selected.length}
+          valgteVaerker={(filter.fase === 5 || filter.fase === 6) && selected.length > 1
+            ? [...new Set(rows.filter((r) => selected.includes(r.version_id)).map((r) => r.image_id))]
+            : []}
           activeKeyword={filter.keyword}
           editors={editors}
           statusNavne={statusNavne}

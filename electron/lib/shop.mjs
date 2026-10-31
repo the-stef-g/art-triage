@@ -6,6 +6,8 @@
 // loggen, aldrig sendt til brugerfladen. Fejlbeskeder herfra indeholder
 // aldrig en noegle; de siger hvad der skete, ikke hvad der blev sendt.
 import { readFileSync, rmSync, mkdtempSync, statSync } from 'node:fs';
+import { request as httpsRequest } from 'node:https';
+import { request as httpRequest } from 'node:http';
 import { createHash } from 'node:crypto';
 import { join, basename } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -83,6 +85,61 @@ function aarsag(err) {
   return String(err?.cause?.message || err?.message || 'unknown error').slice(0, 120);
 }
 
+// Et billede sendes med node:https i stedet for fetch, saa det kan ses,
+// hvor meget der er sendt. Laengden er kendt paa forhaand (Content-Length),
+// saa der ikke sendes i "chunks", som ikke alle servere tager imod.
+// onBytes(sendt, ialt) kaldes, mens det skrives.
+const BID = 256 * 1024;
+export function httpsUpload(url, { method, headers, body, signal, onBytes }) {
+  return new Promise((resolve, reject) => {
+    const u = new URL(url);
+    const req = (u.protocol === 'http:' ? httpRequest : httpsRequest)(u, {
+      method, headers: { ...headers, 'Content-Length': body.length },
+    }, (res) => {
+      const dele = [];
+      res.on('data', (d) => dele.push(d));
+      res.on('error', reject);
+      res.on('end', () => {
+        const tekst = Buffer.concat(dele).toString('utf8');
+        resolve({ status: res.statusCode, ok: res.statusCode >= 200 && res.statusCode < 300, text: async () => tekst });
+      });
+    });
+    req.on('error', reject);
+    if (signal) {
+      const afbryd = () => req.destroy(signal.reason);
+      if (signal.aborted) { afbryd(); return; }
+      signal.addEventListener('abort', afbryd, { once: true });
+    }
+    let pos = 0;
+    const skriv = () => {
+      while (pos < body.length) {
+        const slut = Math.min(pos + BID, body.length);
+        const plads = req.write(body.subarray(pos, slut));
+        pos = slut;
+        if (!plads) {
+          req.once('drain', () => { onBytes?.(pos, body.length); skriv(); });
+          return;
+        }
+      }
+      onBytes?.(body.length, body.length);
+      req.end();
+    };
+    onBytes?.(0, body.length);
+    skriv();
+  });
+}
+
+// Med en anden fetch (testene) sendes billedet med den, og fremdriften
+// meldes, naar det er sendt.
+function fetchUpload(fetchImpl) {
+  return async (url, { onBytes, ...opts }) => {
+    onBytes?.(0, opts.body.length);
+    const res = await fetchImpl(url, opts);
+    onBytes?.(opts.body.length, opts.body.length);
+    return res;
+  };
+}
+
 function basic(user, secret) {
   return `Basic ${Buffer.from(`${user}:${secret}`).toString('base64')}`;
 }
@@ -93,13 +150,14 @@ export class ShopClient {
     this.woo = wooKey && wooSecret ? basic(wooKey, wooSecret) : null;
     this.wp = wpUser && wpPassword ? basic(wpUser, wpPassword) : null;
     this.fetch = fetchImpl || globalThis.fetch;
+    this.upload = fetchImpl ? fetchUpload(fetchImpl) : httpsUpload;
     // Pausen mellem forsoegene; testene saetter den til 0.
     this.vent = (ms) => new Promise((r) => { setTimeout(r, ms); });
     // En forespoergsel uden svar i 5 minutter gives op, i stedet for at haenge.
     this.timeoutMs = 5 * 60 * 1000;
   }
 
-  async _request(auth, kind, method, path, { json, body, headers = {} } = {}) {
+  async _request(auth, kind, method, path, { json, body, headers = {}, onBytes = null } = {}) {
     if (!auth) {
       throw new ShopError(kind === 'woo'
         ? 'No WooCommerce key yet. Add it under Help.'
@@ -121,9 +179,9 @@ export class ShopClient {
     let res;
     for (let i = 1; ; i += 1) {
       try {
-        res = await this.fetch(`${this.baseUrl}${prefix}${path}`, {
-          method, headers: h, body: payload, signal: AbortSignal.timeout(this.timeoutMs),
-        });
+        const url = `${this.baseUrl}${prefix}${path}`;
+        const opts = { method, headers: h, body: payload, signal: AbortSignal.timeout(this.timeoutMs) };
+        res = onBytes ? await this.upload(url, { ...opts, onBytes }) : await this.fetch(url, opts);
         if (i < forsoeg && [502, 503, 504].includes(res.status)) {
           await this.vent(2000 * i);
           continue;
@@ -158,9 +216,10 @@ export class ShopClient {
     return this._request(this.wp, 'wp', method, path, { json });
   }
 
-  uploadMedia(buffer, filename, mime) {
+  uploadMedia(buffer, filename, mime, { onBytes = null } = {}) {
     return this._request(this.wp, 'wp', 'POST', '/media', {
       body: buffer,
+      onBytes,
       headers: {
         'Content-Type': mime,
         'Content-Disposition': `attachment; filename="${filename.replace(/"/g, '')}"`,
@@ -269,7 +328,7 @@ export class MediaSync {
   // Returnerer { id, url, uploaded }. Uploader kun hvis filen er aendret
   // siden sidst; er det kun alt-teksten der er aendret, opdateres den paa
   // mediet uden en ny upload.
-  async ensure(imageId, role, file, alt) {
+  async ensure(imageId, role, file, alt, { onBytes = null } = {}) {
     const key = sourceKey(file);
     const rec = this.db.get('SELECT * FROM work_media WHERE image_id=? AND role=?', imageId, role);
     if (rec && rec.source_key === key) {
@@ -286,7 +345,7 @@ export class MediaSync {
     const abs = this.catalog.abs(file.rel_path);
     const buffer = await this.exporter(abs, undefined, undefined, { rotation: file.rotation || 0 });
     const stem = basename(file.rel_path).replace(/\.[^.]+$/, '');
-    const media = await this.client.uploadMedia(buffer, `${stem}-${role.replace(':', 'x')}.jpg`, 'image/jpeg');
+    const media = await this.client.uploadMedia(buffer, `${stem}-${role.replace(':', 'x')}.jpg`, 'image/jpeg', { onBytes });
     await this.client.wpApi('POST', `/media/${media.id}`, { alt_text: alt || '', title: stem });
     this._remember(imageId, role, key, media, alt);
     return { id: media.id, url: media.source_url ?? null, uploaded: true };
@@ -294,13 +353,13 @@ export class MediaSync {
 
   // Videoen er en fil der vaelges i appen, ikke en version, saa den noegles
   // paa stien og stoerrelsen i stedet.
-  async ensureVideo(imageId, absPath, size, mtime) {
+  async ensureVideo(imageId, absPath, size, mtime, { onBytes = null } = {}) {
     const key = `video:${absPath}:${size}:${mtime}`;
     const rec = this.db.get("SELECT * FROM work_media WHERE image_id=? AND role='video'", imageId);
     if (rec && rec.source_key === key) return { id: rec.media_id, url: rec.source_url, uploaded: false };
     const mime = VIDEO_TYPES[extOf(absPath)];
     if (!mime) throw new ShopError('The video must be an mp4, m4v, mov or webm file');
-    const media = await this.client.uploadMedia(readFileSync(absPath), basename(absPath), mime);
+    const media = await this.client.uploadMedia(readFileSync(absPath), basename(absPath), mime, { onBytes });
     this._remember(imageId, 'video', key, media, null);
     return { id: media.id, url: media.source_url ?? null, uploaded: true };
   }
@@ -521,6 +580,8 @@ export class ShopSync {
     this.status = status;
     this.media = new MediaSync({ catalog, client, exporter });
     this.categoryIds = new Map();
+    this._del = 0;
+    this._dele = 1;
   }
 
   async categoryId(name) {
@@ -596,6 +657,21 @@ export class ShopSync {
     return mangler;
   }
 
+  // Fremdriften i dele: hvert billede er én del (delt efter bytes, mens
+  // det sendes), og hvert trin bagefter er én. del er det der er gjort.
+  _trin(tekst, ekstra = {}) {
+    this.status(tekst, { del: this._del, dele: this._dele, ...ekstra });
+  }
+
+  // Et billede der sendes: MB sendt af MB i alt, og hvor langt i vaerket.
+  _upload(tekst, fil, filer) {
+    const start = this._del;
+    return (bytes, total) => {
+      this._del = start + (total ? bytes / total : 0);
+      this._trin(tekst, { fil, filer, bytes, total });
+    };
+  }
+
   async _mediaFor(work) {
     const imageId = work.imageId;
     const mainFile = this.works.imageFile(imageId);
@@ -606,13 +682,19 @@ export class ShopSync {
     const ialt = work.crops.length + 1;
     // Det er webversionen (JPEG, ca. 3000 px), der sendes, aldrig TIFF'en.
     const jpg = (rel) => basename(rel).replace(/\.[^.]+$/, '.jpg');
-    this.status(`Uploading ${jpg(mainFile.rel_path)} (1 of ${ialt})`);
-    const media = { main: await this.media.ensure(imageId, 'main', mainFile, alt), crops: {}, video: null };
+    const send = async (role, file, nr) => {
+      const tekst = `Uploading ${jpg(file.rel_path)} (${nr} of ${ialt})`;
+      const start = this._del;
+      this._trin(tekst, { fil: nr, filer: ialt });
+      const m = await this.media.ensure(imageId, role, file, alt, { onBytes: this._upload(tekst, nr, ialt) });
+      this._del = start + 1;
+      return m;
+    };
+    const media = { main: await send('main', mainFile, 1), crops: {}, video: null };
     for (const [i, crop] of work.crops.entries()) {
       const file = this.catalog.getFile(this.catalog.getVersion(crop.versionId).effective_file_id);
       if (!file?.present) throw new ShopError(`The ${crop.format} crop file is not available right now`);
-      this.status(`Uploading ${jpg(file.rel_path)} (${i + 2} of ${ialt})`);
-      media.crops[crop.format] = await this.media.ensure(imageId, crop.format, file, alt);
+      media.crops[crop.format] = await send(crop.format, file, i + 2);
     }
     return media;
   }
@@ -621,7 +703,11 @@ export class ShopSync {
     if (!work.video) return;
     let st;
     try { st = statSync(work.video); } catch { throw new ShopError('The video file is not available right now'); }
-    media.video = await this.media.ensureVideo(work.imageId, work.video, st.size, Math.floor(st.mtimeMs));
+    this._trin('Uploading the video');
+    media.video = await this.media.ensureVideo(work.imageId, work.video, st.size, Math.floor(st.mtimeMs), {
+      onBytes: this._upload('Uploading the video', 1, 1),
+    });
+    this._del = Math.round(this._del);
   }
 
   // Produktet som det staar i Woo nu, eller null hvis det er slettet der.
@@ -660,22 +746,26 @@ export class ShopSync {
         return { needsConfirm: true, existing: { id: p.id, name: p.name, status: p.status }, flere: samme.length };
       }
     }
+    // Delene til fremdriften: billederne, videoen og trinene bagefter.
+    const formater = (work.crops || []).map((c) => c.format);
+    const medVarianter = !work.unique && formater.length > 0;
+    this._del = 0;
+    this._dele = work.crops.length + 1 + (work.video ? 1 : 0) + 3
+      + (medVarianter ? 1 : 0) + (work.seriesId ? 1 : 0) + (work.series ? 1 : 0);
     const media = await this._mediaFor(work);
-    if (work.video) this.status('Uploading the video');
     await this._videoFor(work, media);
-    this.status('Finding the category and the series');
+    this._trin('Finding the category and the series');
     const categoryId = await this.categoryId(work.category);
     const termId = work.series ? await this.seriesTermId(work.series) : null;
 
     const eksisterende = work.wooProductId ? await this._existing(work.wooProductId) : null;
     if (work.wooProductId && !eksisterende) this.works.setWooProductId(imageId, null);
     const create = !eksisterende;
-    this.status('Finding the tags');
+    this._del += 1;
+    this._trin('Finding the tags');
     const tagIds = await this.tagIds(this.ordFor(imageId));
     // Printvarianterne for de formater vaerket har beskaeringer i. Uden
     // beskaeringer roeres varianterne ikke.
-    const formater = (work.crops || []).map((c) => c.format);
-    const medVarianter = !work.unique && formater.length > 0;
     const varianter = medVarianter ? printVarianter(formater, 'X') : null;
     const body = buildProduct(work, media, {
       categoryId, create, existingAttributes: eksisterende?.attributes || [], tagIds, varianter,
@@ -692,7 +782,8 @@ export class ShopSync {
     const gem = () => (create
       ? this.client.wc('POST', '/products', body)
       : this.client.wc('PUT', `/products/${work.wooProductId}`, body));
-    this.status(create ? 'Creating the product' : 'Saving the product');
+    this._del += 1;
+    this._trin(create ? 'Creating the product' : 'Saving the product');
     let produkt;
     try {
       produkt = await gem();
@@ -705,22 +796,28 @@ export class ShopSync {
     }
     if (create) this.works.setWooProductId(imageId, produkt.id);
     this.works.setWooStatus(imageId, produkt.status);
+    this._del += 1;
     if (medVarianter) {
       const sku = produkt.sku || body.sku || eksisterende?.sku || vaerkSku(work);
+      this._trin(`Saving the print variants (${formater.length} format${formater.length === 1 ? '' : 's'})`);
       await this._synkVarianter(produkt.id, printVarianter(formater, sku));
+      this._del += 1;
     }
     this.works.setWooAftryk(imageId, this.aftryk(imageId));
     // De andre vaerker i serien faar det nye med som upsell.
     if (work.seriesId) {
-      this.status('Linking the works in the series');
+      this._trin('Linking the works in the series');
       await this._serieUpsells(work.seriesId, imageId);
+      this._del += 1;
     }
     // Serien saettes ikke via wc/v3 men via WP REST paa selve produktet.
     // Uden en serie i appen roeres den i Woo ikke.
     if (termId) {
-      this.status('Setting the series');
+      this._trin('Setting the series');
       await this.client.wpApi('POST', `/product/${produkt.id}`, { series: [termId] });
     }
+    this._del = this._dele;
+    this._trin('Done');
     return { productId: produkt.id, status: produkt.status, link: produkt.permalink ?? null, created: create };
   }
 

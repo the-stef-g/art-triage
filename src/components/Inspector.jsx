@@ -10,7 +10,7 @@ import { gigapixelMaal } from '../printmaal';
 // blev noegleordene kun hentet naar man skiftede billede, saa ord Claude
 // lige havde skrevet foerst dukkede op hvis man gik væk og tilbage igen.
 export default function Inspector({
-  row, fase = 1, selectedCount, activeKeyword, editors, statusNavne = [], series, act, dataRev, tekstRev = 0, hasKey, shop, onShop, onError,
+  row, fase = 1, selectedCount, valgteVaerker = [], activeKeyword, editors, statusNavne = [], series, act, dataRev, tekstRev = 0, hasKey, shop, onShop, onError,
   shopNode = null, cropNode = null, formatAntal = null, onVaelgFormat = null,
 }) {
   const [versions, setVersions] = useState([]);
@@ -298,6 +298,7 @@ export default function Inspector({
             onShop={onShop}
             onError={onError}
             shopNode={shopNode}
+            valgteVaerker={valgteVaerker}
           >
             <h4>Series</h4>
             <div className="knapraekke">
@@ -420,7 +421,7 @@ export default function Inspector({
             <div className="knapraekke format-valg" title="Select every crop in this format, to send them to Gigapixel with the same setting">
               {formatAntal.map(([f, n]) => (
                 <button key={f} className="lille" disabled={!n} onClick={() => onVaelgFormat?.(f)}>
-                  {f}{n ? <span className="antal"> {n}</span> : null}
+                  {f}{n ? <span className="antal">{n}</span> : null}
                 </button>
               ))}
             </div>

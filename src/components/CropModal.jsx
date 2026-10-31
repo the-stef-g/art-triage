@@ -413,7 +413,6 @@ export default function CropModal({
             })}
           </span>
           {!inline && <button onClick={onClose}>Cancel</button>}
-          {intetAtBeskaere && <span className="tom crop-intet">Every format is cropped or turned off.</span>}
           <button className="primaer" disabled={gemmer || optaget.has(format) || intetAtBeskaere} onClick={gem}>{gemmer ? 'Saving …' : 'Save crop'}</button>
         </div>
       </div>

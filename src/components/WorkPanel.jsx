@@ -1,25 +1,9 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { invoke, onEvent } from '../api';
+import { invoke } from '../api';
+import { useKoe, koeTilfoej, vaerkDel, klokken, mb } from '../koe';
 
 const CATEGORIES = ['Graphic Design', 'Photography', 'Paintings', 'Sculptures'];
-
-// Fremdriften i shoppen pr. vaerk (imageId), saa den staar ved det rigtige
-// vaerk, ogsaa naar man klikker videre, mens det sendes, og tilbage igen.
-// Én lytter for hele appen; panelet der viser vaerket, faar besked.
-const FREMDRIFT = new Map();
-const VISERE = new Map();
-let lytter = null;
-function saetFremdrift(imageId, vaerdi) {
-  if (vaerdi) FREMDRIFT.set(imageId, vaerdi); else FREMDRIFT.delete(imageId);
-  VISERE.get(imageId)?.(vaerdi);
-}
-function lytTilShoppen() {
-  if (lytter) return;
-  lytter = onEvent((evt) => {
-    if (evt.type === 'shopFremdrift' && evt.imageId != null) saetFremdrift(evt.imageId, { tekst: evt.tekst, igang: true });
-  });
-}
 
 const TEXT_LABELS = {
   description: 'Description',
@@ -30,24 +14,24 @@ const TEXT_LABELS = {
 // Vaerk-panelet (docs/plan-shop.md). Teksterne rettes kun her; Woo er en
 // kopi. Felterne gemmes naar man forlader dem, ikke for hver tast, saa
 // en igangvaerende rettelse aldrig bliver skrevet over af en genindlaesning.
-export default function WorkPanel({ row, versions, tekstRev = 0, hasKey, shop, onShop, onError, children = null, shopNode = null }) {
+export default function WorkPanel({ row, versions, tekstRev = 0, hasKey, shop, onShop, onError, children = null, shopNode = null, valgteVaerker = [] }) {
   const imageId = row.image_id;
   const [work, setWork] = useState(null);
   const [draft, setDraft] = useState({});
   const [busy, setBusy] = useState(false);
   const [warnings, setWarnings] = useState([]);
-  // Hvad der sker i shoppen lige nu, og hvordan det endte.
-  const [fremdrift, setFremdriftLokal] = useState(() => FREMDRIFT.get(imageId) ?? null);
-  const setFremdrift = (v) => saetFremdrift(imageId, v);
+  // Vaerket i koeen til shoppen: venter, sendes, sendt, sprunget over
+  // eller fejl. Det seneste, hvis det har vaeret der flere gange.
+  const koe = useKoe();
+  const iKoe = [...koe.vaerker].reverse().find((k) => k.imageId === imageId) ?? null;
+  const sendes = iKoe?.status === 'venter' || iKoe?.status === 'sender';
   // Dialogen der spoerger, om en ny titel skal omdoebe filerne.
   const [omdoeb, setOmdoeb] = useState(null);
+  // Naar koeen har sendt vaerket, hentes det igen (produktnummer, status).
   useEffect(() => {
-    lytTilShoppen();
-    setFremdriftLokal(FREMDRIFT.get(imageId) ?? null);
-    VISERE.set(imageId, setFremdriftLokal);
-    return () => { if (VISERE.get(imageId) === setFremdriftLokal) VISERE.delete(imageId); };
-  }, [imageId]);
-  const klokken = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    if (iKoe?.status !== 'sendt') return;
+    invoke('work:get', { imageId }).then(adopt).catch(() => {});
+  }, [iKoe?.status, iKoe?.tid]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const adopt = (w) => {
     setWork(w);
@@ -189,31 +173,17 @@ export default function WorkPanel({ row, versions, tekstRev = 0, hasKey, shop, o
     setBusy(false);
   };
 
-  // Har shoppen allerede et produkt med samme navn, spoerges der, om det er
-  // det, der skal opdateres. Saa bliver der ikke lavet en dublet.
-  const sendToShop = async (valg = {}) => {
-    setBusy(true);
-    setFremdrift({ tekst: 'Starting', igang: true });
+  // Vaerkerne laegges i koeen til shoppen og sendes ét ad gangen. Har
+  // shoppen allerede et produkt med samme navn, springes vaerket over, og
+  // koeen spoerger, om det produkt skal opdateres. Saa bliver der ikke lavet
+  // en dublet.
+  const flere = valgteVaerker.length > 1 && valgteVaerker.includes(imageId);
+  const sendToShop = async (kobl = null) => {
     try {
-      const res = await invoke('shop:send', { imageId, ...valg });
-      if (res.needsConfirm) {
-        setBusy(false);
-        const e = res.existing;
-        setFremdrift(null);
-        if (window.confirm(`The shop already has a product called «${e.name}» (product ${e.id}, ${e.status}). Update that product from the app? Its texts and images are replaced by the ones here.\n\nCancel sends nothing.`)) {
-          await sendToShop({ kobl: e.id });
-        }
-        return;
-      }
-      adopt(await invoke('work:get', { imageId }));
-      const besked = res.created ? `Created draft product ${res.productId} in the shop` : `Updated product ${res.productId} in the shop`;
-      setFremdrift({ tekst: `${besked} at ${klokken()}`, igang: false, ok: true });
-      onShop(besked);
+      await koeTilfoej(flere && kobl == null ? valgteVaerker : [imageId], kobl);
     } catch (err) {
-      setFremdrift({ tekst: `Not sent: ${String(err?.message || err).replace(/^Error: /, '')}`, igang: false, ok: false });
       onError(err);
     }
-    setBusy(false);
   };
   const publish = () => shopKald('shop:publish', (r) => `Product ${r.productId} is now ${r.status}`);
   // Af sitet igen: produktet bliver en kladde, ikke slettet, for gamle
@@ -435,26 +405,22 @@ export default function WorkPanel({ row, versions, tekstRev = 0, hasKey, shop, o
       <div className="knapraekke">
         <button
           className={!work.wooProductId || work.shopAendret ? 'primaer' : ''}
-          disabled={busy || fremdrift?.igang || !work.eligible || !shop?.harWoo || !shop?.harWp || shop?.formatOk === false}
+          disabled={busy || (!flere && sendes) || (!flere && !work.eligible) || !shop?.harWoo || !shop?.harWp || shop?.formatOk === false}
           onClick={() => sendToShop()}
-          title={!work.eligible ? 'The image must be Approved and Finished'
+          title={flere ? 'The selected works go into the shop queue and are sent one at a time' : !work.eligible ? 'The image must be Approved and Finished'
             : (!shop?.harWoo || !shop?.harWp) ? 'Add the WooCommerce key and the WordPress application password under Help'
               : shop?.formatOk === false ? 'The shop\'s product format has changed since the app was made for it. Sending is locked so no product is damaged.' : ''}
         >
-          {work.wooProductId ? 'Update shop' : 'Send to shop'}
+          {flere ? `Send ${valgteVaerker.length} to shop` : work.wooProductId ? 'Update shop' : 'Send to shop'}
         </button>
         {work.wooProductId && work.wooStatus !== 'publish' && (
-          <button disabled={busy || fremdrift?.igang} onClick={publish} title="Publish the draft in the shop. The work moves to Shop.">Publish</button>
+          <button disabled={busy || sendes} onClick={publish} title="Publish the draft in the shop. The work moves to Shop.">Publish</button>
         )}
         {work.wooProductId && work.wooStatus === 'publish' && (
-          <button disabled={busy || fremdrift?.igang} onClick={remove} title="Take the product off the site. It becomes a draft again.">Remove from shop</button>
+          <button disabled={busy || sendes} onClick={remove} title="Take the product off the site. It becomes a draft again.">Remove from shop</button>
         )}
       </div>
-      {fremdrift && (
-        <p className={`shop-fremdrift ${fremdrift.igang ? 'igang' : fremdrift.ok ? 'ok' : 'fejl'}`} role="status">
-          {fremdrift.igang ? `${fremdrift.tekst} …` : `${fremdrift.ok ? '✓' : '✕'} ${fremdrift.tekst}`}
-        </p>
-      )}
+      {iKoe && <VaerkIKoe k={iKoe} koe={koe} onKobl={(id) => sendToShop(id)} />}
       <div className="knapraekke finder-knap">
         <button
           onClick={() => invoke('img:openWorkFolder', { versionId: row.version_id }).catch(onError)}
@@ -550,4 +516,36 @@ function OmdoebDialog({ plan, onRename, onTitle, onCancel }) {
       </div>
     </div>
   );
+}
+
+// Vaerkets linje under shopknapperne: hvor det er i koeen, hvor langt det
+// er naaet, og hvordan det endte.
+function VaerkIKoe({ k, koe, onKobl }) {
+  if (k.status === 'venter') {
+    const foran = koe.vaerker.filter((x) => (x.status === 'venter' || x.status === 'sender') && x.id < k.id).length;
+    return <p className="shop-fremdrift igang" role="status">Waiting in the shop queue{foran ? ` (${foran} before it)` : ''}</p>;
+  }
+  if (k.status === 'sender') {
+    const f = koe.fremdrift;
+    return (
+      <div className="shop-fremdrift igang" role="status">
+        <div className="koe-bjaelke"><div style={{ width: `${Math.round(vaerkDel(f) * 100)}%` }} /></div>
+        <p>{f?.tekst ?? 'Starting'}{f?.total ? ` · ${mb(f.bytes || 0)} of ${mb(f.total)} MB` : ''} …</p>
+      </div>
+    );
+  }
+  if (k.status === 'sendt') return <p className="shop-fremdrift ok" role="status">✓ {k.besked} at {klokken(k.tid)}</p>;
+  if (k.status === 'sprunget') {
+    return (
+      <div className="shop-fremdrift fejl" role="status">
+        <p>Skipped: {k.besked}</p>
+        {k.existing && (
+          <button className="lille" onClick={() => onKobl(k.existing.id)} title="Its texts and images are replaced by the ones here">
+            Update product {k.existing.id} from the app
+          </button>
+        )}
+      </div>
+    );
+  }
+  return <p className="shop-fremdrift fejl" role="status">✕ Not sent: {k.besked}</p>;
 }

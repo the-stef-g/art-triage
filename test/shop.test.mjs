@@ -2,6 +2,7 @@
 // shoppen er en attrap. Testene holder oeje med det der koster noget hvis
 // det gaar galt: dubletter i Woo, genupload af store filer, noegler der
 // ender i en fejlbesked, og at en opdatering ikke roerer lager eller status.
+import { createServer } from 'node:http';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync, utimesSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -11,7 +12,7 @@ import { Catalog } from '../electron/lib/catalog.mjs';
 import { Works } from '../electron/lib/works.mjs';
 import {
   ShopClient, ShopSync, MediaSync, ShopError, parseWooKey, parseWpLogin, vaerkSku, vaerkAftryk,
-  buildProduct, acptMeta, cropMetaKey, ACPT_FIELDS, compareFormat, mergeAttributes,
+  buildProduct, acptMeta, cropMetaKey, ACPT_FIELDS, compareFormat, mergeAttributes, httpsUpload,
 } from '../electron/lib/shop.mjs';
 
 let root;
@@ -714,7 +715,24 @@ describe('send til shop', () => {
     expect(trin[0]).toBe('Uploading a.jpg (1 of 1)');
     expect(trin).toContain('Creating the product');
     await shop.send(id);
-    expect(trin.at(-1)).toBe('Saving the product');
+    expect(trin).toContain('Saving the product');
+    expect(trin.at(-1)).toBe('Done');
+  });
+
+  it('melder hvor langt vaerket er naaet, og MB sendt for hvert billede', async () => {
+    const { id } = klartVaerk('a.png');
+    const { fetchImpl } = attrapShop();
+    const meld = [];
+    const shop = new ShopSync({ catalog, works, client: klient(fetchImpl), exporter, status: (t, e) => meld.push([t, e]) });
+    await shop.send(id);
+    const upload = meld.filter(([, e]) => e?.total);
+    expect(upload.length).toBeGreaterThan(0);
+    expect(upload.at(-1)[1].bytes).toBe(upload.at(-1)[1].total);
+    expect(upload[0][1]).toMatchObject({ fil: 1, filer: 1 });
+    // Delene vokser og ender paa det hele.
+    const dele = meld.map(([, e]) => e.del / e.dele);
+    for (let i = 1; i < dele.length; i += 1) expect(dele[i]).toBeGreaterThanOrEqual(dele[i - 1]);
+    expect(dele.at(-1)).toBe(1);
   });
 
   it('Remove from shop goer produktet til en kladde, uden at slette det', async () => {
@@ -840,5 +858,36 @@ describe('serier', () => {
     // En indstilling shoppen ikke kender, stopper ikke resten.
     expect(res.advarsler).toHaveLength(1);
     expect(res.betingelser).toBe('https://shop.stefg.art/terms-and-conditions/');
+  });
+});
+
+describe('httpsUpload', () => {
+  it('sender med Content-Length og melder bytes undervejs', async () => {
+    let modtaget = null;
+    const server = createServer((req, res) => {
+      const dele = [];
+      req.on('data', (d) => dele.push(d));
+      req.on('end', () => {
+        modtaget = { laengde: req.headers['content-length'], chunked: req.headers['transfer-encoding'], bytes: Buffer.concat(dele).length };
+        res.writeHead(201, { 'Content-Type': 'application/json' });
+        res.end('{"id":7}');
+      });
+    });
+    await new Promise((r) => { server.listen(0, '127.0.0.1', r); });
+    const { port } = server.address();
+    const body = Buffer.alloc(3 * 1024 * 1024, 1);
+    const meldt = [];
+    try {
+      const res = await httpsUpload(`http://127.0.0.1:${port}/wp-json/wp/v2/media`, {
+        method: 'POST', headers: { 'Content-Type': 'image/jpeg' }, body, onBytes: (b, t) => meldt.push([b, t]),
+      });
+      expect(res.status).toBe(201);
+      expect(JSON.parse(await res.text()).id).toBe(7);
+    } finally {
+      server.close();
+    }
+    expect(modtaget).toEqual({ laengde: String(body.length), chunked: undefined, bytes: body.length });
+    expect(meldt[0]).toEqual([0, body.length]);
+    expect(meldt.at(-1)).toEqual([body.length, body.length]);
   });
 });

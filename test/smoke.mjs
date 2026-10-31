@@ -458,6 +458,17 @@ try {
     null,
     { timeout: 15000 }
   );
+  // Koeen til shoppen: et vaerk der ikke kan sendes (ingen noegler), staar
+  // med fejlen og hvorfor, og listen aabner af sig selv.
+  await page.evaluate(() => window.artTriage.invoke('shop:koeTilfoej', { imageIds: Array.from({ length: 30 }, (_, i) => i + 1) }));
+  await page.waitForSelector('.koe-panel .koe-vaerk.fejl', { timeout: 15000 });
+  await page.waitForFunction(() => !document.querySelector('.koe-vaerk.venter, .koe-vaerk.sender'), null, { timeout: 15000 });
+  const koeBesked = await page.locator('.koe-panel .koe-besked').first().innerText();
+  if (!koeBesked.trim()) throw new Error('Koeen siger ikke, hvorfor et vaerk ikke blev sendt');
+  await page.screenshot({ path: join(projectRoot, 'smoke-koe.png') });
+  await page.locator('.koe-panel button', { hasText: 'Clear finished' }).click();
+  await page.waitForSelector('.koe-panel .koe-vaerk', { state: 'detached', timeout: 5000 });
+  await page.locator('.koe-panel button', { hasText: 'Close' }).click();
   await page.locator('.fase', { hasText: 'Sort' }).click();
 
   // Cmd+6 gaar til 6 Shop, ogsaa fra et tekstfelt, og Cmd+1 tilbage.

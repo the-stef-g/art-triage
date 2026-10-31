@@ -91,6 +91,12 @@ export class AppSession {
     this.autoPrintSet = new Set();
     // Det der er i gang lige nu (navn -> antal), til spoergsmaalet ved Quit.
     this.igang = new Map();
+    // Koeen til shoppen: vaerkerne sendes ét ad gangen i raekkefoelge.
+    this.koe = [];
+    this.koeNr = 0;
+    this.koeKoerer = false;
+    this.koeFremdrift = null;
+    this.koeStart = null;
     this.autoPrintKoerer = false;
     this.autoPrintTimer = null;
 
@@ -188,6 +194,8 @@ export class AppSession {
   igangListe() {
     const l = [...this.igang.keys()];
     if (this.kwRunner?.running) l.push('writing keywords with Claude');
+    const venter = this.koe.filter((k) => k.status === 'venter').length;
+    if (venter) l.push(`${venter} work${venter === 1 ? '' : 's'} waiting in the shop queue`);
     return [...new Set(l)];
   }
 
@@ -310,6 +318,8 @@ export class AppSession {
     this.searchIndex = new SearchIndex(this.catalog, MODEL_ID);
     this.undoMgr = new UndoManager(this.catalog);
     this.works = new Works(this.catalog);
+    // Et andet bibliotek: dets vaerker har andre numre.
+    if (!this.koeKoerer) { this.koe = []; this.koeStart = null; this._koeMeld(); }
     this.indexer = new Indexer({
       catalog: this.catalog,
       thumbs: this.thumbs,
@@ -690,7 +700,7 @@ export class AppSession {
   }
 
   // imageId: vaerket fremdriften hoerer til, saa den vises ved det rigtige.
-  _shop(imageId = null) {
+  _shop(imageId = null, status = null) {
     const works = this.requireWorks();
     const d = this.settings.data;
     return new ShopSync({
@@ -700,8 +710,123 @@ export class AppSession {
         baseUrl: d.shopUrl || DEFAULT_SHOP_URL,
         wooKey: d.wooKey, wooSecret: d.wooSecret, wpUser: d.wpUser, wpPassword: d.wpPassword,
       }),
-      status: (tekst) => this.broadcast('shopFremdrift', { tekst, imageId }),
+      status: status || ((tekst) => this.broadcast('shopFremdrift', { tekst, imageId })),
     });
+  }
+
+  // ---------- Koeen til shoppen ----------
+  // Hvert vaerk i koeen: { id, imageId, titel, status, besked, tid, kobl,
+  // existing }. status er venter, sender, sendt, sprunget eller fejl.
+  // Koersel er dem der er lagt i, siden koeen sidst var tom, saa
+  // fremdriften kan sige "vaerk 2 af 4".
+  koeTilstand() {
+    return {
+      vaerker: this.koe,
+      koerer: this.koeKoerer,
+      fremdrift: this.koeFremdrift,
+      start: this.koeStart,
+    };
+  }
+
+  _koeMeld() {
+    this.broadcast('shopKoe', this.koeTilstand());
+  }
+
+  koeTilfoej(imageIds, { kobl = null } = {}) {
+    const works = this.requireWorks();
+    let lagt = 0;
+    for (const imageId of imageIds) {
+      if (this.koe.some((k) => k.imageId === imageId && (k.status === 'venter' || k.status === 'sender'))) continue;
+      let titel;
+      try { titel = works.get(imageId).effective.title; } catch { continue; }
+      // Et vaerk der er sendt foer, staar kun én gang: den nye ligger sidst.
+      this.koe = this.koe.filter((k) => k.imageId !== imageId);
+      this.koeNr += 1;
+      this.koe.push({ id: this.koeNr, imageId, titel, status: 'venter', besked: null, tid: null, kobl: imageIds.length === 1 ? kobl : null, existing: null, koersel: true });
+      lagt += 1;
+    }
+    if (!this.koeKoerer) this.koeStart = null;
+    this._koeMeld();
+    this._koeKoer();
+    return { lagt };
+  }
+
+  koeFjern(id) {
+    this.koe = this.koe.filter((k) => !(k.id === id && k.status !== 'sender'));
+    this._koeMeld();
+    return this.koeTilstand();
+  }
+
+  koeRyd() {
+    this.koe = this.koe.filter((k) => k.status === 'venter' || k.status === 'sender');
+    this._koeMeld();
+    return this.koeTilstand();
+  }
+
+  async _koeKoer() {
+    if (this.koeKoerer) return;
+    this.koeKoerer = true;
+    // Det der er sendt foer denne koersel, taeller ikke med i "2 af 4".
+    for (const k of this.koe) if (k.status !== 'venter') k.koersel = false;
+    this.koeStart = Date.now();
+    try {
+      for (;;) {
+        const k = this.koe.find((x) => x.status === 'venter');
+        if (!k) break;
+        await this._koeSend(k);
+      }
+    } finally {
+      this.koeKoerer = false;
+      this.koeFremdrift = null;
+      this._koeMeld();
+    }
+  }
+
+  async _koeSend(k) {
+    k.status = 'sender';
+    const start = Date.now();
+    this.koeFremdrift = { id: k.id, imageId: k.imageId, tekst: 'Starting', del: 0, dele: 1, start };
+    this._koeMeld();
+    // Bytes kommer tit; bundlinjen og listen behoever dem ikke hurtigere end
+    // et par gange i sekundet.
+    let sidst = 0;
+    const status = (tekst, ekstra = {}) => {
+      this.koeFremdrift = { id: k.id, imageId: k.imageId, tekst, start, ...ekstra };
+      this.broadcast('shopFremdrift', { tekst, imageId: k.imageId });
+      const nu = Date.now();
+      if (ekstra.bytes != null && ekstra.bytes < ekstra.total && nu - sidst < 250) return;
+      sidst = nu;
+      this._koeMeld();
+    };
+    this.log(`shop: sending ${k.titel}`);
+    try {
+      this._requireFormat();
+      const res = await this._arbejde('sending to the shop', () => this._shopCall((shop) => {
+        const s = this._shop(k.imageId, status);
+        return s.send(k.imageId, { kobl: k.kobl });
+      }, k.imageId));
+      if (res.needsConfirm) {
+        const e = res.existing;
+        k.status = 'sprunget';
+        k.existing = e;
+        k.besked = `The shop already has a product called «${e.name}» (product ${e.id}, ${e.status}). Nothing was sent, so no duplicate was made.`;
+        this.log(`shop: ${k.titel} skipped (a product with the same name, ${e.id})`);
+      } else {
+        k.status = 'sendt';
+        k.besked = res.created ? `Created draft product ${res.productId}` : `Updated product ${res.productId}`;
+        k.productId = res.productId;
+        this.log(`shop: ${k.titel} sent (product ${res.productId})`);
+      }
+    } catch (err) {
+      k.status = 'fejl';
+      k.besked = String(err?.message || err).replace(/^Error: /, '');
+      this.log(`shop: ${k.titel} not sent: ${k.besked.slice(0, 200)}`);
+    }
+    k.tid = Date.now();
+    k.varighed = k.tid - start;
+    this.koeFremdrift = null;
+    this.broadcast('changed');
+    this._koeMeld();
   }
 
   // Et tjek der har fundet en forskel mellem shoppen og det format vi
@@ -1184,6 +1309,10 @@ export class AppSession {
       return res.canceled || !res.filePaths.length ? null : res.filePaths[0];
     });
     handle('shop:status', () => this.shopStatus());
+    handle('shop:koe', () => this.koeTilstand());
+    handle('shop:koeTilfoej', ({ imageIds, kobl = null }) => this.koeTilfoej(imageIds, { kobl }));
+    handle('shop:koeFjern', ({ id }) => this.koeFjern(id));
+    handle('shop:koeRyd', () => this.koeRyd());
     // Statussen i shoppen bestemmer om vaerket staar i fase 5 eller 6, saa
     // listerne hentes igen bagefter.
     handle('shop:send', async ({ imageId, kobl = null }) => {
