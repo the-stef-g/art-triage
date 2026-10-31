@@ -4,7 +4,7 @@ Det der venter. Stef siger "byg", før noget herfra bliver lavet.
 
 ## Venter på "byg"
 
-Intet lige nu.
+- **Fejl: pil op og ned i Print springer hver anden fil over.** Listen i Print er én kolonne, men pilene bruger stadig grid'ets antal kolonner fra den fase, man kom fra (fx 2 fra Product). I Print skal op og ned flytte én linje, som i Crop.
 
 ## Venter på en afklaring
 
