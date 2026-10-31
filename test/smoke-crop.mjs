@@ -195,6 +195,11 @@ try {
   await page.locator('.print-linje:not(.hoved)').first().click();
   await page.waitForSelector('button:has-text("Enlarge in Gigapixel")', { timeout: 10000 });
   await page.waitForSelector('.gigapixel-maal >> text=17717 px', { timeout: 10000 });
+  // Filstoerrelsen staar i listen, og formatknappen vaelger alle i formatet.
+  await page.waitForSelector('.print-linje:not(.hoved) .stoerrelse', { timeout: 10000 });
+  await page.locator('.format-valg button', { hasText: '3:2' }).click();
+  await page.waitForSelector('.print-linje.valgt', { timeout: 5000 });
+  if (!(await page.locator('.format-valg button', { hasText: '1:1' }).isDisabled())) throw new Error('1:1 er ikke graa uden 1:1-beskaeringer');
   if (await page.locator('button', { hasText: 'Make print file' }).count()) {
     throw new Error('Beskaeringen har en printknap foer den er forstoerret');
   }

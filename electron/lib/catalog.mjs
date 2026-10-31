@@ -879,7 +879,7 @@ export class Catalog extends EventEmitter {
         r.forstoerrelse = st && st.size > r.size ? st.rel_path : null;
         // Den nyeste -giga-fil, ogsaa naar den endnu ikke er stoerre (kopien
         // der er sendt til Gigapixel): listen viser dens maal.
-        r.giga_fil = st ? { id: st.id, rel: st.rel_path, mtime: st.mtime } : null;
+        r.giga_fil = st ? { id: st.id, rel: st.rel_path, mtime: st.mtime, size: st.size } : null;
       }
     }
     // Kaeden master -> beskaering -> -giga -> printfil: er et led nyere end

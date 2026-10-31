@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { invoke, thumbUrl } from '../api';
-import { fileName, foraeldetTekster } from '../util';
+import { fileName, foraeldetTekster, formatBytes } from '../util';
 import { gigapixelMaal } from '../printmaal';
 
 const px = (m) => (m ? `${m.bredde} × ${m.hoejde}` : '…');
+// Prodigis graense for en printfil (1 MB = 1.000.000 bytes, som i Finder).
+const MAKS_PRINT = 300 * 1000 * 1000;
+const str = (bytes) => (bytes ? <span className="stoerrelse">{formatBytes(bytes)}</span> : null);
 
 // Fase 4 som en liste: én linje pr. beskaering, med det Gigapixel skal
 // forstoerre til, hvor stor forstoerrelsen er, og om printfilen er lavet.
@@ -95,13 +98,16 @@ export default function PrintList({ rows, selected, active, setSelected, setActi
               </span>
               {r.foraeldet && <span className="foraeldet-tekst">{foraeldetTekster(r.foraeldet)[0]}</span>}
             </span>
-            <span className="tal">{px(krop)}</span>
+            <span className="tal">{px(krop)}{str(r.size)}</span>
             <span className="tal">{maalet ? px(maalet) : '–'}</span>
             <span className={`tal ${!r.giga_fil ? 'mangler' : nok ? 'ok' : stor ? 'halv' : 'mangler'}`}>
               {!r.giga_fil ? 'Not sent' : !stor ? 'Not yet' : `${nok ? '✓' : '○'} ${px(giga)}`}
+              {r.giga_fil && str(r.giga_fil.size)}
             </span>
-            <span className={r.printfil ? 'ok' : 'mangler'}>
-              {r.printfil ? `✓ ${fileName(r.printfil.rel)}` : '○'}
+            <span className={!r.printfil ? 'mangler' : r.printfil.bytes > MAKS_PRINT ? 'for-stor' : 'ok'}>
+              {r.printfil ? `${r.printfil.bytes > MAKS_PRINT ? '✕' : '✓'} ${fileName(r.printfil.rel)}` : '○'}
+              {r.printfil && str(r.printfil.bytes)}
+              {r.printfil && r.printfil.bytes > MAKS_PRINT && <span className="stoerrelse">Over Prodigi&apos;s 300 MB</span>}
             </span>
           </div>
         );

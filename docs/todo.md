@@ -4,9 +4,7 @@ Det der venter. Stef siger "byg", før noget herfra bliver lavet.
 
 ## Venter på "byg"
 
-- **Årstallet fra filens oprettelsesdato, når der ingen EXIF er.** Værker uden kamera (fx Desert Canyon 01.png) har ingen optagedato. Så bruges originalens oprettelsesdato, som Finder viser under "Oprettet". EXIF bruges stadig først, og et årstal skrevet i feltet vinder over begge. Værker uden årstal kigges på igen én gang.
-- **Print: filstørrelserne i listen.** Hver linje viser filstørrelsen (MB som i Finder) ved beskæringen, forstørrelsen og printfilen, ikke kun pixelmålene. Printfilen er rød, hvis den er over Prodigis 300 MB.
-- **Print: fem knapper i højre kolonne lige over Enlarge in Gigapixel, 1:1, 2:3, 3:2, 1:2 og 2:1,** der vælger alle linjer med den beskæring, så de kan sendes til Gigapixel på én gang (samme indstilling i Gigapixel). Knappen viser, hvor mange der er, og er grå, når der ingen er.
+Intet lige nu.
 
 ## Venter på en afklaring
 

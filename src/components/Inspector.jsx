@@ -11,7 +11,7 @@ import { gigapixelMaal } from '../printmaal';
 // lige havde skrevet foerst dukkede op hvis man gik væk og tilbage igen.
 export default function Inspector({
   row, fase = 1, selectedCount, activeKeyword, editors, statusNavne = [], series, act, dataRev, tekstRev = 0, hasKey, shop, onShop, onError,
-  shopNode = null, cropNode = null,
+  shopNode = null, cropNode = null, formatAntal = null, onVaelgFormat = null,
 }) {
   const [versions, setVersions] = useState([]);
   const [keywords, setKeywords] = useState([]);
@@ -404,6 +404,15 @@ export default function Inspector({
               ? `${row.forstoerrelse.split('/').pop()} in Edits.`
               : 'Not enlarged yet. Send the crop to Gigapixel; the copy goes in Edits with -giga in its name. Save the enlargement over it, and the app makes the print file.'}
           </p>
+          {formatAntal && (
+            <div className="knapraekke format-valg" title="Select every crop in this format, to send them to Gigapixel with the same setting">
+              {formatAntal.map(([f, n]) => (
+                <button key={f} className="lille" disabled={!n} onClick={() => onVaelgFormat?.(f)}>
+                  {f}{n ? <span className="antal"> {n}</span> : null}
+                </button>
+              ))}
+            </div>
+          )}
           <div className="knapraekke">
             <button
               className="primaer"
@@ -427,7 +436,7 @@ export default function Inspector({
               ? `${row.printfil.rel.split('/').pop()} · ${formatBytes(row.printfil.bytes)}`
               : 'Made by itself when the enlargement is saved.'}
           </p>
-          <p className="tom">A PNG in sRGB at full size, marked 300 DPI, in the work&apos;s Print files folder, made from the largest -giga file. The format is always in its name (Desert 3-2.png), and the file is exactly that format. Prodigi&apos;s ICC profiles are for proofing and are not put in the file.</p>
+          <p className="tom">A JPEG at quality 95 in sRGB at full size, marked 300 DPI, in the work&apos;s Print files folder, made from the largest -giga file, and under Prodigi&apos;s 300 MB. The format is always in its name (Desert 3-2.jpg), and the file is exactly that format. Prodigi&apos;s ICC profiles are for proofing and are not put in the file.</p>
           <div className="knapraekke">
             {row.forstoerrelse && (
               <button

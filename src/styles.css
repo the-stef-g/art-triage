@@ -867,3 +867,9 @@ button.fare { background: var(--kasseret); border-color: var(--kasseret); color:
   cursor: pointer;
 }
 .stak-pil:hover { background: var(--accent); }
+
+/* Print: filstoerrelsen under maalene, og en printfil der er for stor. */
+.print-linje .stoerrelse { display: block; font-size: 11px; color: var(--tekst-svag); }
+.print-linje .for-stor { color: var(--kasseret); }
+.print-linje .for-stor .stoerrelse { color: var(--kasseret); }
+.format-valg .antal { color: var(--tekst-svag); font-size: 11px; }

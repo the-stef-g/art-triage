@@ -2,7 +2,7 @@
 // med det der ellers gaar stille galt: standardvaerdier der skal regnes
 // ud, felter der skal afvises, og at alt overlever en genscanning.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, mkdirSync, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { openDatabase } from '../electron/lib/db.mjs';
@@ -95,10 +95,12 @@ describe('standardvaerdier', () => {
     expect(works.get(id).effective.year).toBe(2019);
   });
 
-  it('giver intet aar naar filen ingen EXIF har', () => {
+  it('uden EXIF bruges filens oprettelsesdato, som Finder viser under Oprettet', () => {
     skriv('uden.png');
     catalog.sync();
-    expect(works.get(imageIdFor('uden.png')).effective.year).toBeNull();
+    const oprettet = statSync(join(root, 'uden.png')).birthtimeMs;
+    const forventet = oprettet > 0 ? new Date(oprettet).getFullYear() : null;
+    expect(works.get(imageIdFor('uden.png')).effective.year).toBe(forventet);
   });
 });
 

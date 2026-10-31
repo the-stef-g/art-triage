@@ -11,6 +11,7 @@ import CropStrip from './components/CropStrip';
 import PrintList from './components/PrintList';
 import { PreviewOverlay, NameModal } from './components/Overlay';
 import { FASEFARVE } from './faser';
+import { formatBytes } from './util';
 
 // Fasen huskes, saa appen aabner hvor man slap.
 const gemtFase = () => {
@@ -22,6 +23,8 @@ const defaultFilter = {
   kunKandidater: false, serieId: null, keyword: null, sort: 'navn', fase: 1,
 };
 const startFilter = () => ({ ...defaultFilter, fase: gemtFase() });
+
+const FORMAT_ORDEN = ['1:1', '2:3', '3:2', '1:2', '2:1'];
 
 // Crop: stakkene der er lukket (vaerkernes image_id), husket mellem
 // sessionerne. Uden adgang til localStorage er alle aabne.
@@ -558,7 +561,7 @@ export default function App() {
       setFejl(`Making ${valgte.length} print file${valgte.length === 1 ? '' : 's'} …`);
       try {
         const res = await invoke('print:make', { versionIds: valgte });
-        const mb = res.reduce((sum, r) => sum + r.bytes, 0) / 1e6;
+        const bytes = res.reduce((sum, r) => sum + r.bytes, 0);
         // Det skal ikke kunne overses, hvis en printfil ikke er lavet af en
         // forstoerrelse.
         const ikke = res.filter((r) => !r.forstoerret);
@@ -566,8 +569,8 @@ export default function App() {
           ? ` Not larger than the crop, so not enlarged yet: ${ikke.map((r) => r.rel.split('/').pop()).join(', ')}.`
           : '';
         setFejl((res.length === 1
-          ? `Print file saved as ${res[0].rel} (${res[0].bredde} × ${res[0].hoejde} px, ${mb.toFixed(1)} MB)`
-          : `${res.length} print files saved in Print files (${mb.toFixed(1)} MB in all)`) + advarsel);
+          ? `Print file saved as ${res[0].rel} (${res[0].bredde} × ${res[0].hoejde} px, ${formatBytes(bytes)})`
+          : `${res.length} print files saved in Print files (${formatBytes(bytes)} in all)`) + advarsel);
         setTimeout(() => setFejl(null), ikke.length ? 10000 : 7000);
       } catch (err) { visFejl(err); }
     },
@@ -1010,6 +1013,16 @@ export default function App() {
           onError={visFejl}
           shopNode={produktLayout ? shopNode : null}
           cropNode={cropLayout ? cropNode : null}
+          formatAntal={filter.fase === 4 ? FORMAT_ORDEN.map((f) => [f, rows.filter((r) => r.crop === f).length]) : null}
+          onVaelgFormat={(f) => {
+            // Print: alle beskaeringer i formatet, saa de kan sendes til
+            // Gigapixel paa én gang med samme indstilling.
+            const ids = rows.filter((r) => r.crop === f).map((r) => r.version_id);
+            if (!ids.length) return;
+            ankerRef.current = rows.findIndex((r) => r.version_id === ids[0]);
+            setSelected(ids);
+            setActive(ids[0]);
+          }}
         />
         {cropLayout && <div className="crop-midte" ref={setCropNode} />}
         {/* Product og Shop: teksterne i midten, og her til hoejre billedet,
