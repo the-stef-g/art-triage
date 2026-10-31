@@ -3,7 +3,19 @@
 // i kataloget, saa det overlever genstart og genscanning.
 import { basename } from 'node:path';
 import { stemOf, beskaeringFraSti } from './util.mjs';
+import { statSync } from 'node:fs';
 import { exifYear } from './exif.mjs';
+
+// Aaret filen blev oprettet (birthtime), eller null hvor filsystemet ikke
+// kender den (saa er den 0 eller mangler).
+function oprettetAar(abs) {
+  try {
+    const ms = statSync(abs).birthtimeMs;
+    return ms > 0 ? new Date(ms).getFullYear() : null;
+  } catch {
+    return null;
+  }
+}
 
 export const CATEGORIES = ['Graphic Design', 'Photography', 'Paintings', 'Sculptures'];
 // Unikke vaerker: ét eksemplar, mål og én pris. Resten sælges som print.
@@ -110,6 +122,8 @@ export class Works {
 
   // Raekken oprettes foerste gang. EXIF-aaret slaas op én gang og husker,
   // at der er kigget, saa et eksternt drev ikke skal laeses ved hver visning.
+  // Uden EXIF (et vaerk uden kamera, fx en PNG) bruges originalens
+  // oprettelsesdato, den Finder viser under "Oprettet".
   _ensure(img) {
     let row = this.db.get('SELECT * FROM works WHERE image_id=?', img.id);
     if (!row) {
@@ -119,7 +133,8 @@ export class Works {
     if (!row.exif_checked) {
       const file = this.catalog.getFile(img.file_id);
       if (file?.present) {
-        const year = exifYear(this.catalog.abs(file.rel_path));
+        const abs = this.catalog.abs(file.rel_path);
+        const year = exifYear(abs) ?? oprettetAar(abs);
         this.db.run('UPDATE works SET exif_year=?, exif_checked=1 WHERE image_id=?', year, img.id);
         row = { ...row, exif_year: year, exif_checked: 1 };
       }

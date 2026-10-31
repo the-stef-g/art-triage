@@ -4,7 +4,7 @@ Det der venter. Stef siger "byg", før noget herfra bliver lavet.
 
 ## Venter på "byg"
 
-Intet lige nu.
+- **Årstallet fra filens oprettelsesdato, når der ingen EXIF er.** Værker uden kamera (fx Desert Canyon 01.png) har ingen optagedato. Så bruges originalens oprettelsesdato, som Finder viser under "Oprettet". EXIF bruges stadig først, og et årstal skrevet i feltet vinder over begge. Værker uden årstal kigges på igen én gang.
 
 ## Venter på en afklaring
 

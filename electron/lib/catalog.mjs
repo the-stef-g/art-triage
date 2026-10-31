@@ -204,6 +204,11 @@ export class Catalog extends EventEmitter {
       );
     });
     // Aaret blev ikke fundet i store TIFF'er; de vaerker uden aar kigges paa igen.
+    // Uden EXIF bruges nu filens oprettelsesdato; de uden aar kigges paa igen.
+    engang('oprettetAar', () => {
+      if (!this.db.all('PRAGMA table_info(works)').length) return;
+      this.db.run('UPDATE works SET exif_checked=0 WHERE exif_year IS NULL');
+    });
     engang('exifTiffIgen', () => {
       if (!this.db.all('PRAGMA table_info(works)').length) return;
       this.db.run('UPDATE works SET exif_checked=0 WHERE exif_year IS NULL');
