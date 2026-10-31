@@ -624,8 +624,10 @@ button.stor {
 .crop-format.findes.foraeldet > button:first-child:disabled { color: var(--kasseret); border-color: var(--kasseret); }
 .crop-minus {
   position: absolute;
-  top: -7px;
-  right: -7px;
+  /* Midten af cirklen ligger praecis paa knappens oeverste hoejre hjoerne. */
+  top: 0;
+  right: 0;
+  transform: translate(50%, -50%);
   width: 16px;
   height: 16px;
   min-width: 0;
@@ -633,11 +635,20 @@ button.stor {
   border-radius: 50%;
   border: none;
   background: #808080;
-  color: #fff;
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 16px;
-  text-align: center;
+  font-size: 0;
+}
+/* Minusset er en streg midt i cirklen, ikke et tegn, saa det ikke flytter
+   sig med skrifttypens linjehoejde. */
+.crop-minus::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 8px;
+  height: 2px;
+  border-radius: 1px;
+  background: #fff;
+  transform: translate(-50%, -50%);
 }
 .crop-minus:hover { background: #c0392b; }
 /* Uden for rammen er markoeren en drejepil, som i Photoshop. */
@@ -828,3 +839,31 @@ button.fare { background: var(--kasseret); border-color: var(--kasseret); color:
 .crop-visning-hjaelp { margin: 6px 0 0; }
 .badge.beskaering.foraeldet { background: var(--kasseret); color: #fff; }
 .crop-strip .crop-film { width: 128px; }
+
+/* Print: tallet til Gigapixel kan klikkes og kopieres. */
+.gigapixel-maal .kopier-tal { all: unset; cursor: pointer; font-weight: 700; color: var(--accent); border-bottom: 1px dashed currentColor; }
+.gigapixel-maal .kopier-tal:hover { opacity: 0.8; }
+.gigapixel-maal .kopieret { color: var(--godkendt); font-size: 12px; }
+
+/* Crop: en stak er masteren og dens beskaeringer. Aaben har den en ramme
+   og en lysere bund, saa det kan ses, hvilke der hoerer sammen. */
+.crop-strip { gap: 8px; }
+.stak { display: flex; gap: 4px; flex: none; border-radius: 6px; padding: 2px; border: 1px solid transparent; }
+.stak.aaben { border-color: var(--kant); background: var(--bg-hover); }
+.stak-formater { position: absolute; top: 2px; right: 2px; display: flex; gap: 2px; }
+.stak-formater .film-maerke { position: static; }
+.stak-pil {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 15px;
+  line-height: 18px;
+  text-align: center;
+  cursor: pointer;
+}
+.stak-pil:hover { background: var(--accent); }

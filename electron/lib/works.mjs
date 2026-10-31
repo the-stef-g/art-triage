@@ -226,6 +226,11 @@ export class Works {
       unique: UNIQUE_CATEGORIES.has(row.category),
       eligible: this.isEligible(imageId),
       editedTexts: editedTexts(row, generated),
+      // Den serie teksterne blev skrevet til ('' uden serie, null for tekster
+      // skrevet foer det blev husket), og om beskrivelsen mangler serien.
+      textsSeries: generated._serie ?? null,
+      serieIkkeITekst: Boolean(img.series_name && row.description
+        && !row.description.toLowerCase().includes(img.series_name.toLowerCase())),
     };
   }
 
@@ -346,12 +351,28 @@ export class Works {
       params.push(clean);
     }
     if (!sets.length) return this.get(imageId);
+    // Serien teksterne er skrevet til, saa de kan skrives om, naar den skifter.
+    generated._serie = img.series_name || '';
     const old = parseGenerated(this.db.get('SELECT generated FROM works WHERE image_id=?', imageId).generated);
     this.db.run(
       `UPDATE works SET ${sets.join(', ')}, generated=?, updated_at=? WHERE image_id=?`,
       ...params, JSON.stringify({ ...old, ...generated }), this.catalog.now(), imageId
     );
     return this.get(imageId);
+  }
+
+  // Vaerker i en serie, hvis tekster er skrevet af Claude til en anden serie
+  // (eller foer serien blev husket) og ikke rettet af Stef: de skal skrives
+  // om, saa serien kommer med.
+  tekstUdenSerie() {
+    const ids = this.db.all(
+      `SELECT i.id FROM images i JOIN works w ON w.image_id = i.id
+       WHERE i.series_id IS NOT NULL AND w.description IS NOT NULL AND w.description != ''`
+    ).map((r) => r.id);
+    return ids.filter((id) => {
+      const w = this.get(id);
+      return w.eligible && !w.editedTexts.length && w.textsSeries !== w.seriesName;
+    });
   }
 
   // Woo-produktets id gemmes, saa der aldrig laves dubletter.

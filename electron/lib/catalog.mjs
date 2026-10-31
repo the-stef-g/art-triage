@@ -186,6 +186,12 @@ export class Catalog extends EventEmitter {
 
   // Skemamigreringer for biblioteker oprettet med aeldre versioner.
   _migrate() {
+    // Retningsordene (horizontal, vertical, square) satte appen selv. De
+    // bruges ikke mere, for kunden filtrerer paa Format; de automatiske
+    // fjernes, Stefs egne bliver.
+    if (this.db.all('PRAGMA table_info(keywords)').length) {
+      this.db.run("DELETE FROM keywords WHERE manual=0 AND word IN ('horizontal', 'vertical', 'square')");
+    }
     const kolonner = this.db.all('PRAGMA table_info(keywords)').map((k) => k.name);
     if (!kolonner.includes('manual')) {
       this.db.exec('ALTER TABLE keywords ADD COLUMN manual INTEGER NOT NULL DEFAULT 0');

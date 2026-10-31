@@ -334,6 +334,35 @@ describe('serier og print af sig selv', () => {
     expect(serie('Sand 3')).toBe('Sand');
   });
 
+  it('vaerker hvis tekster ikke er skrevet til deres serie, skal skrives om; rettede ikke', () => {
+    for (const n of ['Sol 1', 'Sol 2']) {
+      skriv(`Import/Ahl/${n}.tif`, n);
+    }
+    catalog.sync();
+    for (const n of ['Sol 1', 'Sol 2']) {
+      catalog.setRating([raekke(`Import/Ahl/${n}.tif`).version_id], 'godkendt');
+      skriv(`Approved/${n}/Master/${n}.tif`, `m${n}`);
+    }
+    catalog.sync();
+    const works = new Works(catalog);
+    const a = raekke('Approved/Sol 1/Original/Sol 1.tif').image_id;
+    const b = raekke('Approved/Sol 2/Original/Sol 2.tif').image_id;
+    // Teksterne skrevet foer serien fandtes.
+    works.saveGeneratedTexts(a, { description: 'Warm light.', short_text: 'Light.', alt_text: 'A sun.' });
+    works.saveGeneratedTexts(b, { description: 'Warm light.', short_text: 'Light.', alt_text: 'A sun.' });
+    expect(works.get(a).textsSeries).toBe('');
+    works.autoSerier();
+    // Stef har rettet i b: den skrives ikke om, men faar en note.
+    works.save(b, { description: 'My own words.' });
+    expect(works.tekstUdenSerie()).toEqual([a]);
+    expect(works.get(b).serieIkkeITekst).toBe(true);
+    // Skrevet om til serien: ikke mere.
+    works.saveGeneratedTexts(a, { description: 'Warm light, part of the series Sol.' });
+    expect(works.get(a).textsSeries).toBe('Sol');
+    expect(works.get(a).serieIkkeITekst).toBe(false);
+    expect(works.tekstUdenSerie()).toEqual([]);
+  });
+
   it('alle vaerker saelges som print, undtagen malerier og skulpturer', () => {
     catalog.setRating([raekke('Import/Ahl/x.cr2').version_id], 'godkendt');
     skriv('Approved/x/Master/x.tif', 'm');

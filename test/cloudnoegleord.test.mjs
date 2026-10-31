@@ -13,7 +13,7 @@ import { openDatabase } from '../electron/lib/db.mjs';
 import { Catalog } from '../electron/lib/catalog.mjs';
 import {
   buildRequest, parseKeywords, costOf, mediaTypeFor, KeywordRunner, vocabularyBlock,
-  SYSTEM_PROMPT, KEYWORD_MODELS, DEFAULT_KEYWORD_MODEL, MAX_KEYWORDS, retning,
+  SYSTEM_PROMPT, KEYWORD_MODELS, DEFAULT_KEYWORD_MODEL, MAX_KEYWORDS,
 } from '../electron/lib/keywords.mjs';
 
 let root;
@@ -356,13 +356,6 @@ describe('koeren', () => {
 });
 
 describe('soegeord til kunderne', () => {
-  it('retningen maales: horizontal, vertical eller square', () => {
-    expect(retning(300, 200)).toBe('horizontal');
-    expect(retning(200, 300)).toBe('vertical');
-    expect(retning(200, 205)).toBe('square');
-    expect(retning(0, 10)).toBe(null);
-  });
-
   it('beder om motiv, aarstid og farver, ikke detaljer, og aldrig retningen', () => {
     expect(SYSTEM_PROMPT).toMatch(/customer/);
     expect(SYSTEM_PROMPT).toMatch(/spring, summer, autumn or winter/);
@@ -370,12 +363,12 @@ describe('soegeord til kunderne', () => {
     expect(SYSTEM_PROMPT).toMatch(/Never horizontal, vertical, square/);
   });
 
-  it('tager retningsord ud af svaret; dem laegger appen selv paa', () => {
+  it('tager retningsord ud af svaret; kunden filtrerer paa Format', () => {
     const svar = { content: [{ type: 'text', text: JSON.stringify({ keywords: ['beach', 'vertical', 'blue'] }) }] };
     expect(parseKeywords(svar).map((k) => k.word)).toEqual(['beach', 'blue']);
   });
 
-  it('koeren laegger den maalte retning paa ordene', async () => {
+  it('koeren laegger ingen retning paa ordene', async () => {
     const sharp = (await import('sharp')).default;
     const thumb = join(root, 'thumb.png');
     await sharp({ create: { width: 60, height: 40, channels: 3, background: '#00f' } }).png().toFile(thumb);
@@ -384,6 +377,14 @@ describe('soegeord til kunderne', () => {
     runner.start();
     await faerdig(runner);
     const fil = versionFor('godkendt.png');
-    expect(catalog.keywordsForFile(fil.file_id).map((k) => k.word)).toEqual(['beach', 'horizontal']);
+    expect(catalog.keywordsForFile(fil.file_id).map((k) => k.word)).toEqual(['beach']);
+  });
+
+  it('de automatiske retningsord fjernes, naar kataloget aabnes; Stefs egne bliver', () => {
+    const fil = versionFor('godkendt.png');
+    catalog.saveKeywords(fil.file_id, [{ word: 'square', score: 100 }, { word: 'desert', score: 90 }]);
+    catalog.db.run("INSERT OR REPLACE INTO keywords(file_id, word, score, manual) VALUES(?, 'vertical', 100, 1)", fil.file_id);
+    catalog._migrate();
+    expect(catalog.keywordsForFile(fil.file_id).map((k) => k.word).sort()).toEqual(['desert', 'vertical']);
   });
 });

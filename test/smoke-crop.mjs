@@ -125,6 +125,17 @@ try {
   // Tilbage paa masteren kan der beskaeres igen.
   await page.locator('.crop-strip .master-film').first().click();
   await page.waitForSelector('button:has-text("Save crop")', { timeout: 10000 });
+  // Masteren viser sine formater, og S lukker og aabner stakken.
+  await page.waitForSelector('.crop-strip .master-film .stak-formater >> text=1:1', { timeout: 10000 });
+  const antalFilm = () => page.locator('.crop-strip .film-billede').count();
+  await page.locator('.crop-strip').click({ position: { x: 2, y: 2 } }).catch(() => {});
+  await page.keyboard.press('s');
+  await page.waitForFunction(() => document.querySelectorAll('.crop-strip .film-billede').length === 1, null, { timeout: 5000 });
+  await page.screenshot({ path: join(projectRoot, 'smoke-crop-stak.png') });
+  await page.keyboard.press('s');
+  await page.waitForFunction(() => document.querySelectorAll('.crop-strip .film-billede').length === 2, null, { timeout: 5000 });
+  if (await antalFilm() !== 2) throw new Error('Stakken aabnede ikke igen');
+  await page.waitForSelector('.crop-strip .stak.aaben', { timeout: 5000 });
   await page.waitForFunction(() => document.querySelector('.crop-flade img')?.naturalWidth > 0, null, { timeout: 10000 });
 
   const filer = readdirSync(join(lib, 'Approved', 'blaa', 'Master'));

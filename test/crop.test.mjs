@@ -1,6 +1,6 @@
 // Beskaering af en masterfil: en ny fil ved siden af, aldrig en overskrivning.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, writeFileSync, rmSync, existsSync, readdirSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, rmSync, existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { cropMaster, tilRaaPixel } from '../electron/lib/crop.mjs';
@@ -115,11 +115,21 @@ describe('beskaering', () => {
 });
 
 describe('beskaering paa macOS bruger sips', () => {
-  // En falsk sips der bare skriver filen, saa kaldene kan ses.
+  // En falsk sips der goer det samme som den rigtige (med sharp), saa
+  // kaldene kan ses, og resultatet kan maales.
   function falsk(kald) {
     return async (cmd, args) => {
       kald.push([cmd, args]);
-      writeFileSync(args[args.indexOf('--out') + 1], 'resultat');
+      const ud = args[args.indexOf('--out') + 1];
+      const ind = args[args.indexOf('--out') - 1];
+      const buf = readFileSync(ind);
+      if (args[0] === '-r') {
+        await sharp(buf).rotate(Number(args[1])).toFile(ud);
+      } else {
+        const [h, w] = [Number(args[1]), Number(args[2])];
+        const [top, left] = [Number(args[4]), Number(args[5])];
+        await sharp(buf).extract({ left, top, width: w, height: h }).toFile(ud);
+      }
     };
   }
 
@@ -152,5 +162,18 @@ describe('beskaering paa macOS bruger sips', () => {
     });
     expect(res.bit8).toBe(true);
     expect((await sharp(res.path).metadata()).width).toBe(200);
+  });
+
+  it('en sips der ikke beskaerer, giver ikke en fil i forkert format', async () => {
+    const fil = await master('H.tif');
+    const res = await cropMaster({
+      kilde: fil, rect: { x: 0, y: 0, w: 0.5, h: 1 }, ratio: '1:1', platform: 'darwin',
+      // Melder at alt gik godt, men kopierer bare masteren.
+      runner: async (cmd, args) => { writeFileSync(args[args.indexOf('--out') + 1], readFileSync(fil)); },
+    });
+    const m = await sharp(res.path).metadata();
+    expect(m.width).toBe(m.height);
+    expect(res.bit8).toBe(true);
+    expect(readdirSync(dir).some((n) => n.includes('.tmp'))).toBe(false);
   });
 });

@@ -61,31 +61,11 @@ export const SYSTEM_PROMPT = [
   'Hard rules:',
   '- Single words only, lowercase, British spelling (colour, grey, harbour).',
   '- No two words that mean the same thing.',
-  '- Never horizontal, vertical, square, landscape format or portrait format: the shop adds',
-  '  the orientation itself.',
+  '- Never horizontal, vertical, square, landscape format or portrait format: the shop lets',
+  '  customers filter on the format.',
   '- Never guess a place name, a person, a date or a technique.',
   '- Say nothing you are not sure of. A wrong word is worse than a missing one.',
 ].join('\n');
-
-async function maalRetning(fil) {
-  try {
-    const sharp = (await import('sharp')).default;
-    const m = await sharp(fil).metadata();
-    const [b, h] = m.orientation >= 5 ? [m.height, m.width] : [m.width, m.height];
-    return retning(b, h);
-  } catch {
-    return null;
-  }
-}
-
-// Retningen maales paa billedet: en flise der er 5 % bredere end hoej er
-// horizontal, og omvendt; ellers square.
-export function retning(bredde, hoejde) {
-  if (!bredde || !hoejde) return null;
-  if (bredde > hoejde * 1.05) return 'horizontal';
-  if (hoejde > bredde * 1.05) return 'vertical';
-  return 'square';
-}
 
 // Katalogets egne ord sendes med, saa den samme ting faar det samme ord
 // hver gang. Uden det bliver det wall paa ét billede og walls paa det
@@ -159,7 +139,7 @@ export const MAX_KEYWORDS = 8;
 
 // Ord der ikke er vaerd at soege paa, og som kun dukker op fordi et
 // flerordssvar blev delt op.
-// Retningsordene laegger appen selv paa, saa de tages ud af svaret.
+// Retningsordene bruges ikke (kunden filtrerer paa Format), saa de tages ud af svaret.
 const STOPORD = new Set([
   'a', 'an', 'and', 'of', 'the', 'with', 'in', 'on', 'at', 'to', 'or', 'is',
   'very', 'some', 'this', 'that', 'it', 'its',
@@ -359,11 +339,9 @@ export class KeywordRunner extends EventEmitter {
       this.setProgress({ phase: 'fejl', fejl: err?.message || 'The connection to Claude failed' });
       return false;
     }
-    // Retningen maales paa forhaandsvisningen, som allerede er drejet som
-    // billedet vises.
+    // Retningen (horizontal, vertical, square) saettes ikke: kunden
+    // filtrerer paa Format i shoppen, og alle vaerker beskaeres.
     const entries = [...res.entries];
-    const r = await maalRetning(thumbPath);
-    if (r) entries.push({ word: r, score: 100 });
     if (entries.length) this.catalog.saveKeywords(file.id, entries);
     this.catalog.markKeywordRun(file.id, this.service.model, entries.length);
     // En serie deler de ord de fleste af dens vaerker har.

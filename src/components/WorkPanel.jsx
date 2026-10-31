@@ -310,6 +310,11 @@ export default function WorkPanel({ row, versions, tekstRev = 0, hasKey, shop, o
         </button>
         {skriveHint && <span className="vaerk-note">{skriveHint}</span>}
       </div>
+      {/* Serien skal staa i teksterne. Uden Stefs rettelser skriver appen dem
+          selv om; ellers siges det her. */}
+      {work.serieIkkeITekst && work.editedTexts.length > 0 && (
+        <p className="vaerk-note">The description does not mention the series «{work.seriesName}». Write texts again to add it, or add it yourself.</p>
+      )}
       {warnings.length > 0 && (
         <ul className="vaerk-advarsler">
           {warnings.map((w) => <li key={w}>{w}</li>)}

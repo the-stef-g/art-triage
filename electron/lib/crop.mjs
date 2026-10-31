@@ -113,6 +113,14 @@ export async function cropMaster({
         rmSync(tmp, { force: true });
         renameSync(tmp2, tmp);
       }
+      // sips kan melde at alt gik godt uden at have beskaaret (en 1:1 blev
+      // gemt i masterens 2:3). Filen skal have praecis de beregnede maal;
+      // ellers laves beskaeringen med sharp nedenfor.
+      const [vb, vh] = r === 90 || r === 270 ? [raa.height, raa.width] : [raa.width, raa.height];
+      const fik = await sharp(tmp, { failOn: 'none' }).metadata();
+      if (fik.width !== vb || fik.height !== vh) {
+        throw new Error(`sips gave ${fik.width} x ${fik.height}, not ${vb} x ${vh}`);
+      }
       renameSync(tmp, ud);
       return { path: ud, bit8: false };
     } catch {

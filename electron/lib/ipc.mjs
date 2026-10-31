@@ -1,6 +1,6 @@
 // Session-laget: ejer det aabne bibliotek (database, katalog, thumbnails,
 // watcher, indeksering) og registrerer alle IPC-handlers som UI'et kalder.
-import { ipcMain, dialog, shell } from 'electron';
+import { ipcMain, dialog, shell, clipboard } from 'electron';
 import { join } from 'node:path';
 import { existsSync, statSync } from 'node:fs';
 import { cropMaster } from './crop.mjs';
@@ -150,6 +150,8 @@ export class AppSession {
         // En serie deler de ord de fleste af dens vaerker har.
         const ord = katalog.synkSerieOrd();
         if (ord) this.log(`series keywords: ${ord} added`);
+        // Teksterne skal naevne serien.
+        this._serieTekster();
       } catch (err) {
         this.log(`auto series failed: ${String(err?.message || err).slice(0, 200)}`);
       }
@@ -488,6 +490,12 @@ export class AppSession {
         this.log(`auto keywords failed: ${String(err?.message || err).slice(0, 200)}`);
       }
       try {
+        // Serien foerst, saa Claude kan naevne den i teksterne.
+        this.requireWorks().autoSerier();
+      } catch (err) {
+        this.log(`auto series failed: ${String(err?.message || err).slice(0, 200)}`);
+      }
+      try {
         const work = this.requireWorks().get(imageId);
         if (!work.eligible || work.description || work.shortText || work.altText) return;
         await this._arbejde('writing texts with Claude', () => this.writeWorkTexts({ imageId }));
@@ -499,6 +507,35 @@ export class AppSession {
         this.broadcast('besked', { tekst: `The texts could not be written: ${String(err?.message || err).slice(0, 160)}` });
       }
     });
+  }
+
+  // Vaerker i en serie, hvis tekster ikke er skrevet til den serie (og som
+  // Stef ikke selv har rettet i), faar teksterne skrevet om, én ad gangen
+  // i samme koe som de nye vaerker. Hvert vaerk proeves én gang pr. session.
+  _serieTekster() {
+    if (!this.settings.data.claudeKey || !this.works) return;
+    this.serieForsoegt = this.serieForsoegt || new Set();
+    let ids;
+    try {
+      ids = this.works.tekstUdenSerie().filter((id) => !this.serieForsoegt.has(id));
+    } catch (err) {
+      this.log(`series texts failed: ${String(err?.message || err).slice(0, 200)}`);
+      return;
+    }
+    for (const imageId of ids) {
+      this.serieForsoegt.add(imageId);
+      this.autoTekstKoe = (this.autoTekstKoe || Promise.resolve()).then(async () => {
+        try {
+          const work = this.requireWorks().get(imageId);
+          if (work.editedTexts.length || !work.seriesName) return;
+          await this._arbejde('writing texts with Claude', () => this.writeWorkTexts({ imageId }));
+          this.log(`texts written again for the series ${work.seriesName}: ${work.effective.title}`);
+          this.broadcast('changed');
+        } catch (err) {
+          this.log(`series texts failed: ${String(err?.message || err).slice(0, 200)}`);
+        }
+      });
+    }
   }
 
   // Bredformat bliver til skabelonen spread, hoejformat og kvadratisk til
@@ -926,6 +963,8 @@ export class AppSession {
       if (!abs) throw new Error('This image has no work folder. Only Approved images do.');
       await shell.openPath(abs);
     });
+    // Kun teksten, fx bredden til Gigapixel, saa den kan saettes ind med Cmd+V.
+    handle('app:copy', ({ text }) => { clipboard.writeText(String(text ?? '')); });
     handle('img:reveal', ({ versionId }) => {
       const p = this.requireCatalog().filePathForVersion(versionId);
       if (p) shell.showItemInFolder(p);
@@ -938,9 +977,14 @@ export class AppSession {
       this.undoMgr.beforeSeries(imageIds);
       catalog.assignSeries(imageIds, seriesId ?? null);
       catalog.synkSerieOrd();
+      this._serieTekster();
     });
     handle('ser:setShop', ({ seriesId, patch }) => this.requireCatalog().setSeriesShop(seriesId, patch));
-    handle('ser:rename', ({ seriesId, name }) => this.requireCatalog().renameSeries(seriesId, name));
+    handle('ser:rename', ({ seriesId, name }) => {
+      const res = this.requireCatalog().renameSeries(seriesId, name);
+      this._serieTekster();
+      return res;
+    });
     handle('ser:delete', ({ seriesId }) => this.requireCatalog().deleteSeries(seriesId));
 
     handle('fold:tree', () => this.requireCatalog().folderTree());

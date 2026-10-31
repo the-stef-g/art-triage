@@ -18,6 +18,8 @@ export default function Inspector({
   const [nytOrd, setNytOrd] = useState('');
   // Beskaeringen der er ved at blive fjernet, med filerne i dens kaede.
   const [slet, setSlet] = useState(null);
+  // Bredden Gigapixel skal forstoerre den aktive beskaering til, i pixels.
+  const [gigaBredde, setGigaBredde] = useState(null);
 
   const loadKeywords = () => {
     if (row) invoke('kw:forFile', { fileId: row.file_id }).then(setKeywords).catch(() => {});
@@ -396,7 +398,7 @@ export default function Inspector({
       {fase === 4 && (
         <>
           <h4>Enlargement</h4>
-          <GigapixelMaal row={row} dataRev={dataRev} />
+          <GigapixelMaal row={row} dataRev={dataRev} onBredde={setGigaBredde} onError={onError} />
           <p className="tom">
             {row.forstoerrelse
               ? `${row.forstoerrelse.split('/').pop()} in Edits.`
@@ -406,7 +408,11 @@ export default function Inspector({
             <button
               className="primaer"
               disabled={!installeret.has('Topaz Gigapixel')}
-              onClick={() => act.sendToEditor('Topaz Gigapixel')}
+              onClick={() => {
+                // Bredden paa udklipsholderen, klar til Cmd+V i Gigapixel.
+                if (gigaBredde) invoke('app:copy', { text: String(gigaBredde) }).catch(() => {});
+                act.sendToEditor('Topaz Gigapixel');
+              }}
               title={installeret.has('Topaz Gigapixel')
                 ? 'Copy the crop (or all the selected crops) to Edits as …-giga, and open the copies in Gigapixel'
                 : 'Topaz Gigapixel was not found in Applications'}
@@ -465,10 +471,12 @@ export default function Inspector({
 
 // Det tal der skal skrives ind i Gigapixel: bredden i pixels, og hvor mange
 // gange beskaeringen skal forstoerres, for det stoerste print ved 300 DPI.
-function GigapixelMaal({ row, dataRev }) {
+function GigapixelMaal({ row, dataRev, onBredde, onError }) {
   const [info, setInfo] = useState(null);
+  const [kopieret, setKopieret] = useState(false);
   useEffect(() => {
     let aktuel = true;
+    setInfo(null);
     invoke('print:maal', { filer: [{ id: row.file_id, mtime: row.mtime }] })
       .then((res) => {
         const token = row.crop ? row.crop.replace(':', '-') : null;
@@ -477,15 +485,22 @@ function GigapixelMaal({ row, dataRev }) {
       .catch(() => {});
     return () => { aktuel = false; };
   }, [row.file_id, row.mtime, dataRev]);
-  if (!info) return null;
-  const maal = gigapixelMaal(row.crop ? row.crop.replace(':', '-') : null, info.cm);
+  const maal = info ? gigapixelMaal(row.crop ? row.crop.replace(':', '-') : null, info.cm) : null;
+  useEffect(() => { onBredde?.(maal ? maal.bredde : null); }, [maal?.bredde]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!maal) {
     return null;
   }
+  const kopier = () => {
+    invoke('app:copy', { text: String(maal.bredde) })
+      .then(() => { setKopieret(true); setTimeout(() => setKopieret(false), 1500); })
+      .catch(onError);
+  };
   const gange = info.krop ? maal.bredde / info.krop.bredde : null;
   return (
     <p className="gigapixel-maal">
-      Set the width to <b>{maal.bredde} px</b> ({maal.bredde} × {maal.hoejde}
+      Set the width to{' '}
+      <button className="kopier-tal" onClick={kopier} title="Copy the number">{maal.bredde}</button>
+      {' '}px{kopieret && <span className="kopieret"> Copied</span>} ({maal.bredde} × {maal.hoejde}
       {gange ? `, ×${gange.toFixed(2)}` : ''}) for the largest print, {info.cm} cm on the long side, at 300 DPI.
     </p>
   );

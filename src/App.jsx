@@ -23,6 +23,24 @@ const defaultFilter = {
 };
 const startFilter = () => ({ ...defaultFilter, fase: gemtFase() });
 
+// Crop: stakkene der er lukket (vaerkernes image_id), husket mellem
+// sessionerne. Uden adgang til localStorage er alle aabne.
+const LUKKEDE_STAKKE = 'cropLukkedeStakke';
+function hentLukkede() {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(LUKKEDE_STAKKE) || '[]'));
+  } catch {
+    return new Set();
+  }
+}
+function gemLukkede(saet) {
+  try {
+    localStorage.setItem(LUKKEDE_STAKKE, JSON.stringify([...saet]));
+  } catch {
+    // ignoreres; stakken er bare aaben naeste gang
+  }
+}
+
 export default function App() {
   const [library, setLibrary] = useState(null);
   const [recent, setRecent] = useState([]);
@@ -97,6 +115,38 @@ export default function App() {
     setTimeout(() => setFejl(null), 6000);
   }, []);
 
+  // Crop: alle raekker (master og beskaeringer) og de lukkede stakke. En
+  // lukket stak viser kun masteren, saa pilene springer beskaeringerne over.
+  const raaCropRef = useRef([]);
+  const lukkedeRef = useRef(hentLukkede());
+  const [lukkede, setLukkede] = useState(lukkedeRef.current);
+  const visCrop = (alle, luk) => alle.filter((r) => !r.crop || !luk.has(r.image_id));
+  // Aabner eller lukker et vaerks stak. Lukkes den, mens en af dens
+  // beskaeringer er valgt, gaar valget til masteren.
+  const skiftStak = (imageId) => {
+    const ny = new Set(lukkedeRef.current);
+    const lukker = !ny.has(imageId);
+    if (lukker) ny.add(imageId); else ny.delete(imageId);
+    lukkedeRef.current = ny;
+    setLukkede(ny);
+    gemLukkede(ny);
+    const vis = visCrop(raaCropRef.current, ny);
+    setRows(vis);
+    const aktiv = raaCropRef.current.find((r) => r.version_id === activeRef.current);
+    if (lukker && aktiv?.crop && aktiv.image_id === imageId) {
+      const master = vis.find((r) => r.image_id === imageId && !r.crop);
+      if (master) {
+        setSelected([master.version_id]);
+        setActive(master.version_id);
+      }
+    } else {
+      const synlige = new Set(vis.map((r) => r.version_id));
+      setSelected((sel) => sel.filter((id) => synlige.has(id)));
+    }
+  };
+  const skiftStakRef = useRef(skiftStak);
+  skiftStakRef.current = skiftStak;
+
   const refreshEn = useCallback(async () => {
     try {
       const res = await invoke('img:list', filterRef.current);
@@ -107,9 +157,9 @@ export default function App() {
       const gammeltIdx = gamleRows.findIndex((r) => r.version_id === activeRef.current);
       // I Print staar forstoerrelserne paa beskaeringens linje, ikke for sig.
       if (filterRef.current.fase === 4) res.rows = res.rows.filter((r) => !r.giga);
-      // I Crop staar hver master i filmstriben med sine beskaeringer lige
-      // efter sig, i formaternes raekkefoelge. Masteren viser, hvor mange den
-      // har, og om en af dem er aeldre end den.
+      // I Crop er hver master en stak med sine beskaeringer lige efter sig,
+      // i formaternes raekkefoelge. Masteren viser formaterne, roede hvis
+      // beskaeringen er aeldre end den.
       if (filterRef.current.fase === 3) {
         const ORDEN = ['1:1', '2:3', '3:2', '1:2', '2:1'];
         const grupper = new Map();
@@ -123,11 +173,19 @@ export default function App() {
         for (const g of grupper.values()) {
           g.crops.sort((x, y) => ORDEN.indexOf(x.crop) - ORDEN.indexOf(y.crop));
           if (g.master) {
-            ud.push({ ...g.master, crops: { antal: g.crops.length, foraeldet: g.crops.some((c) => c.foraeldet) } });
+            ud.push({
+              ...g.master,
+              crops: {
+                antal: g.crops.length,
+                foraeldet: g.crops.some((c) => c.foraeldet),
+                formater: g.crops.map((c) => ({ format: c.crop, foraeldet: Boolean(c.foraeldet) })),
+              },
+            });
           }
           ud.push(...g.crops);
         }
-        res.rows = ud;
+        raaCropRef.current = ud;
+        res.rows = visCrop(ud, lukkedeRef.current);
       }
       setRows(res.rows);
       setCounts(res.counts);
@@ -785,6 +843,10 @@ export default function App() {
           else if (fase === 2) act.discardWork();
           break;
         case 'u': if (fase === 1) act.setRating('ubedomt'); break;
+        // S aabner og lukker stakken i Crop, som i Lightroom.
+        case 's':
+          if (fase === 3 && !e.metaKey && !e.ctrlKey && idx >= 0) skiftStakRef.current(rs[idx].image_id);
+          break;
         // [ og ] er svaere at ramme paa et dansk tastatur, saa L og R gør det samme.
         case '[': case 'l': if (!e.metaKey && !e.ctrlKey) act.rotate(-90); break;
         case ']': case 'r': if (!e.metaKey && !e.ctrlKey) act.rotate(90); break;
@@ -857,6 +919,8 @@ export default function App() {
           {cropLayout ? (
             <CropStrip
               rows={rows}
+              lukkede={lukkede}
+              onStak={skiftStak}
               active={active}
               thumbRev={thumbRev}
               onSelect={(versionId, i) => {
