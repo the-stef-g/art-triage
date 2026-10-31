@@ -4,7 +4,7 @@ Det der venter. Stef siger "byg", før noget herfra bliver lavet.
 
 ## Venter på "byg"
 
-Intet lige nu.
+- **Crop: linjen "Every format is cropped or turned off." fjernes.** Knapperne siger det selv.
 
 ## Venter på en afklaring
 
