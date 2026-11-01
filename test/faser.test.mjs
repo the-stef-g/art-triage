@@ -676,6 +676,8 @@ describe('forfra i Import', () => {
     expect(fase(2)).toEqual(['Approved/Fishy Fish/Edits/Fishy Fish sketch+pencil.psd', 'Approved/Fishy Fish/Original/Fishy Fish.png']);
     expect(raekke('Approved/Fishy Fish/Edits/Fishy Fish sketch+pencil.psd').image_id)
       .toBe(raekke('Approved/Fishy Fish/Original/Fishy Fish.png').image_id);
+    // PSD'en hedder efter sin fil, ikke "Original".
+    expect(raekke('Approved/Fishy Fish/Edits/Fishy Fish sketch+pencil.psd').version_name).toBe('sketch+pencil');
   });
 });
 

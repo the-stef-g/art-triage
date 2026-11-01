@@ -610,6 +610,7 @@ export class Catalog extends EventEmitter {
       }
       if (this._tilknytArbejdsmapper()) changedFileIds.push(-1);
       if (this._importErUbedoemt()) changedFileIds.push(-1);
+      if (this._retVersionsnavne()) changedFileIds.push(-1);
     });
 
     if (changedFileIds.length || missing.length) this.emit('changed');
@@ -721,6 +722,27 @@ export class Catalog extends EventEmitter {
       antal += 1;
     }
     return antal;
+  }
+
+  // En version der engang var et billede for sig (fx en PSD der er flettet
+  // ind i sit vaerk), hedder stadig "Original". Den faar sit navn fra filen:
+  // det der staar efter originalens navn (*sketch+pencil*), ellers hele
+  // filnavnet uden endelse. Returnerer antallet af omdoebte.
+  _retVersionsnavne() {
+    const rows = this.db.all(
+      `SELECT v.id, f.rel_path, mf.rel_path AS master_rel FROM versions v
+       JOIN files f ON f.id = v.file_id
+       JOIN images i ON i.id = v.image_id
+       JOIN files mf ON mf.id = i.master_file_id
+       WHERE v.is_master=0 AND v.name='Original'`
+    );
+    for (const r of rows) {
+      const stem = stemOf(posix.basename(r.rel_path));
+      const mStem = stemOf(posix.basename(r.master_rel));
+      const rest = stem.startsWith(mStem) ? stem.slice(mStem.length).replace(/^[-_. ()]+|[)]+$/g, '') : '';
+      this.db.run('UPDATE versions SET name=? WHERE id=?', rest || stem, r.id);
+    }
+    return rows.length;
   }
 
   // Mappen er sandheden: en fil i Import er ikke bedoemt og har ingen
