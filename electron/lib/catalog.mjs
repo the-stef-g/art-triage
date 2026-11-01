@@ -609,6 +609,7 @@ export class Catalog extends EventEmitter {
         changedFileIds.push(fileId);
       }
       if (this._tilknytArbejdsmapper()) changedFileIds.push(-1);
+      if (this._importErUbedoemt()) changedFileIds.push(-1);
     });
 
     if (changedFileIds.length || missing.length) this.emit('changed');
@@ -718,6 +719,59 @@ export class Catalog extends EventEmitter {
       }
       this._stakSomVersion(maal, f.id);
       antal += 1;
+    }
+    return antal;
+  }
+
+  // Mappen er sandheden: en fil i Import er ikke bedoemt og har ingen
+  // versioner, ogsaa naar den er flyttet tilbage dertil i Finder for at
+  // starte forfra. Bedoemmelsen, Edited, Finished og programmet nulstilles.
+  // En redigering der laa som version af et andet billede, bliver sit eget
+  // billede, og et billede hvis original ligger i Import, slipper sine
+  // versioner: virtuelle kopier og versioner hvis fil er vaek, slettes, og
+  // filer der ligger andre steder, bliver deres egne billeder.
+  // Returnerer antallet af aendrede versioner.
+  _importErUbedoemt() {
+    if (!this.mappestyring || !this.importMappe) return 0;
+    const praefiks = `${this.importMappe}/`;
+    const iImport = (rel) => rel.startsWith(praefiks);
+    let antal = 0;
+    const egetBillede = (versionId, fileId, nulstil) => {
+      const imageId = this.db.run('INSERT INTO images(master_file_id, created_at) VALUES(?,?)', fileId, this.now()).lastInsertRowid;
+      this.db.run("UPDATE versions SET image_id=?, is_master=1, file_id=NULL, name='Original' WHERE id=?", imageId, versionId);
+      if (nulstil) this.db.run("UPDATE versions SET rating='ubedomt', edited=0, finished=0, editor=NULL WHERE id=?", versionId);
+      antal += 1;
+    };
+    // En version med sin egen fil i Import.
+    for (const v of this.db.all(
+      `SELECT v.id, v.file_id, f.rel_path FROM versions v JOIN files f ON f.id = v.file_id
+       WHERE v.is_master=0 AND f.present=1`
+    )) {
+      if (iImport(v.rel_path) && !this.db.get('SELECT id FROM images WHERE master_file_id=?', v.file_id)) {
+        egetBillede(v.id, v.file_id, true);
+      }
+    }
+    // Et billede hvis original ligger i Import.
+    for (const b of this.db.all(
+      'SELECT i.id, f.rel_path FROM images i JOIN files f ON f.id = i.master_file_id WHERE f.present=1'
+    )) {
+      if (!iImport(b.rel_path)) continue;
+      for (const v of this.db.all(
+        `SELECT v.id, v.file_id, f.present, f.rel_path FROM versions v LEFT JOIN files f ON f.id = v.file_id
+         WHERE v.image_id=? AND v.is_master=0`, b.id
+      )) {
+        if (v.file_id && v.present && !this.db.get('SELECT id FROM images WHERE master_file_id=?', v.file_id)) {
+          egetBillede(v.id, v.file_id, iImport(v.rel_path));
+        } else {
+          this.db.run('DELETE FROM versions WHERE id=?', v.id);
+          antal += 1;
+        }
+      }
+      antal += this.db.run(
+        `UPDATE versions SET rating='ubedomt', edited=0, finished=0, editor=NULL
+         WHERE image_id=? AND is_master=1
+           AND (rating != 'ubedomt' OR edited=1 OR finished=1 OR editor IS NOT NULL)`, b.id
+      ).changes;
     }
     return antal;
   }

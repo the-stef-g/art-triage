@@ -4,7 +4,7 @@ Det der venter. Stef siger "byg", før noget herfra bliver lavet.
 
 ## Venter på "byg"
 
-Intet lige nu.
+- **Forfra i Import (klar, testet).** Filer der flyttes tilbage til Import i Finder, er ubedømte igen: bedømmelse, Edited, Finished (det gule F) og program nulstilles, og de er ikke længere versioner af et andet værk. De står i Sort og kan godkendes igen, og så bliver Fishy Fish ét værk med PSD'en i Edits.
 
 ## Venter på en afklaring
 

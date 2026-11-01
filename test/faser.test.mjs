@@ -645,6 +645,40 @@ describe('gamle mappenavne', () => {
   });
 });
 
+describe('forfra i Import', () => {
+  it('filer der flyttes tilbage til Import i Finder, er ubedoemte og hver for sig, og kan godkendes igen', () => {
+    skriv('Import/Fishy/Fishy Fish.png', 'png');
+    utimesSync(join(root, 'Import/Fishy/Fishy Fish.png'), 1.7e9, 1.7e9);
+    skriv('Import/Fishy/Fishy Fish sketch+pencil.psd', 'psd');
+    catalog.sync();
+    catalog.setRating(['Import/Fishy/Fishy Fish.png', 'Import/Fishy/Fishy Fish sketch+pencil.psd'].map((r) => raekke(r).version_id), 'godkendt');
+    catalog.sync();
+    skriv('Approved/Fishy Fish/Masters/Fishy Fish.tif', 'm');
+    catalog.sync();
+    expect(raekke('Approved/Fishy Fish/Original/Fishy Fish.png').finished).toBe(1);
+    // Stef flytter originalen og redigeringen tilbage til Import og sletter
+    // vaerkmappen for at starte forfra.
+    renameSync(join(root, 'Approved/Fishy Fish/Original/Fishy Fish.png'), join(root, 'Import/Fishy Fish.png'));
+    renameSync(join(root, 'Approved/Fishy Fish/Edits/Fishy Fish sketch+pencil.psd'), join(root, 'Import/Fishy Fish sketch+pencil.psd'));
+    rmSync(join(root, 'Approved/Fishy Fish'), { recursive: true, force: true });
+    catalog.sync();
+    const png = raekke('Import/Fishy Fish.png');
+    const psd = raekke('Import/Fishy Fish sketch+pencil.psd');
+    expect([png.rating, psd.rating]).toEqual(['ubedomt', 'ubedomt']);
+    expect([png.finished, png.edited, psd.finished]).toEqual([0, 0, 0]);
+    expect(png.image_id).not.toBe(psd.image_id);
+    expect([png.version_count, psd.version_count]).toEqual([1, 1]);
+    expect(fase(1)).toEqual(expect.arrayContaining(['Import/Fishy Fish.png', 'Import/Fishy Fish sketch+pencil.psd']));
+    expect(fase(2)).toEqual([]);
+    // Og godkendes de igen, er de ét vaerk med PSD'en i Edits.
+    catalog.setRating([psd.version_id, png.version_id], 'godkendt');
+    catalog.sync();
+    expect(fase(2)).toEqual(['Approved/Fishy Fish/Edits/Fishy Fish sketch+pencil.psd', 'Approved/Fishy Fish/Original/Fishy Fish.png']);
+    expect(raekke('Approved/Fishy Fish/Edits/Fishy Fish sketch+pencil.psd').image_id)
+      .toBe(raekke('Approved/Fishy Fish/Original/Fishy Fish.png').image_id);
+  });
+});
+
 describe('skanning mens appen flytter en fil', () => {
   it('en fil der flyttes af en bedoemmelse midt i en skanning, forsvinder ikke', () => {
     skriv('Import/Serie/a.jpg', 'a');
