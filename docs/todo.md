@@ -4,7 +4,8 @@ Det der venter. Stef siger "byg", før noget herfra bliver lavet.
 
 ## Venter på "byg"
 
-Intet lige nu.
+- **Product: hele beskrivelsen kan ses.** Feltet Description vokser med teksten, så hele teksten står fremme uden at rulle (som seriens intro).
+- **Product: Section colour viser farven.** Et lille felt med farven ved siden af koden (#1b3a4b), og et klik på det åbner en farvevælger.
 
 ## Venter på en afklaring
 
