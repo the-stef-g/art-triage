@@ -950,3 +950,26 @@ textarea.serie-intro { field-sizing: content; min-height: 4lh; resize: vertical;
 .shop-fremdrift .koe-bjaelke { margin-bottom: 4px; }
 .shop-fremdrift p { margin: 0; }
 .shop-fremdrift > button { margin-top: 4px; }
+
+/* Product: beskrivelsen vokser med teksten, saa hele teksten staar fremme. */
+textarea.vaerk-beskrivelse { field-sizing: content; min-height: 7lh; resize: vertical; }
+
+/* Section colour: farven selv ved siden af koden. */
+.farve-felt { display: flex; align-items: center; gap: 6px; }
+.farve-felt > input:not([type='color']) { flex: 1 1 auto; min-width: 0; width: auto; }
+.farve-felt > input.farve-proeve {
+  flex: 0 0 28px;
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--kant);
+  border-radius: 6px;
+  background: none;
+  cursor: pointer;
+}
+.farve-proeve::-webkit-color-swatch-wrapper { padding: 0; }
+.farve-proeve::-webkit-color-swatch { border: none; border-radius: 5px; }
+.farve-proeve.tom::-webkit-color-swatch {
+  background: repeating-linear-gradient(45deg, var(--bg-aktiv) 0 4px, transparent 4px 8px) !important;
+}

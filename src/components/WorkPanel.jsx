@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { invoke } from '../api';
 import { useKoe, koeTilfoej, vaerkDel, klokken, mb } from '../koe';
+
+const HEX = /^#[0-9a-f]{6}$/i;
 
 const CATEGORIES = ['Graphic Design', 'Photography', 'Paintings', 'Sculptures'];
 
@@ -19,6 +21,8 @@ export default function WorkPanel({ row, versions, tekstRev = 0, hasKey, shop, o
   const [work, setWork] = useState(null);
   const [draft, setDraft] = useState({});
   const [busy, setBusy] = useState(false);
+  // Farvevaelgeren melder hver bevaegelse; der gemmes, naar den staar stille.
+  const farveTimer = useRef(null);
   const [warnings, setWarnings] = useState([]);
   // Vaerket i koeen til shoppen: venter, sendes, sendt, sprunget over
   // eller fejl. Det seneste, hvis det har vaeret der flere gange.
@@ -278,12 +282,28 @@ export default function WorkPanel({ row, versions, tekstRev = 0, hasKey, shop, o
           </select>
         </label>
         <label>Section colour
-          <input
-            value={draft.sectionColour}
-            placeholder="Series colour"
-            onChange={set('sectionColour')}
-            onBlur={blurSave('sectionColour', 'section_colour', work.sectionColour)}
-          />
+          <span className="farve-felt">
+            {/* Farven selv; et klik aabner farvevaelgeren. Uden en gyldig
+                kode staar feltet tomt (stribet). */}
+            <input
+              type="color"
+              className={`farve-proeve ${HEX.test(draft.sectionColour) ? '' : 'tom'}`}
+              value={HEX.test(draft.sectionColour) ? draft.sectionColour.toLowerCase() : '#000000'}
+              title="Choose the colour"
+              onChange={(e) => {
+                const v = e.target.value;
+                setDraft((d) => ({ ...d, sectionColour: v }));
+                clearTimeout(farveTimer.current);
+                farveTimer.current = setTimeout(() => commit({ section_colour: v }), 500);
+              }}
+            />
+            <input
+              value={draft.sectionColour}
+              placeholder="Series colour"
+              onChange={set('sectionColour')}
+              onBlur={blurSave('sectionColour', 'section_colour', work.sectionColour)}
+            />
+          </span>
         </label>
       </div>
       <label>Video
@@ -358,6 +378,7 @@ export default function WorkPanel({ row, versions, tekstRev = 0, hasKey, shop, o
             {work.editedTexts.includes(column) && <span className="vaerk-rettet"> · edited by you</span>}
             <textarea
               rows={rows}
+              className={column === 'description' ? 'vaerk-beskrivelse' : undefined}
               value={draft[key]}
               onChange={set(key)}
               onBlur={blurSave(key, column, work[key])}

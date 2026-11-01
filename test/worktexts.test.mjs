@@ -35,7 +35,8 @@ const gode = {
 describe('instruktionen', () => {
   it('har reglerne fra planen', () => {
     for (const regel of [
-      '80 to 150 words', 'never with "This', 'one sentence', '150 characters',
+      'There is no word count', 'Eye level with the reader', 'No art talk', 'never',
+      'Never open with "This artwork"', 'one sentence', '150 characters',
       'stunning', 'one-of-a-kind', 'perfect', 'em-dash', 'AI', 'Photoshop',
       'Describe only what can be seen', 'rust', 'never translated', 'British English',
     ]) {
@@ -112,7 +113,7 @@ describe('advarsler', () => {
       short_text: 'Perfect gift.',
       alt_text: 'x'.repeat(200),
     }).join(' | ');
-    expect(w).toMatch(/words; it should be 80 to 150/);
+    expect(w).not.toMatch(/words; it should be/);
     expect(w).toMatch(/200 characters/);
     expect(w).toMatch(/"stunning"/);
     expect(w).toMatch(/"unique"/);
@@ -148,6 +149,21 @@ describe('kaldet', () => {
   });
 });
 
+describe('kunstsnak', () => {
+  it('siger fra om ord der siger meget og intet', () => {
+    const w = lintTexts({
+      description: 'The fins echo the background, anchoring the fish and keeping the eye on its colours.',
+      short_text: 'A fish.',
+      alt_text: 'A fish on blue.',
+    }).join(' | ');
+    expect(w).toMatch(/"echo"/);
+    expect(w).toMatch(/"anchoring"/);
+    expect(w).toMatch(/"the eye"/);
+    // En kort tekst er fin: der er ingen ordgraense.
+    expect(lintTexts({ description: 'A fish made of petals.', short_text: 'A fish.', alt_text: 'A fish.' })).toEqual([]);
+  });
+});
+
 describe('serien', () => {
   const vaerker = [
     { titel: 'Desert Canyon 01', beskrivelse: 'Light over the canyon.', farve: '#3b2a20' },
@@ -155,7 +171,8 @@ describe('serien', () => {
   ];
 
   it('beder om en kort intro og en farve, uden noget der skifter fra serie til serie', () => {
-    expect(SERIE_SYSTEM_PROMPT).toMatch(/INTRO: 40 to 80 words/);
+    expect(SERIE_SYSTEM_PROMPT).toMatch(/There is no word count/);
+    expect(SERIE_SYSTEM_PROMPT).not.toMatch(/\d+ to \d+ words/);
     expect(SERIE_SYSTEM_PROMPT).not.toContain('Desert Canyon');
     const brief = serieBrief('Desert Canyon', vaerker);
     expect(brief).toContain('Series: Desert Canyon');

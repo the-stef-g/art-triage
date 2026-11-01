@@ -4,20 +4,7 @@ Det der venter. Stef siger "byg", før noget herfra bliver lavet.
 
 ## Venter på "byg"
 
-- **Product: hele beskrivelsen kan ses.** Feltet Description vokser med teksten, så hele teksten står fremme uden at rulle (som seriens intro).
-- **Teksterne fra Claude skal lyde som Stef, ikke som AI.** I dag beder appen om 80 til 150 ord i beskrivelsen og en afsluttende sætning om "hvor værket hører hjemme", og så bliver det fyld. Nyt:
-  - Ingen ordgrænse. Kun det der giver mening om netop det værk; er der ikke mere at sige, er teksten kort. Advarslen om "80 til 150 ord" fjernes.
-  - I øjenhøjde med læseren: almindelige ord, korte sætninger, som man ville sige det til nogen foran billedet. Ingen kunstsnak ("anchoring", "echoing", "the eye", "invites"), ingen opremsning af farver for opremsningens skyld, ingen sætning om stemning eller hvor værket passer ind.
-  - Ingen fast afslutning og ingen fast åbning.
-  - Stefs egne noter vægtes højest; står der noget dér, bygger teksten på det.
-  - Det samme for seriens intro (i dag 40 til 80 ord).
-  - Gerne et par af Stefs egne tekster som eksempel på hans stemme, så Claude kan ramme tonen. Har Stef dem, lægges de ind som eksempler i instruktionen.
-- **Søgeordene: færre og mere præcise.** Fishy Fish fik fish, animal, blue (godt) og pattern, orange, red, white (forkert). I dag beder appen om 4 til 8 ord og 1 til 3 farver, og "pattern" og "texture" står på listen over motiv-ord. Nyt:
-  - Ingen mindsteantal: hellere tre rigtige ord end seks med fyld.
-  - Farver kun for den farve, der fylder billedet (baggrunden og helheden, her blå), ikke farverne i motivets detaljer (fiskens orange hoved). Som regel én farve, højst to.
-  - pattern betyder et gentaget mønster (det samme element igen og igen over billedet), og kun det. Mange detaljer i et motiv er ikke et pattern. texture og abstract tilsvarende kun, når billedet virkelig er en tekstur eller abstrakt. Definitionerne står i instruktionen til Claude.
-  - Gælder nye søgeord; de eksisterende ord kan skrives igen med Reanalyse.
-- **Product: Section colour viser farven.** Et lille felt med farven ved siden af koden (#1b3a4b), og et klik på det åbner en farvevælger.
+Intet lige nu.
 
 ## Venter på en afklaring
 

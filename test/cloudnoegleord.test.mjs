@@ -204,6 +204,19 @@ describe('svaret', () => {
     expect(ord[0].score).toBeGreaterThan(ord[1].score);
   });
 
+  it('beholder hoejst to farver og ingen mindsteantal', () => {
+    const ord = parseKeywords(svar(['fish', 'animal', 'blue', 'orange', 'red', 'white']));
+    expect(ord.map((k) => k.word)).toEqual(['fish', 'animal', 'blue', 'orange']);
+    expect(parseKeywords(svar(['fish', 'blue'])).map((k) => k.word)).toEqual(['fish', 'blue']);
+  });
+
+  it('instruktionen: pattern er et gentaget moenster, og farven er den der fylder billedet', () => {
+    expect(SYSTEM_PROMPT).toMatch(/pattern only for a repeated pattern/);
+    expect(SYSTEM_PROMPT).toMatch(/Many details in a subject are not a pattern/);
+    expect(SYSTEM_PROMPT).toMatch(/not the colours of details in the subject/);
+    expect(SYSTEM_PROMPT).toMatch(/There is no minimum/);
+  });
+
   it('deler et flerordssvar op i enkeltord', () => {
     // Instruktionen beder om enkeltord, men beder er ikke det samme som
     // faar. Uden opdelingen ender kataloget med blue paint, white paint,

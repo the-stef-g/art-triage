@@ -47,16 +47,22 @@ export const SYSTEM_PROMPT = [
   'in the shop\'s search box when they look for a picture for their wall, so every word must be',
   'one a customer would actually search for.',
   '',
-  'Give 4 to 8 keywords, in this order:',
+  'Give only the keywords that are right, at most 8, in this order. There is no minimum: three',
+  'right words are better than six with filler.',
   '1. The SUBJECT in the broad, everyday words customers search for: landscape, seascape, beach,',
   '   sea, coast, lake, river, forest, tree, flower, garden, field, mountain, desert, sky,',
   '   cloud, sunset, sunrise, night, snow, city, street, town, village, house, architecture,',
   '   church, bridge, harbour, boat, lighthouse, animal, bird, horse, people, portrait,',
-  '   abstract, pattern, texture, and the like. One to three words.',
+  '   and the like. One to three words.',
+  '   Use pattern only for a repeated pattern: the same element again and again across the',
+  '   picture. Many details in a subject are not a pattern. Use texture only when the picture',
+  '   is a texture, and abstract only when there is no recognisable subject.',
   '   Never a detail or a part of the subject: not roof, chimney, window, brick, wall, door,',
   '   tile or branch, unless it really is the whole subject of the picture.',
   '2. The SEASON, only when it is clearly visible: spring, summer, autumn or winter.',
-  '3. The DOMINANT COLOURS: one to three, chosen only from this list: ' + FARVER.join(', ') + '.',
+  '3. The DOMINANT COLOUR: the colour that fills the picture, the background and the whole,',
+  '   not the colours of details in the subject. Usually one, at most two, chosen only from',
+  '   this list: ' + FARVER.join(', ') + '.',
   '',
   'Hard rules:',
   '- Single words only, lowercase, British spelling (colour, grey, harbour).',
@@ -177,9 +183,13 @@ export function parseKeywords(message, { max = MAX_KEYWORDS } = {}) {
   if (!Array.isArray(raa)) return [];
   const set = new Set();
   const ud = [];
+  // Hoejst to farver: den der fylder billedet, ikke detaljernes farver.
+  const farver = new Set(FARVER);
+  let antalFarver = 0;
   for (const post of raa) {
     for (const ord of splitOrd(post)) {
       if (set.has(ord)) continue;
+      if (farver.has(ord) && ++antalFarver > 2) continue;
       set.add(ord);
       ud.push({ word: ord, score: 900 - ud.length });
       if (ud.length >= max) return ud;

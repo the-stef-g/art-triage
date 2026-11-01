@@ -12,14 +12,25 @@ export const TEXT_IMAGE_SIZE = 1024;
 // titel, serie eller noter i den: de skifter fra vaerk til vaerk og
 // ville aflyse cachen, saa de sendes i brugerbeskeden.
 export const TEXT_SYSTEM_PROMPT = [
-  'You write the texts for one artwork in an artist\'s own webshop. The artist will read and',
-  'correct your drafts, so write plainly and do not decorate. Use British English.',
+  'You write the texts for one artwork in an artist\'s own webshop, as the artist would say them',
+  'to someone standing in front of the picture. Use British English.',
+  '',
+  'How to write:',
+  '- Eye level with the reader. Everyday words and short sentences. Say what is there and what is',
+  '  worth noticing, and stop. Write only what means something about this particular work.',
+  '- There is no word count. If there is little to say, the text is short. Two good sentences',
+  '  beat a paragraph of filler.',
+  '- No art talk. Never words like "anchoring", "echoing", "invites", "evokes", "the eye",',
+  '  "interplay", "juxtaposition", "a sense of", "a celebration of", "speaks to", "draws you in".',
+  '- Do not list colours for the sake of it. Name a colour only when it matters.',
+  '- No fixed opening and no fixed ending. Never open with "This artwork" or similar, and never',
+  '  end with a sentence about the mood, the room or where the work belongs.',
+  '- The artist\'s own notes come first. When they are given, build the text on them and keep',
+  '  their meaning; do not add what they do not say.',
   '',
   'Return three texts:',
   '',
-  'DESCRIPTION: 80 to 150 words. Open with the experience of the work, never with "This',
-  'artwork" or similar. Cover subject, colours and composition, and weave in the artist\'s own',
-  'notes where they are given. End with one calm sentence about where the work belongs.',
+  'DESCRIPTION: the text on the product page, written as above.',
   '',
   'SHORT TEXT: one sentence, for a card or for sharing.',
   '',
@@ -123,6 +134,10 @@ export function parseTexts(message) {
 const FORBUDTE = [
   /\bstunning\b/i, /\bunique\b/i, /\bone[- ]of[- ]a[- ]kind\b/i, /\bperfect gift\b/i,
   /\bAI\b/, /\bartificial intelligence\b/i, /\bphotoshop\b/i, /\bgenerated\b/i,
+  // Kunstsnak, der siger meget og intet.
+  /\banchor(?:s|ing|ed)?\b/i, /\becho(?:es|ing|ed)?\b/i, /\binvites?\b/i, /\bevok(?:es|ing|ed?)\b/i,
+  /\bthe eye\b/i, /\binterplay\b/i, /\bjuxtaposition\b/i, /\ba sense of\b/i,
+  /\ba celebration of\b/i, /\bspeaks to\b/i, /\bdraws you in\b/i,
 ];
 
 // Advarsler til Stef, ikke afvisninger: teksten gemmes alligevel, for den
@@ -130,10 +145,6 @@ const FORBUDTE = [
 // til at overse.
 export function lintTexts(texts) {
   const advarsler = [];
-  const ord = (texts.description || '').split(/\s+/).filter(Boolean).length;
-  if (ord && (ord < 80 || ord > 150)) {
-    advarsler.push(`The description is ${ord} words; it should be 80 to 150`);
-  }
   if ((texts.alt_text || '').length > 160) {
     advarsler.push(`The alt text is ${texts.alt_text.length} characters; it should be about 150 at most`);
   }
@@ -207,8 +218,11 @@ export const SERIE_SYSTEM_PROMPT = [
   'You write the introduction for a series of artworks in an artist\'s own webshop. The artist',
   'will read and correct your draft, so write plainly and do not decorate. Use British English.',
   '',
-  'INTRO: 40 to 80 words about what the works in the series share: the place, the light, the',
-  'mood or the subject. Name the series exactly as given. Do not list the works one by one.',
+  'INTRO: what the works in the series share: the place, the light or the subject. Name the',
+  'series exactly as given. Do not list the works one by one. There is no word count: write',
+  'only what means something, at eye level with the reader, in everyday words and short',
+  'sentences, as the artist would say it. No art talk ("echoing", "invites", "a sense of") and',
+  'no closing sentence about the mood.',
   '',
   'COLOUR: one colour as a hex code (#rrggbb) for the series on the website. It must sit well',
   'with the section colours of the works and set the series off; do not simply repeat one of them.',
