@@ -4,7 +4,7 @@ Det der venter. Stef siger "byg", før noget herfra bliver lavet.
 
 ## Venter på "byg"
 
-- **Versionens navn efter en fletning (klar, testet).** En fil der engang var et billede for sig og er flettet ind i et værk (PSD'en i Fishy Fish), hed stadig "Original" og fik den lilla Original-label i Edit. Nu får den navn efter filen (*sketch+pencil*), også dem der allerede hedder forkert.
+Intet lige nu.
 
 ## Venter på en afklaring
 
