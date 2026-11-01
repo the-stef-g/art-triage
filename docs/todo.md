@@ -15,7 +15,7 @@ Det der venter. Stef siger "byg", før noget herfra bliver lavet.
 - **Søgeordene: færre og mere præcise.** Fishy Fish fik fish, animal, blue (godt) og pattern, orange, red, white (forkert). I dag beder appen om 4 til 8 ord og 1 til 3 farver, og "pattern" og "texture" står på listen over motiv-ord. Nyt:
   - Ingen mindsteantal: hellere tre rigtige ord end seks med fyld.
   - Farver kun for den farve, der fylder billedet (baggrunden og helheden, her blå), ikke farverne i motivets detaljer (fiskens orange hoved). Som regel én farve, højst to.
-  - pattern, texture og abstract kun når billedet virkelig er et mønster, en tekstur eller abstrakt, ikke fordi motivet har detaljer.
+  - pattern betyder et gentaget mønster (det samme element igen og igen over billedet), og kun det. Mange detaljer i et motiv er ikke et pattern. texture og abstract tilsvarende kun, når billedet virkelig er en tekstur eller abstrakt. Definitionerne står i instruktionen til Claude.
   - Gælder nye søgeord; de eksisterende ord kan skrives igen med Reanalyse.
 - **Product: Section colour viser farven.** Et lille felt med farven ved siden af koden (#1b3a4b), og et klik på det åbner en farvevælger.
 
