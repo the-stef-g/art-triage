@@ -44,8 +44,33 @@ proc.on('exit', (code, signal) => writeSync(2, `[app] exited: code=${code} signa
 
 let succes = false;
 let kode = 1;
+let siden = null;
+// Ved en fejl: hvad vinduet viser, og hvad appen har skrevet i sin log.
+async function diagnose() {
+  if (siden && !siden.isClosed()) {
+    const tilstand = await siden.evaluate(() => ({
+      fase: document.querySelector('.fase.aktiv')?.textContent,
+      faser: [...document.querySelectorAll('.fase')].map((f) => f.textContent).join(' | '),
+      fliser: [...document.querySelectorAll('.tile-navn')].map((t) => t.title),
+      strimmel: document.querySelector('.crop-strip, .crop-strip-tom')?.outerHTML?.slice(0, 400) ?? null,
+      bundlinje: document.querySelector('.statusbar')?.textContent,
+      beskeder: window.__beskeder,
+    }));
+    console.error(`[diagnose] ${JSON.stringify(tilstand)}`);
+  }
+  const { readFileSync: laes } = await import('node:fs');
+  const { homedir } = await import('node:os');
+  for (const navn of ['Stef G Art', 'art-triage']) {
+    try {
+      const log = laes(join(homedir(), '.config', navn, 'art-triage-ai.log'), 'utf8').trim().split('\n');
+      console.error(`[diagnose] log (${navn}):\n${log.slice(-40).join('\n')}`);
+      break;
+    } catch { /* ikke her */ }
+  }
+}
 try {
   const page = await app.firstWindow({ timeout: 60000 });
+  siden = page;
   page.on('crash', () => console.error('[side] the renderer crashed'));
   page.on('close', () => console.error('[side] the window closed'));
   page.on('pageerror', (e) => console.error(`[side] pageerror: ${e.message}`));
@@ -310,6 +335,7 @@ try {
   console.error(`SMOKE FEJL: ${err?.message || err}`);
   if (err?.stack) console.error(String(err.stack).split('\n').filter((l) => l.includes('smoke-crop.mjs')).join('\n'));
   kode = await fejlKode(proc);
+  await diagnose().catch((e) => console.error(`[diagnose] ${e.message}`));
   const win = app.windows()[0];
   if (win) await win.screenshot({ path: join(projectRoot, 'smoke-crop-fejl.png') }).catch(() => {});
 } finally {
