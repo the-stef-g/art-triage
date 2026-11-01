@@ -134,9 +134,25 @@ export class AppSession {
   // aldrig koere oven i hinanden: en fuld gennemgang af et stort
   // bibliotek paa et eksternt drev tager tid, og to ad gangen ville bare
   // traekke hinanden ned.
-  async runSync(reason = 'auto') {
-    if (!this.catalog) return { skipped: true, reason };
-    if (this.scanning) return { skipped: true, reason };
+  //
+  // Kommer der en anmodning, mens en skanning koerer (watcheren, Scan again,
+  // en ny master), koeres én skanning mere bagefter, og den der spurgte,
+  // venter paa den. Foer blev anmodningen bare droppet, og en ny fil blev
+  // foerst set ved uret 90 sekunder senere.
+  runSync(reason = 'auto') {
+    if (!this.catalog) return Promise.resolve({ skipped: true, reason });
+    if (this.syncIgang) {
+      this.syncNaeste ??= this.syncIgang.catch(() => {}).then(() => {
+        this.syncNaeste = null;
+        return this.runSync(reason);
+      });
+      return this.syncNaeste;
+    }
+    this.syncIgang = this._koerSync(reason).finally(() => { this.syncIgang = null; });
+    return this.syncIgang;
+  }
+
+  async _koerSync(reason) {
     this.scanning = true;
     const start = Date.now();
     const katalog = this.catalog;
