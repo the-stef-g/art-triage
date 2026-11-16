@@ -538,3 +538,63 @@ function OmdoebDialog({ plan, onRename, onTitle, onCancel }) {
     </div>
   );
 }
+
+// Edit: vaerkets navn. Samme regel som i Product: en ny titel spoerger, om
+// vaerkmappen og filerne, der hedder som vaerket, skal omdoebes.
+export function VaerkNavn({ imageId, onError, onChanged }) {
+  const [work, setWork] = useState(null);
+  const [titel, setTitel] = useState('');
+  const [omdoeb, setOmdoeb] = useState(null);
+  const hent = () => invoke('work:get', { imageId }).then((w) => { setWork(w); setTitel(w.title ?? ''); }).catch(() => setWork(null));
+  useEffect(() => { hent(); }, [imageId]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!work) return null;
+  const gem = async (patch) => {
+    try {
+      const w = await invoke('work:save', { imageId, patch });
+      setWork(w);
+      setTitel(w.title ?? '');
+      onChanged?.();
+    } catch (err) { onError(err); hent(); }
+  };
+  const blur = async () => {
+    const ny = String(titel ?? '').trim();
+    if (ny === String(work.title ?? '')) return;
+    if (!ny) { gem({ title: titel }); return; }
+    try {
+      const plan = await invoke('work:omdoebPlan', { imageId, title: ny });
+      if (plan && plan.til !== plan.fra) setOmdoeb({ ...plan, titel: ny });
+      else gem({ title: ny });
+    } catch (err) { onError(err); gem({ title: ny }); }
+  };
+  return (
+    <>
+      <label className="vaerk-navn">Title
+        <input
+          value={titel}
+          placeholder={work.effective.title}
+          onChange={(e) => setTitel(e.target.value)}
+          onBlur={blur}
+          onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+        />
+      </label>
+      {omdoeb && createPortal(
+        <OmdoebDialog
+          plan={omdoeb}
+          onRename={async () => {
+            const t = omdoeb.titel;
+            setOmdoeb(null);
+            try {
+              const w = await invoke('work:omdoeb', { imageId, title: t });
+              setWork(w);
+              setTitel(w.title ?? '');
+              onChanged?.();
+            } catch (err) { onError(err); hent(); }
+          }}
+          onTitle={() => { const t = omdoeb.titel; setOmdoeb(null); gem({ title: t }); }}
+          onCancel={() => { setOmdoeb(null); setTitel(work.title ?? ''); }}
+        />,
+        document.body,
+      )}
+    </>
+  );
+}

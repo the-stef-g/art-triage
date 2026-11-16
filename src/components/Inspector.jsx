@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { invoke, thumbUrl } from '../api';
 import { formatBytes, formatDate, fileName, foraeldetTekster } from '../util';
-import WorkPanel from './WorkPanel';
+import WorkPanel, { VaerkNavn } from './WorkPanel';
 import CropModal from './CropModal';
 import { gigapixelMaal } from '../printmaal';
 
@@ -234,6 +234,9 @@ export default function Inspector({
 
       {fase === 2 && (
         <>
+          <div className="vaerk">
+            <VaerkNavn key={row.image_id} imageId={row.image_id} onError={onError} />
+          </div>
           <h4>Edits</h4>
           <p className="tom">
             {row.editor ? `Edited in ${row.editor}.` : iEdits ? 'An edit. The program is not in the file name.' : 'The original.'}

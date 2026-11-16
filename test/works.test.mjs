@@ -274,7 +274,7 @@ describe('beskaeringer fra filnavnene', () => {
     ]);
     // En markering lavet i haanden for et format ingen fil har, gaelder stadig.
     works.setCrop(id, vid('uden.tif'), '2:3');
-    expect(works.get(id).crops.map((c) => c.format)).toEqual(['1:1', '2:3', '3:2']);
+    expect(works.get(id).crops.map((c) => c.format)).toEqual(['1:1', '3:2', '2:3']);
   });
 });
 

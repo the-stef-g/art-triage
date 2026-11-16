@@ -25,7 +25,8 @@ const defaultFilter = {
 };
 const startFilter = () => ({ ...defaultFilter, fase: gemtFase() });
 
-const FORMAT_ORDEN = ['1:1', '2:3', '3:2', '1:2', '2:1'];
+// Bred- og hoejformat staar sammen: 3:2 og 2:1, saa 2:3 og 1:2.
+const FORMAT_ORDEN = ['1:1', '3:2', '2:1', '2:3', '1:2'];
 
 // Crop: stakkene der er lukket (vaerkernes image_id), husket mellem
 // sessionerne. Uden adgang til localStorage er alle aabne.
@@ -175,7 +176,7 @@ export default function App() {
       // i formaternes raekkefoelge. Masteren viser formaterne, roede hvis
       // beskaeringen er aeldre end den.
       if (filterRef.current.fase === 3) {
-        const ORDEN = ['1:1', '2:3', '3:2', '1:2', '2:1'];
+        const ORDEN = FORMAT_ORDEN;
         const grupper = new Map();
         for (const r of res.rows) {
           const g = grupper.get(r.image_id) || { master: null, crops: [] };

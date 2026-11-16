@@ -83,7 +83,7 @@ export async function lavPrintfil({
   kilde, mappe, base, token, forstoerrelser = [], rotation = 0, maksBytes = MAKS_BYTES,
 }) {
   if (!PRINTFORMATER[token]) {
-    throw new Error('Only a crop in one of the five print formats (1:1, 2:3, 3:2, 1:2, 2:1) can be printed');
+    throw new Error('Only a crop in one of the five print formats (1:1, 3:2, 2:1, 2:3, 1:2) can be printed');
   }
   if (!existsSync(kilde)) throw new Error('The file is not on disk');
   const sharp = (await import('sharp')).default;

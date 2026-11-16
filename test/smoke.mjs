@@ -416,6 +416,8 @@ try {
   await page.locator('.tile').first().click();
   // Originalen staar taendt; Edit kan ikke vaelges for originalen selv.
   await page.waitForSelector('.rolle-valg button.aktiv-rolle:has-text("Original")', { timeout: 10000 });
+  // Vaerkets navn kan rettes i Edit.
+  await page.waitForSelector('.vaerk-navn input', { timeout: 10000 });
   await page.screenshot({ path: join(projectRoot, 'smoke-edit.png') });
   await page.locator('.rolle-valg button', { hasText: /^Master$/ }).click();
   await page.waitForFunction(() => document.querySelectorAll('.tile').length === 0, null, { timeout: 15000 });

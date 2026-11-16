@@ -21,7 +21,8 @@ export const CATEGORIES = ['Graphic Design', 'Photography', 'Paintings', 'Sculpt
 // Unikke vaerker: ét eksemplar, mål og én pris. Resten sælges som print.
 export const UNIQUE_CATEGORIES = new Set(['Paintings', 'Sculptures']);
 export const TEMPLATES = ['spread', 'poster'];
-export const CROP_FORMATS = ['1:1', '2:3', '3:2', '1:2', '2:1'];
+// Bred- og hoejformat staar sammen, overalt i appen.
+export const CROP_FORMATS = ['1:1', '3:2', '2:1', '2:3', '1:2'];
 // Den korte tekst er vaek: der er kun én tekst, beskrivelsen. Gamle korte
 // tekster ligger stadig i kataloget, men bruges ikke.
 export const TEXT_FIELDS = ['description', 'alt_text'];
