@@ -4,7 +4,8 @@ Det der venter. Stef siger "byg", før noget herfra bliver lavet.
 
 ## Venter på "byg"
 
-- **Beskrivelsen er stadig for lang: som regel én sætning.** Til Worn Wall skrev Claude fire sætninger, der remser detaljer op (malingen der skaller, farverne, murstenene, bjælken). Stef: "A brick wall where time has left its mark." er nok. Instruktionen får det som eksempel på længde og tone: én kort sætning er det normale, højst to, og aldrig en opremsning af detaljer. Den korte tekst og seriens intro følger samme mål.
+- **Beskrivelsen er stadig for lang: som regel én sætning.** Til Worn Wall skrev Claude fire sætninger, der remser detaljer op (malingen der skaller, farverne, murstenene, bjælken). Stef: "A brick wall where time has left its mark." er nok. Instruktionen får det som eksempel på længde og tone: én kort sætning er det normale, højst to, og aldrig en opremsning af detaljer. Seriens intro følger samme mål.
+- **Kun én tekst: den korte tekst forsvinder.** Feltet Short text fjernes fra Product og fra tjeklisten, Claude skriver kun beskrivelsen (og alt-teksten), og serien nævnes i beskrivelsen. Beskrivelsen sendes som produktets description, som sitet stefg.art viser på værkets side; short description i WooCommerce sendes tom, så den samme sætning ikke står to gange på shoppens produktside. Gamle korte tekster bliver liggende i kataloget, men sendes ikke mere.
 
 ## Venter på en afklaring
 
