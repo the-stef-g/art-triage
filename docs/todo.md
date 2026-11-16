@@ -4,7 +4,10 @@ Det der venter. Stef siger "byg", før noget herfra bliver lavet.
 
 ## Venter på "byg"
 
-- **Korte tekster, der lader folk selv tolke.** Teksterne skal være korte, kun de nødvendige ord, og ikke fortælle læseren hvad de skal se, føle eller tænke. Beskriv kort hvad der er (motiv, og det man ellers kunne overse), ingen tolkning af betydning eller stemning, ingen "the fish seems to …", "suggests", "as if". Appen har hidtil ikke brugt om-mig.md (Google Drive); og den er ikke helt rigtig (Stef bruger både tankestreger og "lad os"), så den bruges ikke som den er. Med i instruktionen kommer kun: ingen trekantsstrukturer ("Not X. Not Y. But Z."), ingen superlativer, jordnær og uden corporate-speak. Ikke "50–80 ord" fra filen. Gælder også seriens intro og den korte tekst.
+- **Korte tekster, der lader folk selv tolke.** Teksterne skal være korte, kun de nødvendige ord, og ikke fortælle læseren hvad de skal se, føle eller tænke. Beskriv kort hvad der er (motiv, og det man ellers kunne overse), ingen tolkning af betydning eller stemning, ingen "the fish seems to …", "suggests", "as if". Appen har hidtil ikke brugt om-mig.md (Google Drive); og den er ikke helt rigtig (Stef bruger både tankestreger og "lad os"), så den bruges ikke som den er. Med i instruktionen kommer kun: ingen trekantsstrukturer ("Not X. Not Y. But Z."), ingen superlativer, jordnær og uden corporate-speak. Ikke "50–80 ord" fra filen. Forbuddet mod tankestreger i appens instruktion og advarslen om dem fjernes: Claude må bruge tankestreger ligesom Stef. Gælder også seriens intro og den korte tekst.
+- **Værktøjslinjen:** New folder fjernes (mapper laves i Finder). Scan again, Clean up og Switch library flyttes fra knapper i værktøjslinjen til menupunkter i Edit-menuen i Mac'ens menulinje (med deres genveje, hvis de har nogen).
+- **Sorteringen ved søgefeltet:** dropdown-menuen (Name / Modified) står lige ved siden af søgefeltet i stedet for ude til højre.
+- **Print: boblen med antallet på formatknapperne kan næsten ikke ses.** Mere kontrast: lysere baggrund og tydelig tekst, så tallet kan læses.
 
 ## Venter på en afklaring
 
