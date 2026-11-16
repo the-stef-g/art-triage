@@ -9,14 +9,12 @@ Det der venter. Stef siger "byg", før noget herfra bliver lavet.
 - **Sorteringen ved søgefeltet:** dropdown-menuen (Name / Modified) står lige ved siden af søgefeltet i stedet for ude til højre.
 - **Print: boblen med antallet på formatknapperne kan næsten ikke ses.** Mere kontrast: lysere baggrund og tydelig tekst, så tallet kan læses.
 - **Shop queue under Send to shop:** køen er ikke et pop op-vindue, men sidder fast i shop-kolonnen lige under Send to shop (og knappen i bundlinjen forsvinder). Fremdriften (værk 2 af 4, MB, trin, tid) står der.
-- **Bundlinjen fjernes:** slideren, biblioteksnavnet og tallene (billeder, approved osv.) forsvinder. Versionsnummeret flyttes op efter "Stef G Art" i topbjælken, i samme typografi som nu, med lidt mere luft til Sort-knappen.
+- **Bundlinjens venstre side ryddes:** slideren, versionsnummeret, biblioteksnavnet og tallene (billeder, approved osv.) forsvinder fra bundlinjen; resten af bundlinjen (beskeder, fejl, AI-status, Claude-forbrug osv.) bliver. Versionsnummeret flyttes op efter "Stef G Art" i topbjælken, i samme typografi som nu, med lidt mere luft til Sort-knappen.
+- **Kassér i fase 1-5:** Discard work virker i Sort, Edit, Crop, Print og Product, også for et værk med en master. En dialog viser, hvad der sker, og så: originalen flyttes til Discarded, redigeringer, master, beskæringer og printfiler i papirkurven, de tomme mapper (værkmappen med Original, Edits, Masters og Print files) slettes, og er værket i shoppen (kladde), slettes produktet der også.
 
 ## Venter på en afklaring
 
-- **Kassér i fase 1-5:** hvad skal der ske med et værk, der har en master? Forslag: originalen til Discarded, og redigeringer, master, beskæringer og printfiler i papirkurven, efter en dialog der viser filerne. Og en kladde i shoppen (fase 5): slettes den, eller bliver den liggende?
-- **Bundlinjens beskeder:** når bundlinjen fjernes, hvor skal beskederne så stå ("Print file saved as …", fejl, "Drive not connected", fejlede forhåndsvisninger, AI-status og Claude-forbruget)?
-
-Fortrydelsesret og betaling er afgjort 30. oktober 2026: prints har 14 dages fortrydelsesret, og beløbet reserveres ved bestilling og trækkes ved afsendelse. Hele beslutningen står i sitets repo, `docs/fortrydelsesret-og-betaling.md` i `the-stef-g/stefs.cloud`.
+Intet lige nu. Fortrydelsesret og betaling er afgjort 30. oktober 2026: prints har 14 dages fortrydelsesret, og beløbet reserveres ved bestilling og trækkes ved afsendelse. Hele beslutningen står i sitets repo, `docs/fortrydelsesret-og-betaling.md` i `the-stef-g/stefs.cloud`.
 
 ## Til shoppen (WordPress på shop.stefg.art)
 
