@@ -8,10 +8,15 @@ Det der venter. Stef siger "byg", før noget herfra bliver lavet.
 - **Værktøjslinjen:** New folder fjernes (mapper laves i Finder). Scan again, Clean up og Switch library flyttes fra knapper i værktøjslinjen til menupunkter i Edit-menuen i Mac'ens menulinje (med deres genveje, hvis de har nogen).
 - **Sorteringen ved søgefeltet:** dropdown-menuen (Name / Modified) står lige ved siden af søgefeltet i stedet for ude til højre.
 - **Print: boblen med antallet på formatknapperne kan næsten ikke ses.** Mere kontrast: lysere baggrund og tydelig tekst, så tallet kan læses.
+- **Shop queue under Send to shop:** køen er ikke et pop op-vindue, men sidder fast i shop-kolonnen lige under Send to shop (og knappen i bundlinjen forsvinder). Fremdriften (værk 2 af 4, MB, trin, tid) står der.
+- **Bundlinjen fjernes:** slideren, biblioteksnavnet og tallene (billeder, approved osv.) forsvinder. Versionsnummeret flyttes op efter "Stef G Art" i topbjælken, i samme typografi som nu, med lidt mere luft til Sort-knappen.
 
 ## Venter på en afklaring
 
-Intet lige nu. Fortrydelsesret og betaling er afgjort 30. oktober 2026: prints har 14 dages fortrydelsesret, og beløbet reserveres ved bestilling og trækkes ved afsendelse. Hele beslutningen står i sitets repo, `docs/fortrydelsesret-og-betaling.md` i `the-stef-g/stefs.cloud`.
+- **Kassér i fase 1-5:** hvad skal der ske med et værk, der har en master? Forslag: originalen til Discarded, og redigeringer, master, beskæringer og printfiler i papirkurven, efter en dialog der viser filerne. Og en kladde i shoppen (fase 5): slettes den, eller bliver den liggende?
+- **Bundlinjens beskeder:** når bundlinjen fjernes, hvor skal beskederne så stå ("Print file saved as …", fejl, "Drive not connected", fejlede forhåndsvisninger, AI-status og Claude-forbruget)?
+
+Fortrydelsesret og betaling er afgjort 30. oktober 2026: prints har 14 dages fortrydelsesret, og beløbet reserveres ved bestilling og trækkes ved afsendelse. Hele beslutningen står i sitets repo, `docs/fortrydelsesret-og-betaling.md` i `the-stef-g/stefs.cloud`.
 
 ## Til shoppen (WordPress på shop.stefg.art)
 
