@@ -4,7 +4,7 @@ Det der venter. Stef siger "byg", før noget herfra bliver lavet.
 
 ## Venter på "byg"
 
-Intet lige nu.
+- **Korte tekster, der lader folk selv tolke.** Teksterne skal være korte, kun de nødvendige ord, og ikke fortælle læseren hvad de skal se, føle eller tænke. Beskriv kort hvad der er (motiv, og det man ellers kunne overse), ingen tolkning af betydning eller stemning, ingen "the fish seems to …", "suggests", "as if". Appen har hidtil ikke brugt om-mig.md (Google Drive); tonereglerne derfra kommer med i instruktionen til Claude: ingen tankestreger, ingen trekantsstrukturer ("Not X. Not Y. But Z."), ingen superlativer, aldrig "we" eller "let's", førsteperson eller tilskuerperspektiv, jordnær og uden corporate-speak. Kun tonereglerne, ikke resten af filen (CV, priser osv.), og ikke "50–80 ord" fra filen. Gælder også seriens intro og den korte tekst.
 
 ## Venter på en afklaring
 
