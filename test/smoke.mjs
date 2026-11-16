@@ -452,7 +452,8 @@ try {
   await page.locator('label', { hasText: /^Year/ }).locator('input').click();
   await page.waitForSelector('.omdoeb-dialog', { timeout: 5000 });
   await page.screenshot({ path: join(projectRoot, 'smoke-omdoeb.png') });
-  await page.locator('.omdoeb-dialog button', { hasText: 'Rename files' }).click();
+  // Enter trykker den blaa knap (Rename files).
+  await page.keyboard.press('Enter');
   await page.waitForFunction(
     () => document.querySelector('.tile-navn')?.title.startsWith('Approved/Roed 1/Masters/Roed 1'),
     null,

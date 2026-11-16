@@ -52,7 +52,7 @@ export function NameModal({ title, value, placeholder, onSubmit, onClose }) {
           }}
         />
         <div className="knapraekke">
-          <button onClick={submit}>OK</button>
+          <button className="primaer" onClick={submit}>OK</button>
           <button className="lille" onClick={onClose}>Cancel</button>
         </div>
       </div>

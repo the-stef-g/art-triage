@@ -4,9 +4,7 @@ Det der venter. Stef siger "byg", før noget herfra bliver lavet.
 
 ## Venter på "byg"
 
-- **Product: en Write intro-knap ved Series intro.** Knappen beder Claude om en ny intro til serien med det samme, efter de nuværende regler (kort, som regel én sætning), også når serien allerede har en intro. Har Stef selv rettet i introen, spørger appen først, om den skal overskrives. Seriens farve røres ikke, hvis den er valgt. Bagefter sendes introen med næste Update shop.
-- **Enter og Retur trykker den blå knap i dialogerne.** I alle appens dialogbokse (omdøb filer, kassér værk, fjern beskæring, navnefelter osv.) udløser Enter og Retur den blå hovedknap; Escape fortryder. Er den blå knap grå (ikke mulig), sker der intet.
-- **Edit: Luminar Neo åbner filen uden en kopi.** Knappen Luminar Neo åbner den valgte fil direkte i Neo i stedet for at lave en -neo-kopi i Edits. Stef eksporterer selv en .tif fra Neo til værkets Edits, og appen tager den som en redigering. Topaz Photo AI og Photoshop laver stadig en kopi som i dag.
+Intet lige nu.
 
 ## Venter på en afklaring
 

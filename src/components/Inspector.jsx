@@ -241,7 +241,7 @@ export default function Inspector({
           <p className="tom">
             {row.editor ? `Edited in ${row.editor}.` : iEdits ? 'An edit. The program is not in the file name.' : 'The original.'}
           </p>
-          <p className="tom">Send a copy to a program. The copy goes in the Edits folder with the program&apos;s ending (-neo, -tp, -ps). Save your result in Edits too.</p>
+          <p className="tom">Luminar Neo opens the file itself; export your result to the work&apos;s Edits folder. Topaz Photo AI and Photoshop get a copy in Edits with the program&apos;s ending (-tp, -ps); save your result in Edits too.</p>
           <div className="knapraekke">
             {PROGRAMMER.map(([navn, endelse]) => (
               <button
@@ -249,7 +249,9 @@ export default function Inspector({
                 disabled={!installeret.has(navn)}
                 onClick={() => act.sendToEditor(navn)}
                 title={installeret.has(navn)
-                  ? `Copy this file to Edits as …-${endelse}, and open the copy in ${navn}`
+                  ? (navn === 'Luminar Neo'
+                    ? 'Open this file in Luminar Neo, without a copy. Export your result to the work\'s Edits folder.'
+                    : `Copy this file to Edits as …-${endelse}, and open the copy in ${navn}`)
                   : `${navn} was not found in Applications`}
               >
                 {navn}
@@ -564,7 +566,7 @@ function SletCropDialog({ slet, onCancel, onOk }) {
     const taste = (e) => {
       e.stopImmediatePropagation();
       if (e.key === 'Escape') onCancel();
-      if (e.key === 'Enter') onOk();
+      if (e.key === 'Enter') { e.preventDefault(); onOk(); }
     };
     window.addEventListener('keydown', taste, true);
     return () => window.removeEventListener('keydown', taste, true);

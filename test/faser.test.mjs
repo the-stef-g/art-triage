@@ -392,8 +392,12 @@ describe('serier og print af sig selv', () => {
     works.autoSerier();
     const a = raekke('Approved/Sol 1/Original/Sol 1.tif').image_id;
     const b = raekke('Approved/Sol 2/Original/Sol 2.tif').image_id;
+    const serieId = catalog.listSeries()[0].id;
+    expect(() => works.serieTilIntro(serieId)).toThrow(/texts of a work/);
     works.saveGeneratedTexts(a, { description: 'Warm light, part of the series Sol.' });
     expect(works.serierUdenIntro()).toEqual([]); // kun ét vaerk med tekst
+    // Write intro virker allerede med ét vaerk, og ogsaa naar der er en intro.
+    expect(works.serieTilIntro(serieId).vaerker).toHaveLength(1);
     works.saveGeneratedTexts(b, { description: 'Cold light, part of the series Sol.' });
     works.save(b, { section_colour: '#112233' });
     const [sol] = works.serierUdenIntro();
@@ -403,6 +407,8 @@ describe('serier og print af sig selv', () => {
     expect(catalog.listSeries()[0].template).toBe('walkthrough');
     catalog.setSeriesShop(sol.id, { intro: 'The sun.' });
     expect(works.serierUdenIntro()).toEqual([]);
+    expect(works.serieTilIntro(sol.id)).toMatchObject({ navn: 'Sol', intro: 'The sun.' });
+    expect(works.serieTilIntro(sol.id).vaerker).toHaveLength(2);
   });
 
   it('kategorien foelger serien', () => {

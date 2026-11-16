@@ -4,16 +4,17 @@ import { fileName } from '../util';
 // Kassér et vaerk: hvad der sker, foer det sker. Originalen til Discarded,
 // resten af vaerkmappen i papirkurven, og produktet ud af shoppen.
 export default function KasserDialog({ plan, onCancel, onOk }) {
+  const publiceret = plan.status === 'publish';
+  // Enter og Retur trykker hovedknappen, naar den kan trykkes.
   useEffect(() => {
     const taste = (e) => {
       e.stopImmediatePropagation();
       if (e.key === 'Escape') onCancel();
-      if (e.key === 'Enter') onOk();
+      if (e.key === 'Enter') { e.preventDefault(); if (!publiceret) onOk(); }
     };
     window.addEventListener('keydown', taste, true);
     return () => window.removeEventListener('keydown', taste, true);
-  }, [onCancel, onOk]);
-  const publiceret = plan.status === 'publish';
+  }, [onCancel, onOk, publiceret]);
   return (
     <div className="dialog-bag" onClick={onCancel}>
       <div className="dialog kasser-dialog" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>

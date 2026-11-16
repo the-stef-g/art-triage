@@ -209,6 +209,25 @@ export default function WorkPanel({ row, versions, tekstRev = 0, hasKey, shop, o
     }
   };
 
+  // Write intro: en ny intro fra Claude med det samme. Har Stef rettet i
+  // introen, spoerges der foerst. Den sendes med naeste Update shop.
+  const writeIntro = async (overwrite = false) => {
+    setBusy(true);
+    try {
+      const res = await invoke('ser:writeIntro', { seriesId: work.series.id, overwrite });
+      if (res.needsConfirm) {
+        setBusy(false);
+        if (window.confirm('You have edited the series intro. Replace it with a new one from Claude?')) await writeIntro(true);
+        return;
+      }
+      adopt(await invoke('work:get', { imageId }));
+      onShop('New series intro written. It goes to the shop with the next Update shop');
+    } catch (err) {
+      onError(err);
+    }
+    setBusy(false);
+  };
+
   const kanSkrive = work.eligible && hasKey;
   const skriveHint = !work.eligible
     ? 'Texts unlock when the image is Approved and Finished'
@@ -463,10 +482,19 @@ export default function WorkPanel({ row, versions, tekstRev = 0, hasKey, shop, o
               className="serie-intro"
               rows={4}
               defaultValue={work.series.intro ?? ''}
-              key={`intro-${work.series.id}`}
+              key={`intro-${work.series.id}-${work.series.intro ?? ''}`}
               onBlur={(e) => { if (e.target.value !== (work.series.intro ?? '')) saveSeries({ intro: e.target.value }); }}
             />
           </label>
+          <div className="knapraekke">
+            <button
+              disabled={!hasKey || busy}
+              onClick={() => writeIntro(false)}
+              title={hasKey ? 'Claude writes a new short intro for the series from the texts of its works' : 'Add your Claude API key under Help first'}
+            >
+              Write intro
+            </button>
+          </div>
           <div className="vaerk-raekke">
             <label>Series template
               <select value={work.series.template || ''} onChange={(e) => saveSeries({ template: e.target.value })}>
@@ -503,15 +531,17 @@ export default function WorkPanel({ row, versions, tekstRev = 0, hasKey, shop, o
 
 // Dialogen naar titlen aendres: hvad der omdoebes, og et valg.
 function OmdoebDialog({ plan, onRename, onTitle, onCancel }) {
+  const kan = !plan.problemer.length;
+  // Enter og Retur trykker den blaa knap (Rename files), Escape fortryder.
   useEffect(() => {
     const taste = (e) => {
       e.stopImmediatePropagation();
       if (e.key === 'Escape') onCancel();
+      if (e.key === 'Enter') { e.preventDefault(); if (kan) onRename(); }
     };
     window.addEventListener('keydown', taste, true);
     return () => window.removeEventListener('keydown', taste, true);
-  }, [onCancel]);
-  const kan = !plan.problemer.length;
+  }, [onCancel, onRename, kan]);
   return (
     <div className="dialog-bag" onClick={onCancel}>
       <div className="dialog omdoeb-dialog" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>

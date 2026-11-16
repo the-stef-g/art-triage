@@ -29,6 +29,8 @@ import { debounce, dataDirFor, openFdCount } from './util.mjs';
 // periodiske genskanning er derfor ikke et sikkerhedsnet men den baerende
 // mekanisme: uden den dukker nye filer foerst op efter en genstart.
 const RESCAN_MIN_MS = 90_000;
+// Programmer der aabner filen selv, uden en kopi i Edits.
+const UDEN_KOPI = new Set(['Luminar Neo']);
 // Saa laenge staar et sendt vaerk i koeen, naar koeen er faerdig.
 const KOE_RYD_MS = 5000;
 // Et langsomt drev maa ikke ende med at skanne i et vaek. Naeste skanning
@@ -64,6 +66,7 @@ const ARBEJDE = {
   'work:flytTil': 'moving a file to another work',
   'work:goerTilOriginal': 'changing the original of a work',
   'work:egetVaerk': 'making a work of its own',
+  'ser:writeIntro': 'writing texts with Claude',
   'work:discard': 'discarding a work',
   'edit:makeMaster': 'making a master',
   'edit:send': 'copying to an editor',
@@ -602,6 +605,7 @@ export class AppSession {
           const patch = { intro: res.serie.intro };
           if (res.serie.colour && !nu.colour) patch.colour = res.serie.colour;
           this.requireCatalog().setSeriesShop(serie.id, patch);
+          this._husIntro(serie.id, res.serie.intro);
           this.log(`series intro written for ${serie.navn} ($${res.cost.toFixed(4)})`);
           this.broadcast('besked', { tekst: `Intro written for the series ${serie.navn}` });
           this.broadcast('changed');
@@ -610,6 +614,13 @@ export class AppSession {
         }
       }
     });
+  }
+
+  // Den intro Claude sidst skrev til en serie. Er introen en anden nu, har
+  // Stef rettet i den, og Write intro spoerger, foer den overskrives.
+  _husIntro(seriesId, intro) {
+    this.settings.data.claudeIntros = { ...(this.settings.data.claudeIntros || {}), [seriesId]: intro };
+    this.settings.save();
   }
 
   // Printfilen var en PNG foer 0.41; naar JPEG'en er lavet, gaar den i
@@ -1100,11 +1111,20 @@ export class AppSession {
       const app = detectEditors(this.settings.data.customEditors).find((e) => e.label === program);
       if (!app) throw new Error(`${program} was not found in Applications`);
       const ids = Array.isArray(versionIds) && versionIds.length ? versionIds : [versionId];
+      // Luminar Neo faar filen selv: Stef eksporterer en .tif fra Neo til
+      // Edits, saa en kopi ville bare ligge der overflødig.
+      if (UDEN_KOPI.has(program)) {
+        const filer = ids.map((id) => catalog.filePathForVersion(id)).filter(Boolean);
+        if (!filer.length) throw new Error('The file is not available right now');
+        for (const f of filer) this.log(`edit: open in ${program} without a copy -> ${f.slice(catalog.root.length + 1)}`);
+        await openInApp(app.appPath, filer);
+        return { rel: filer[0].slice(catalog.root.length + 1), antal: filer.length, kopi: false };
+      }
       const filer = ids.map((id) => catalog.kopiTilEdits(id, suffiks));
       for (const dest of filer) this.log(`edit: copy for ${program} -> ${dest.slice(catalog.root.length + 1)}`);
       await this.runSync('kopi til editor');
       await openInApp(app.appPath, filer);
-      return { rel: filer[0].slice(catalog.root.length + 1), antal: filer.length };
+      return { rel: filer[0].slice(catalog.root.length + 1), antal: filer.length, kopi: true };
     });
 
     // Fase 2, sidste skridt: den faerdige redigering bliver master.
@@ -1257,6 +1277,24 @@ export class AppSession {
       this.works?.synkSerieKategori();
       this._serieTekster();
       this._serieFelter();
+    });
+    // Write intro: Claude skriver seriens intro igen med det samme, ogsaa naar
+    // den har én. Har Stef rettet i den, spoerges der foerst (needsConfirm).
+    // En farve der er valgt, roeres ikke.
+    handle('ser:writeIntro', async ({ seriesId, overwrite = false }) => {
+      if (!this.settings.data.claudeKey) throw new Error('Add your Claude API key under Help first');
+      const serie = this.requireWorks().serieTilIntro(seriesId);
+      const claudes = this.settings.data.claudeIntros?.[serie.id];
+      if (!overwrite && serie.intro.trim() && serie.intro !== claudes) return { needsConfirm: true };
+      const res = await this._arbejde('writing texts with Claude', () => this._tekstService().writeSeries(serie.navn, serie.vaerker));
+      const nu = this.requireCatalog().listSeries().find((x) => x.id === serie.id);
+      const patch = { intro: res.serie.intro };
+      if (res.serie.colour && !nu?.colour) patch.colour = res.serie.colour;
+      this.requireCatalog().setSeriesShop(serie.id, patch);
+      this._husIntro(serie.id, res.serie.intro);
+      this.log(`series intro written again for ${serie.navn} ($${res.cost.toFixed(4)})`);
+      this.broadcast('changed');
+      return { intro: res.serie.intro, cost: res.cost };
     });
     handle('ser:setShop', ({ seriesId, patch }) => this.requireCatalog().setSeriesShop(seriesId, patch));
     handle('ser:rename', ({ seriesId, name }) => {

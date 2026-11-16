@@ -443,6 +443,19 @@ export class Works {
     return ud;
   }
 
+  // Én serie til Write intro: dens vaerker med en beskrivelse. Knappen
+  // virker, saa snart ét vaerk i serien har en.
+  serieTilIntro(seriesId) {
+    const s = this.db.get('SELECT id, name, intro FROM series WHERE id=?', seriesId);
+    if (!s) throw new Error('The series does not exist');
+    const ids = this.db.all('SELECT id FROM images WHERE series_id=? ORDER BY id', s.id).map((r) => r.id);
+    const vaerker = ids.map((id) => this.get(id))
+      .filter((w) => w.description)
+      .map((w) => ({ titel: w.effective.title, beskrivelse: w.description, farve: w.sectionColour || null }));
+    if (!vaerker.length) throw new Error('Write the texts of a work in the series first: the intro is written from them');
+    return { id: s.id, navn: s.name, intro: s.intro || '', vaerker };
+  }
+
   // En serie uden skabelon faar Walkthrough, som shoppen ogsaa giver en ny.
   // Returnerer antallet af serier der fik den.
   standardSkabelon() {

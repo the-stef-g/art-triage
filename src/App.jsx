@@ -551,9 +551,11 @@ export default function App() {
       }
       try {
         const res = await invoke('edit:send', { versionIds: ids, program });
-        visBesked(res.antal > 1
-          ? `Copied ${res.antal} crops to Edits and opened them in ${program}`
-          : `Copied to ${res.rel} and opened in ${program}`, 5000);
+        visBesked(!res.kopi
+          ? `Opened ${res.rel.split('/').pop()} in ${program}. Export your result to the work's Edits folder.`
+          : res.antal > 1
+            ? `Copied ${res.antal} crops to Edits and opened them in ${program}`
+            : `Copied to ${res.rel} and opened in ${program}`, res.kopi ? 5000 : 7000);
       } catch (err) { visFejl(err); }
     },
     // Det sidste i fase 2: den markerede fil bliver vaerkets master, og
