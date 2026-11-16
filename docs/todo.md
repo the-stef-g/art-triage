@@ -4,7 +4,7 @@ Det der venter. Stef siger "byg", før noget herfra bliver lavet.
 
 ## Venter på "byg"
 
-Intet lige nu.
+- **Beskrivelsen er stadig for lang: som regel én sætning.** Til Worn Wall skrev Claude fire sætninger, der remser detaljer op (malingen der skaller, farverne, murstenene, bjælken). Stef: "A brick wall where time has left its mark." er nok. Instruktionen får det som eksempel på længde og tone: én kort sætning er det normale, højst to, og aldrig en opremsning af detaljer. Den korte tekst og seriens intro følger samme mål.
 
 ## Venter på en afklaring
 
