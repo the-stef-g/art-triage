@@ -4,7 +4,7 @@ Det der venter. Stef siger "byg", før noget herfra bliver lavet.
 
 ## Venter på "byg"
 
-Intet lige nu.
+- **Edit: værkets navn kan ændres.** Et felt med værkets navn (titlen) øverst i højre kolonne i Edit, som i Product. En ny titel spørger som i Product, om filerne skal omdøbes (værkmappen og alle filer der hedder som værket, også originalen og redigeringerne), og så hedder masteren også det nye navn, når den laves.
 
 ## Venter på en afklaring
 
