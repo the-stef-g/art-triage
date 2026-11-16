@@ -348,6 +348,20 @@ function buildMenu() {
         { role: 'copy', label: 'Copy' },
         { role: 'paste', label: 'Paste' },
         { role: 'selectAll', label: 'Select All' },
+        { type: 'separator' },
+        // Foer knapper i vaerktoejslinjen.
+        {
+          label: 'Scan Again',
+          click: () => mainWin?.webContents.send('evt', { type: 'genvej', cmd: 'rescan' }),
+        },
+        {
+          label: 'Clean Up',
+          click: () => mainWin?.webContents.send('evt', { type: 'genvej', cmd: 'cleanup' }),
+        },
+        {
+          label: 'Switch Library …',
+          click: () => mainWin?.webContents.send('evt', { type: 'genvej', cmd: 'switch-library' }),
+        },
       ],
     },
 

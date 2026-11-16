@@ -7,6 +7,7 @@ import Grid from './components/Grid';
 import Inspector from './components/Inspector';
 import StatusBar, { MIN_KOLONNER, MAX_KOLONNER } from './components/StatusBar';
 import Filmstrip from './components/Filmstrip';
+import KasserDialog from './components/KasserDialog';
 import CropStrip from './components/CropStrip';
 import PrintList from './components/PrintList';
 import { PreviewOverlay, NameModal } from './components/Overlay';
@@ -70,6 +71,9 @@ export default function App() {
   // standard. Mellemrum og Escape skifter stadig til gitteret.
   const [showPreview, setShowPreview] = useState(() => gemtFase() === 1);
   const [modal, setModal] = useState(null);
+  const actRef = useRef(null);
+  // Kassér et vaerk: planen, mens dialogen staar fremme.
+  const [kasser, setKasser] = useState(null);
   const [fejl, setFejl] = useState(null);
   const [appInfo, setAppInfo] = useState(null);
   const [drev, setDrev] = useState(null); // {missing, root} naar drevet skifter tilstand
@@ -342,6 +346,10 @@ export default function App() {
         setThumbRev(evt.retry);
       }
     } else if (evt.type === 'genvej') {
+      // Edit-menuen: Scan again, Clean up og Switch library.
+      if (evt.cmd === 'rescan') { actRef.current?.rescan(); return; }
+      if (evt.cmd === 'cleanup') { actRef.current?.cleanup(); return; }
+      if (evt.cmd === 'switch-library') { actRef.current?.chooseLibrary(); return; }
       if (evt.cmd === 'hf-token') {
         // Hjaelp-menuen: indtast/ret Hugging Face-token.
         invoke('app:info').then((info) => {
@@ -577,20 +585,15 @@ export default function App() {
           : `${res.length} print files saved in Print files (${formatBytes(bytes)} in all)`) + advarsel, ikke.length ? 10000 : 7000);
       } catch (err) { visFejl(err); }
     },
-    // Fase 2: kassér hele vaerket. Originalen gaar til Discarded, og
-    // redigeringerne i papirkurven.
+    // Fase 2-5: kassér hele vaerket, ogsaa et med en master. En dialog viser
+    // foerst, hvad der sker: originalen til Discarded, resten af vaerkmappen
+    // i papirkurven, og produktet ud af shoppen.
     discardWork: async () => {
       const f = getFocused();
       if (!f) return;
-      const ok = window.confirm(
-        'Discard this work?\n\n'
-        + 'The original goes to the Discarded folder. The files in Edits go to the Trash.'
-      );
-      if (!ok) return;
       try {
-        const res = await invoke('work:discard', { versionId: f.version_id });
-        const n = res?.edits ?? 0;
-        visBesked(n ? `Discarded. ${n} edit file${n === 1 ? '' : 's'} moved to the Trash.` : 'Discarded.', 5000);
+        const plan = await invoke('work:discardPlan', { versionId: f.version_id });
+        setKasser({ plan, versionId: f.version_id });
       } catch (err) { visFejl(err); }
     },
     editIn: async (appPath, versionId = getFocused()?.version_id) => {
@@ -741,6 +744,8 @@ export default function App() {
       } catch (err) { visFejl(err); }
     },
   };
+  // Menuen kalder handlingerne udefra; refen har altid de nyeste.
+  actRef.current = act;
 
   // ---------- Tastaturgenveje ----------
 
@@ -874,7 +879,7 @@ export default function App() {
         case 'c': if (fase === 1) act.setRating('kandidat'); break;
         case 'x':
           if (fase === 1) act.setRating('kasseret');
-          else if (fase === 2) act.discardWork();
+          else if (fase >= 2 && fase <= 5) act.discardWork();
           break;
         case 'u': if (fase === 1) act.setRating('ubedomt'); break;
         // S aabner og lukker stakken i Crop, som i Lightroom.
@@ -927,13 +932,9 @@ export default function App() {
         setFilter={setFilter}
         searchInfo={searchInfo}
         faseTal={faseTal}
-        onNewFolder={act.newFolder}
-        onCleanup={act.cleanup}
-        onChooseLibrary={act.chooseLibrary}
-        onRescan={act.rescan}
-        skanner={skanner}
         act={act}
         harValg={selected.length > 0}
+        version={appInfo?.version}
       />
       <div className={produktLayout ? 'hoved produkt' : cropLayout ? 'hoved beskaer' : filter.fase === 4 ? 'hoved print' : 'hoved'}>
         <Sidebar
@@ -1078,24 +1079,30 @@ export default function App() {
         )}
       </div>
       <StatusBar
-        counts={counts}
         aiStatus={aiStatus}
         indexProgress={indexProgress}
-        searchInfo={searchInfo}
         fejl={fejl}
-        library={library}
-        version={appInfo?.version}
         drevMangler={Boolean(drev?.missing)}
         kwStatus={kwStatus}
         textStatus={textStatus}
         thumbStatus={thumbStatus}
         onRetryPreviews={() => invoke('thumbs:retry').catch(visFejl)}
-        kolonner={kolonner}
-        setKolonner={(n) => {
-          setKolonner(n);
-          localStorage.setItem('kolonner', String(n));
-        }}
       />
+      {kasser && (
+        <KasserDialog
+          plan={kasser.plan}
+          onCancel={() => setKasser(null)}
+          onOk={async () => {
+            const { versionId, plan } = kasser;
+            setKasser(null);
+            visBesked(`Discarding ${plan.titel} …`, 0);
+            try {
+              const res = await invoke('work:discard', { versionId });
+              visBesked(`Discarded ${plan.titel}: the original is in Discarded, ${res.filer} file${res.filer === 1 ? '' : 's'} in the Trash${res.productId ? `, product ${res.productId} out of the shop` : ''}.`, 7000);
+            } catch (err) { visFejl(err); }
+          }}
+        />
+      )}
       {modal && (
         <NameModal
           title={modal.title}

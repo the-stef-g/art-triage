@@ -224,35 +224,21 @@ try {
   await page.keyboard.press(' ');
   await page.waitForSelector('.forstoerret', { state: 'detached', timeout: 10000 });
 
-  // Skyderen i bundlinjen styrer hvor mange billeder der staar i bredden,
-  // og fliserne skal fylde hele midterfeltet. Foer var flisebredden fast,
-  // saa de kolonner der ikke gik op blev til en stribe bar baggrund langs
-  // hoejre kant.
-  for (const antal of [3, 7]) {
-    await page.locator('.kolonnevalg input').fill(String(antal));
-    await page.waitForFunction(
-      (n) => document.querySelector('.kolonnevalg .antal')?.textContent.trim() === String(n),
-      antal,
-      { timeout: 10000 }
-    );
-    const maal = await page.evaluate(() => {
-      const omraade = document.querySelector('.grid-omraade').getBoundingClientRect();
-      const celler = [...document.querySelectorAll('.celle')].map((c) => c.getBoundingClientRect());
-      const foerste = celler[0];
-      const iFoersteRaekke = celler.filter((c) => Math.abs(c.top - foerste.top) < 2);
-      const hoejst = Math.max(...iFoersteRaekke.map((c) => c.right));
-      return { rest: omraade.right - hoejst, iRaekken: iFoersteRaekke.length };
-    });
-    // Der er tre billeder, saa ved syv kolonner fyldes raekken ikke, og
-    // der maales kun paa bredden ved tre.
-    if (antal === 3 && maal.iRaekken !== 3) {
-      throw new Error(`Skyderen gav ${maal.iRaekken} billeder i bredden og ikke ${antal}`);
-    }
-    if (antal === 3 && maal.rest > 20) {
-      throw new Error(`Der stod ${Math.round(maal.rest)} px bar baggrund til hoejre for fliserne`);
-    }
+  // Bundlinjens venstre side er ryddet: ingen skyder, intet biblioteksnavn
+  // og ingen tal. Versionsnummeret staar efter navnet i topbjaelken, og
+  // knapperne Scan again, Clean up og Switch library er flyttet til
+  // Edit-menuen; New folder er vaek.
+  if (await page.locator('.kolonnevalg, .statusbar .bibliotek').count()) {
+    throw new Error('Bundlinjen viser stadig skyderen eller biblioteksnavnet');
   }
-  await page.locator('.kolonnevalg input').fill('4');
+  const version = await page.locator('.toolbar .titel .app-version').innerText();
+  if (!/^\d+\.\d+\.\d+$/.test(version.trim())) throw new Error(`Versionsnummeret i topbjaelken er «${version}»`);
+  for (const navn of ['New folder', 'Scan again', 'Clean up', 'Switch library']) {
+    if (await page.locator('.toolbar button', { hasText: navn }).count()) throw new Error(`${navn} staar stadig i vaerktoejslinjen`);
+  }
+  // Sorteringen staar ved soegefeltet.
+  if (!(await page.locator('.soegefelt select').count())) throw new Error('Sorteringen staar ikke ved soegefeltet');
+
 
   // Piletast-navigation gaar i ring. Der er tre billeder, saa tre tryk
   // paa hoejre pil fra det foerste skal lande paa det foerste igen.
@@ -467,17 +453,20 @@ try {
     null,
     { timeout: 15000 }
   );
-  // Koeen til shoppen: et vaerk der ikke kan sendes (ingen noegler), staar
-  // med fejlen og hvorfor, og listen aabner af sig selv.
+  // Koeen til shoppen staar lige under Send to shop, i shop-kolonnen. Et
+  // vaerk der ikke kan sendes (ingen noegler), staar med fejlen og hvorfor,
+  // til det fjernes.
   await page.evaluate(() => window.artTriage.invoke('shop:koeTilfoej', { imageIds: Array.from({ length: 30 }, (_, i) => i + 1) }));
-  await page.waitForSelector('.koe-panel .koe-vaerk.fejl', { timeout: 15000 });
+  await page.waitForSelector('.produkt-hoejre .koe-panel .koe-vaerk.fejl', { timeout: 15000 });
   await page.waitForFunction(() => !document.querySelector('.koe-vaerk.venter, .koe-vaerk.sender'), null, { timeout: 15000 });
   const koeBesked = await page.locator('.koe-panel .koe-besked').first().innerText();
   if (!koeBesked.trim()) throw new Error('Koeen siger ikke, hvorfor et vaerk ikke blev sendt');
   await page.screenshot({ path: join(projectRoot, 'smoke-koe.png') });
-  await page.locator('.koe-panel button', { hasText: 'Clear finished' }).click();
-  await page.waitForSelector('.koe-panel .koe-vaerk', { state: 'detached', timeout: 5000 });
-  await page.locator('.koe-panel button', { hasText: 'Close' }).click();
+  // Fejlene bliver staaende, til de fjernes; saa er koeen vaek.
+  while (await page.locator('.koe-panel .koe-vaerk').count()) {
+    await page.locator('.koe-panel .koe-vaerk button', { hasText: 'Remove' }).first().click();
+  }
+  await page.waitForSelector('.koe-panel', { state: 'detached', timeout: 5000 });
   await page.locator('.fase', { hasText: 'Sort' }).click();
 
   // Cmd+6 gaar til 6 Shop, ogsaa fra et tekstfelt, og Cmd+1 tilbage.

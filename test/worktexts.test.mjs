@@ -37,7 +37,8 @@ describe('instruktionen', () => {
     for (const regel of [
       'There is no word count', 'Eye level with the reader', 'No art talk', 'never',
       'Never open with "This artwork"', 'one sentence', '150 characters',
-      'stunning', 'one-of-a-kind', 'perfect', 'em-dash', 'AI', 'Photoshop',
+      'stunning', 'one-of-a-kind', 'perfect', 'Not X. Not Y. But Z.', 'AI', 'Photoshop',
+      'Let people see and interpret for themselves', 'Never tell the reader what to see',
       'Describe only what can be seen', 'rust', 'never translated', 'British English',
     ]) {
       expect(TEXT_SYSTEM_PROMPT).toContain(regel);
@@ -95,10 +96,10 @@ describe('svaret', () => {
     expect(uden.section_colour).toBeUndefined();
   });
 
-  it('fjerner tankestreger', () => {
-    expect(cleanText('Light — and stone')).toBe('Light, and stone');
-    expect(cleanText('2019–2021')).toBe('2019-2021');
-    expect(parseTexts(svar({ ...gode, short_text: 'Dawn — cold.' })).short_text).toBe('Dawn, cold.');
+  it('lader tankestreger staa og rydder mellemrum op', () => {
+    expect(cleanText('Light — and  stone')).toBe('Light — and stone');
+    expect(parseTexts(svar({ ...gode, short_text: 'Dawn — cold.' })).short_text).toBe('Dawn — cold.');
+    expect(TEXT_SYSTEM_PROMPT).not.toMatch(/em-dash/);
   });
 });
 
@@ -159,6 +160,7 @@ describe('kunstsnak', () => {
     expect(w).toMatch(/"echo"/);
     expect(w).toMatch(/"anchoring"/);
     expect(w).toMatch(/"the eye"/);
+    expect(lintTexts({ description: 'The fish seems to swim, as if in water.', short_text: 'x', alt_text: 'x' }).join(' ')).toMatch(/"seems to"/);
     // En kort tekst er fin: der er ingen ordgraense.
     expect(lintTexts({ description: 'A fish made of petals.', short_text: 'A fish.', alt_text: 'A fish.' })).toEqual([]);
   });
@@ -171,7 +173,8 @@ describe('serien', () => {
   ];
 
   it('beder om en kort intro og en farve, uden noget der skifter fra serie til serie', () => {
-    expect(SERIE_SYSTEM_PROMPT).toMatch(/There is no word count/);
+    expect(SERIE_SYSTEM_PROMPT).toMatch(/no word count/);
+    expect(SERIE_SYSTEM_PROMPT).toMatch(/interpret for themselves/);
     expect(SERIE_SYSTEM_PROMPT).not.toMatch(/\d+ to \d+ words/);
     expect(SERIE_SYSTEM_PROMPT).not.toContain('Desert Canyon');
     const brief = serieBrief('Desert Canyon', vaerker);
@@ -180,11 +183,11 @@ describe('serien', () => {
     expect(brief).toContain('Clouds over the plain.');
   });
 
-  it('henter intro og farve ud af svaret, og renser tankestreger', async () => {
+  it('henter intro og farve ud af svaret', async () => {
     const kald = [];
     const client = { messages: { create: async (req) => { kald.push(req); return svar({ intro: 'A canyon — at dawn.', colour: '#AA5533' }); } } };
     const res = await new ClaudeWorkTexts({ apiKey: 'k', model: 'claude-haiku-4-5', client }).writeSeries('Desert Canyon', vaerker);
-    expect(res.serie).toEqual({ intro: 'A canyon, at dawn.', colour: '#aa5533' });
+    expect(res.serie).toEqual({ intro: 'A canyon — at dawn.', colour: '#aa5533' });
     expect(kald[0].messages[0].content).toHaveLength(1);
     expect(parseSerie(svar({ intro: '', colour: '#000000' }))).toBe(null);
   });

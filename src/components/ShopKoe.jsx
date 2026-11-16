@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
-import { createPortal } from 'react-dom';
 import {
-  useKoe, koeTilfoej, koeFjern, koeRyd, koersel, vaerkDel, mb, varighed, klokken,
+  useKoe, koeTilfoej, koeFjern, koersel, vaerkDel, mb, varighed, klokken,
 } from '../koe';
 
 // Uret til tid brugt og tid tilbage, kun mens koeen koerer.
@@ -71,30 +70,35 @@ const STATUS = {
   fejl: () => 'Error',
 };
 
-// Koeen til shoppen: alt der venter, i den raekkefoelge det sendes, og
-// hvordan det gik med det der er sendt. Kan aabnes fra alle faser.
-function KoePanel({ t, nu, onLuk }) {
-  const faerdige = t.vaerker.some((k) => k.status !== 'venter' && k.status !== 'sender');
+// Koeen til shoppen, lige under Send to shop: alt der venter, i den
+// raekkefoelge det sendes, og hvordan det gik. Er der intet i koeen, staar
+// der intet. De sendte vaerker forsvinder af sig selv, naar koeen er
+// faerdig; sprunget over og fejl bliver staaende med aarsagen.
+export default function ShopKoe() {
+  const t = useKoe();
+  const nu = useNu(t.koerer);
+  if (!t.vaerker.length) return null;
   return (
-    <div className="koe-panel" role="dialog" aria-label="Shop queue">
-      <div className="koe-hoved">
-        <h4>Shop queue</h4>
-        {faerdige && <button className="lille" onClick={() => koeRyd()} title="Remove the works that are done from the list">Clear finished</button>}
-        <button className="lille" onClick={onLuk} title="Close (the queue keeps running)">Close</button>
-      </div>
+    <div className="koe-panel" aria-label="Shop queue">
+      <h4>Shop queue</h4>
       <KoeFremdrift t={t} nu={nu} />
-      {!t.vaerker.length && <p className="tom">Nothing in the queue. Select works in Product or Shop and click Send to shop.</p>}
       <ol className="koe-liste">
         {t.vaerker.map((k) => (
           <li key={k.id} className={`koe-vaerk ${k.status}`}>
             <div className="koe-linje">
               <span className="koe-titel">{k.titel}</span>
               <span className="koe-status">{STATUS[k.status]?.(k) ?? k.status}</span>
-              {k.status === 'venter' && (
-                <button className="lille" onClick={() => koeFjern(k.id)} title="Take the work out of the queue. Nothing is sent.">Remove</button>
+              {(k.status === 'venter' || k.status === 'sprunget' || k.status === 'fejl') && (
+                <button
+                  className="lille"
+                  onClick={() => koeFjern(k.id)}
+                  title={k.status === 'venter' ? 'Take the work out of the queue. Nothing is sent.' : 'Remove from the list'}
+                >
+                  Remove
+                </button>
               )}
             </div>
-            {k.besked && <p className="koe-besked">{k.besked}{k.varighed >= 1000 ? ` (${varighed(k.varighed)})` : ''}</p>}
+            {k.besked && k.status !== 'sendt' && <p className="koe-besked">{k.besked}</p>}
             {k.status === 'sprunget' && k.existing && (
               <button
                 className="lille"
@@ -111,36 +115,5 @@ function KoePanel({ t, nu, onLuk }) {
         ))}
       </ol>
     </div>
-  );
-}
-
-// Knappen i bundlinjen. Den viser koeen kort, og et klik aabner listen.
-export default function KoeKnap() {
-  const t = useKoe();
-  const [aaben, setAaben] = useState(false);
-  const nu = useNu(t.koerer);
-  const venter = t.vaerker.filter((k) => k.status === 'venter').length;
-  const fejl = t.vaerker.filter((k) => k.status === 'fejl' || k.status === 'sprunget').length;
-  // Aabner af sig selv, naar noget laegges i koeen.
-  const [sidstAntal, setSidstAntal] = useState(0);
-  useEffect(() => {
-    const n = t.vaerker.filter((k) => k.status === 'venter' || k.status === 'sender').length;
-    if (n > sidstAntal) setAaben(true);
-    setSidstAntal(n);
-  }, [t.vaerker]); // eslint-disable-line react-hooks/exhaustive-deps
-  if (!t.vaerker.length && !aaben) return null;
-  const k = koersel(t);
-  const tekst = t.koerer
-    ? `Shop queue · ${k.nr} of ${k.ialt}`
-    : fejl ? `Shop queue · ${fejl} not sent` : 'Shop queue';
-  return (
-    <>
-      <button className={`lille koe-knap ${t.koerer ? 'koerer' : ''} ${!t.koerer && fejl ? 'fejl' : ''}`} onClick={() => setAaben((a) => !a)} title="Show the queue of works going to the shop">
-        {tekst}
-        {t.koerer && <span className="koe-mini"><span style={{ width: `${Math.round(k.del * 100)}%` }} /></span>}
-        {!t.koerer && venter ? ` · ${venter} waiting` : ''}
-      </button>
-      {aaben && createPortal(<KoePanel t={t} nu={nu} onLuk={() => setAaben(false)} />, document.body)}
-    </>
   );
 }

@@ -1421,15 +1421,43 @@ export class Catalog extends EventEmitter {
   // Kassér et vaerk i fase 2: originalen gaar til Discarded som alle andre
   // kasserede, og redigeringerne fjernes fra kataloget. Returnerer de filer
   // og den arbejdsmappe der skal i papirkurven (det goer kalderen).
+  // Hvad der sker, naar et vaerk kasseres: originalen til Discarded, og
+  // alt andet i vaerkmappen (redigeringer, master, beskaeringer, printfiler)
+  // i papirkurven sammen med mapperne. Intet roeres her.
+  kasserPlan(versionId) {
+    const vaerk = this._vaerkFor(versionId);
+    if (!vaerk) throw new Error('Only approved works can be discarded this way');
+    const original = this.db.get(
+      'SELECT f.rel_path FROM images i JOIN files f ON f.id = i.master_file_id WHERE i.id=?', vaerk.imageId
+    )?.rel_path ?? null;
+    const mappe = join(this.root, 'Approved', vaerk.work);
+    const filer = [];
+    const gaa = (abs) => {
+      let navne;
+      try { navne = readdirSync(abs, { withFileTypes: true }); } catch { return; }
+      for (const d of navne) {
+        if (d.name === '.DS_Store') continue;
+        const sti = join(abs, d.name);
+        if (d.isDirectory()) gaa(sti);
+        else filer.push(toRel(this.root, sti));
+      }
+    };
+    gaa(mappe);
+    return {
+      imageId: vaerk.imageId,
+      work: vaerk.work,
+      original,
+      tilPapirkurv: filer.filter((r) => r !== original).sort((a, b) => daCollator.compare(a, b)),
+      mappe: `Approved/${vaerk.work}`,
+    };
+  }
+
+  // Kasserer hele vaerket, ogsaa et med en master: originalen gaar til
+  // Discarded, og resten af vaerkets versioner forsvinder fra kataloget.
+  // Selve vaerkmappen laegges i papirkurven af den der kalder.
   kasserVaerk(versionId) {
     const vaerk = this._vaerkFor(versionId);
-    if (!vaerk) throw new Error('Only Approved works can be discarded here');
-    const harMaster = this.db.get(
-      `SELECT 1 AS ok FROM versions v JOIN files f ON f.id = v.file_id
-       WHERE v.image_id=? AND f.present=1 AND f.rel_path LIKE 'Approved/%/Masters/%' LIMIT 1`,
-      vaerk.imageId
-    );
-    if (harMaster) throw new Error('This work already has a master and is no longer in Edit');
+    if (!vaerk) throw new Error('Only approved works can be discarded this way');
     const ekstra = this.db.all(
       `SELECT v.id AS vid, f.id AS fid, f.rel_path FROM versions v JOIN files f ON f.id = v.file_id
        WHERE v.image_id=? AND v.is_master=0`,
@@ -1445,9 +1473,8 @@ export class Catalog extends EventEmitter {
     });
     // Originalen flyttes af den almindelige regel for kasserede.
     this.setRating(alle.filter((id) => !ekstra.some((e) => e.vid === id)), 'kasseret');
-    return { filer: tilPapirkurv, arbejdsmappe: join(this.root, 'Approved', vaerk.work) };
+    return { imageId: vaerk.imageId, filer: tilPapirkurv, arbejdsmappe: join(this.root, 'Approved', vaerk.work) };
   }
-
 
   getVersion(versionId) {
     return this.db.get(

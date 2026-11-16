@@ -962,6 +962,22 @@ export class ShopSync {
     return { productId: produkt.id, status: produkt.status };
   }
 
+  // Et kasseret vaerk fjernes fra shoppen: produktet og dets varianter
+  // laegges i WordPress' papirkurv (kan hentes tilbage dér), og appen
+  // glemmer det. Er produktet allerede vaek i shoppen, er der intet at goere.
+  async slet(imageId) {
+    const work = this.works.get(imageId);
+    if (!work.wooProductId) return { productId: null };
+    const id = work.wooProductId;
+    try {
+      await this.client.wc('DELETE', `/products/${id}`);
+    } catch (err) {
+      if (err.status !== 404) throw err;
+    }
+    this.works.setWooProductId(imageId, null);
+    return { productId: id };
+  }
+
   async publish(imageId) {
     const work = this.works.get(imageId);
     if (!work.wooProductId) throw new ShopError('Send the work to the shop first');

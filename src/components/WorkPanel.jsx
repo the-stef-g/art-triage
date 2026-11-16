@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { invoke } from '../api';
-import { useKoe, koeTilfoej, vaerkDel, klokken, mb } from '../koe';
+import { useKoe, koeTilfoej } from '../koe';
+import ShopKoe from './ShopKoe';
 
 const HEX = /^#[0-9a-f]{6}$/i;
 
@@ -441,7 +442,7 @@ export default function WorkPanel({ row, versions, tekstRev = 0, hasKey, shop, o
           <button disabled={busy || sendes} onClick={remove} title="Take the product off the site. It becomes a draft again.">Remove from shop</button>
         )}
       </div>
-      {iKoe && <VaerkIKoe k={iKoe} koe={koe} onKobl={(id) => sendToShop(id)} />}
+      <ShopKoe />
       <div className="knapraekke finder-knap">
         <button
           onClick={() => invoke('img:openWorkFolder', { versionId: row.version_id }).catch(onError)}
@@ -537,36 +538,4 @@ function OmdoebDialog({ plan, onRename, onTitle, onCancel }) {
       </div>
     </div>
   );
-}
-
-// Vaerkets linje under shopknapperne: hvor det er i koeen, hvor langt det
-// er naaet, og hvordan det endte.
-function VaerkIKoe({ k, koe, onKobl }) {
-  if (k.status === 'venter') {
-    const foran = koe.vaerker.filter((x) => (x.status === 'venter' || x.status === 'sender') && x.id < k.id).length;
-    return <p className="shop-fremdrift igang" role="status">Waiting in the shop queue{foran ? ` (${foran} before it)` : ''}</p>;
-  }
-  if (k.status === 'sender') {
-    const f = koe.fremdrift;
-    return (
-      <div className="shop-fremdrift igang" role="status">
-        <div className="koe-bjaelke"><div style={{ width: `${Math.round(vaerkDel(f) * 100)}%` }} /></div>
-        <p>{f?.tekst ?? 'Starting'}{f?.total ? ` · ${mb(f.bytes || 0)} of ${mb(f.total)} MB` : ''} …</p>
-      </div>
-    );
-  }
-  if (k.status === 'sendt') return <p className="shop-fremdrift ok" role="status">✓ {k.besked} at {klokken(k.tid)}</p>;
-  if (k.status === 'sprunget') {
-    return (
-      <div className="shop-fremdrift fejl" role="status">
-        <p>Skipped: {k.besked}</p>
-        {k.existing && (
-          <button className="lille" onClick={() => onKobl(k.existing.id)} title="Its texts and images are replaced by the ones here">
-            Update product {k.existing.id} from the app
-          </button>
-        )}
-      </div>
-    );
-  }
-  return <p className="shop-fremdrift fejl" role="status">✕ Not sent: {k.besked}</p>;
 }

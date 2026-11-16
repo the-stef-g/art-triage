@@ -16,10 +16,14 @@ export const TEXT_SYSTEM_PROMPT = [
   'to someone standing in front of the picture. Use British English.',
   '',
   'How to write:',
-  '- Eye level with the reader. Everyday words and short sentences. Say what is there and what is',
-  '  worth noticing, and stop. Write only what means something about this particular work.',
-  '- There is no word count. If there is little to say, the text is short. Two good sentences',
-  '  beat a paragraph of filler.',
+  '- Short. Only the words that are needed. There is no word count: if there is little to say,',
+  '  the text is one or two sentences.',
+  '- Let people see and interpret for themselves. Say briefly what is there, and what could',
+  '  easily be missed, and stop. Never tell the reader what to see, feel or think, and never',
+  '  explain what the work means. No "seems to", "suggests", "as if", "reminds", "captures" or',
+  '  "you can almost". Do not describe a mood.',
+  '- Eye level with the reader. Everyday words and short sentences, down to earth, no corporate',
+  '  speak.',
   '- No art talk. Never words like "anchoring", "echoing", "invites", "evokes", "the eye",',
   '  "interplay", "juxtaposition", "a sense of", "a celebration of", "speaks to", "draws you in".',
   '- Do not list colours for the sake of it. Name a colour only when it matters.',
@@ -47,7 +51,7 @@ export const TEXT_SYSTEM_PROMPT = [
   'Rules for all three:',
   '- No superlatives and no clichés: never "stunning", "unique", "one-of-a-kind" or "perfect',
   '  gift". No sales tricks.',
-  '- No dashes of the em-dash kind. Use a comma, a full stop or "and" instead.',
+  '- No triads such as "Not X. Not Y. But Z." or three adjectives in a row.',
   '- Never mention AI, Photoshop or any other tool. The tools are only tools.',
   '- Describe only what can be seen. Do not write "drawn", "painted" or the like about a',
   '  technique the work does not have. Choose colour words that cannot be read as materials,',
@@ -98,12 +102,10 @@ export function buildTextRequest({ model, base64, mediaType, work }) {
   };
 }
 
-// Tankestreger er forbudt, og et svar er ikke altid lydigt. En tankestreg
-// med mellemrum omkring bliver til komma, resten til bindestreg.
+// Mellemrum ryddes op. Tankestreger staar, som Claude skrev dem: Stef
+// bruger dem selv.
 export function cleanText(text) {
   return String(text ?? '')
-    .replace(/\s+[—–]\s+/g, ', ')
-    .replace(/[—–]/g, '-')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -138,6 +140,8 @@ const FORBUDTE = [
   /\banchor(?:s|ing|ed)?\b/i, /\becho(?:es|ing|ed)?\b/i, /\binvites?\b/i, /\bevok(?:es|ing|ed?)\b/i,
   /\bthe eye\b/i, /\binterplay\b/i, /\bjuxtaposition\b/i, /\ba sense of\b/i,
   /\ba celebration of\b/i, /\bspeaks to\b/i, /\bdraws you in\b/i,
+  // At fortaelle laeseren, hvad der skal ses.
+  /\bseems? to\b/i, /\bsuggests?\b/i, /\bas if\b/i, /\byou can almost\b/i,
 ];
 
 // Advarsler til Stef, ikke afvisninger: teksten gemmes alligevel, for den
@@ -219,10 +223,10 @@ export const SERIE_SYSTEM_PROMPT = [
   'will read and correct your draft, so write plainly and do not decorate. Use British English.',
   '',
   'INTRO: what the works in the series share: the place, the light or the subject. Name the',
-  'series exactly as given. Do not list the works one by one. There is no word count: write',
-  'only what means something, at eye level with the reader, in everyday words and short',
-  'sentences, as the artist would say it. No art talk ("echoing", "invites", "a sense of") and',
-  'no closing sentence about the mood.',
+  'series exactly as given. Do not list the works one by one. Short, only the words that are',
+  'needed, no word count. Let people see and interpret for themselves: never tell them what to',
+  'see, feel or think, and do not explain what the series means or describe a mood. Everyday',
+  'words, short sentences, down to earth. No art talk ("echoing", "invites", "a sense of").',
   '',
   'COLOUR: one colour as a hex code (#rrggbb) for the series on the website. It must sit well',
   'with the section colours of the works and set the series off; do not simply repeat one of them.',
@@ -230,7 +234,7 @@ export const SERIE_SYSTEM_PROMPT = [
   'Rules:',
   '- No superlatives and no clichés: never "stunning", "unique", "one-of-a-kind" or "perfect',
   '  gift". No sales tricks.',
-  '- No dashes of the em-dash kind. Use a comma, a full stop or "and" instead.',
+  '- No triads such as "Not X. Not Y. But Z.".',
   '- Never mention AI, Photoshop or any other tool.',
   '- Series names and titles are never translated.',
 ].join('\n');

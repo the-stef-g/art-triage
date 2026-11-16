@@ -88,6 +88,8 @@ try {
     };
     new MutationObserver(kig).observe(document.documentElement, { subtree: true, childList: true, characterData: true });
   });
+  // Scan Again sidder i Edit-menuen; testen beder appen om det samme direkte.
+  const skanIgen = () => page.evaluate(() => window.artTriage.invoke('lib:rescan'));
   const glemBeskeder = () => page.evaluate(() => { window.__beskeder = []; });
   const ventBesked = (re, timeout) => page.waitForFunction(
     (kilde) => window.__beskeder.some((t) => new RegExp(kilde).test(t)), re.source, { timeout },
@@ -114,7 +116,7 @@ try {
   // En masterfil lægges i Master, og appen finder den. Vaerket forlader
   // fase 2 og staar i fase 3 (Crops).
   await billede(join(lib, 'Approved', 'blaa', 'Masters', 'blaa master.png'));
-  await page.locator('button', { hasText: 'Scan again' }).click();
+  await skanIgen();
   await page.waitForFunction(() => document.querySelectorAll('.tile').length === 0, null, { timeout: 20000 });
   await page.locator('.fase', { hasText: 'Crop' }).click();
   // Crop: vaerkerne i en filmstribe under beskaeringen, én pr. vaerk.
@@ -232,7 +234,7 @@ try {
   mkdirSync(join(lib, 'Approved', 'blaa', 'Edits'), { recursive: true });
   const giga21 = join(lib, 'Approved', 'blaa', 'Edits', 'blaa master 2-1-giga.png');
   copyFileSync(join(lib, 'Approved', 'blaa', 'Masters', 'blaa master 2-1.png'), giga21);
-  await page.locator('button', { hasText: 'Scan again' }).click();
+  await skanIgen();
   await page.waitForTimeout(1500);
   await page.locator('.crop-format.findes:has-text("2:1") .crop-minus').click();
   await page.waitForSelector('.dialog >> text=blaa master 2-1-giga.png', { timeout: 10000 });
@@ -245,7 +247,7 @@ try {
 
   // Omdoeber man den selv i Finder, foelger appen med efter en genscanning.
   renameSync(join(lib, 'Approved', 'blaa', 'Masters', 'blaa master 1-1.png'), join(lib, 'Approved', 'blaa', 'Masters', 'blaa master 3-2.png'));
-  await page.locator('button', { hasText: 'Scan again' }).click();
+  await skanIgen();
   await page.waitForSelector('.crop-format.findes button:has-text("3:2")', { timeout: 20000 });
   await page.waitForSelector('.crop-format:not(.findes) button:has-text("1:1")', { timeout: 20000 });
   await page.screenshot({ path: join(projectRoot, 'smoke-crop-knapper.png') });
@@ -288,7 +290,7 @@ try {
   const foer = new Date(Date.now() - 10_000);
   utimesSync(join(edits, 'blaa master 3-2-giga.png'), foer, foer);
   await glemBeskeder();
-  await page.locator('button', { hasText: 'Scan again' }).click();
+  await skanIgen();
   await ventBesked(/is not 3:2/, 30000);
   if (await page.locator('.print-linje:not(.hoved)').count() !== 1) throw new Error('-giga-filen staar paa sin egen linje');
   if (existsSync(join(lib, 'Approved', 'blaa', 'Print files', 'blaa master 3-2.jpg'))) {
@@ -298,7 +300,7 @@ try {
   // Med det rigtige format i navnet laver appen selv printfilen.
   renameSync(kilde, join(lib, 'Approved', 'blaa', 'Masters', 'blaa master 1-1.png'));
   renameSync(join(edits, 'blaa master 3-2-giga.png'), join(edits, 'blaa master 1-1-giga.png'));
-  await page.locator('button', { hasText: 'Scan again' }).click();
+  await skanIgen();
   const printfil = join(lib, 'Approved', 'blaa', 'Print files', 'blaa master 1-1.jpg');
   const t0 = Date.now() + 30_000;
   while (!existsSync(printfil) && Date.now() < t0) await page.waitForTimeout(250);
@@ -322,7 +324,7 @@ try {
   renameSync(`${giga}.tmp`, giga);
   const lidtSiden = new Date(Date.now() - 10_000);
   utimesSync(giga, lidtSiden, lidtSiden);
-  await page.locator('button', { hasText: 'Scan again' }).click();
+  await skanIgen();
   const slut = Date.now() + 30_000;
   while (!existsSync(printfil) && Date.now() < slut) await page.waitForTimeout(250);
   if (!existsSync(printfil)) throw new Error('Printfilen blev ikke lavet automatisk');

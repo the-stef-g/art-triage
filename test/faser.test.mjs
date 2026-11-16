@@ -212,10 +212,25 @@ describe('fase 2', () => {
     expect(fase(2)).toEqual([]);
   });
 
-  it('et vaerk med en master kan ikke kasseres herfra', () => {
+  it('et vaerk med en master kan ogsaa kasseres, fra masteren eller en beskaering', () => {
+    skriv('Approved/x/Edits/x-neo.tif', 'e');
     skriv('Approved/x/Masters/x.tif', 'm');
+    skriv('Approved/x/Masters/x 2-3.tif', 'c');
+    skriv('Approved/x/Print files/x 2-3.jpg', 'p');
     catalog.sync();
-    expect(() => catalog.kasserVaerk(raekke('Approved/x/Masters/x.tif').version_id)).toThrow(/master/);
+    const crop = raekke('Approved/x/Masters/x 2-3.tif').version_id;
+    // Planen viser originalen og det der gaar i papirkurven; intet roeres.
+    const plan = catalog.kasserPlan(crop);
+    expect(plan.original).toBe('Approved/x/Original/x.cr2');
+    expect(plan.mappe).toBe('Approved/x');
+    expect(plan.tilPapirkurv).toEqual([
+      'Approved/x/Edits/x-neo.tif', 'Approved/x/Masters/x 2-3.tif', 'Approved/x/Masters/x.tif', 'Approved/x/Print files/x 2-3.jpg',
+    ]);
+    expect(existsSync(join(root, 'Approved/x/Masters/x.tif'))).toBe(true);
+    const { arbejdsmappe } = catalog.kasserVaerk(crop);
+    expect(arbejdsmappe).toBe(join(root, 'Approved/x'));
+    expect(raekke('Discarded/x/x.cr2').rating).toBe('kasseret');
+    for (const n of [2, 3, 4, 5]) expect(fase(n).filter((r) => r.startsWith('Approved/x/'))).toEqual([]);
   });
 });
 

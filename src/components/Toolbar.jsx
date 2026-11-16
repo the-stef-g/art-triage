@@ -15,16 +15,16 @@ const HANDLINGER = {
     { tast: 'X', navn: 'discard' },
     { tast: 'U', navn: 'unrated' },
   ],
-  2: [
-    { tast: 'X', navn: 'discard work' },
-  ],
+  2: [{ tast: 'X', navn: 'discard work' }],
+  3: [{ tast: 'X', navn: 'discard work' }],
+  4: [{ tast: 'X', navn: 'discard work' }],
+  5: [{ tast: 'X', navn: 'discard work' }],
 };
 // Space og Cmd+Z er ikke med. De sidder i fingrene i forvejen, og en
 // knap til dem ville bare fylde i raekken.
 
 export default function Toolbar({
-  filter, setFilter, searchInfo, faseTal, onNewFolder, onCleanup, onChooseLibrary, onRescan, skanner,
-  act, harValg,
+  filter, setFilter, searchInfo, faseTal, act, harValg, version,
 }) {
   const [text, setText] = useState(filter.search);
 
@@ -70,7 +70,7 @@ export default function Toolbar({
       case 'A': act.setRating('godkendt'); break;
       case 'C': act.setRating('kandidat'); break;
       case 'X':
-        if (filter.fase === 2) act.discardWork();
+        if (filter.fase >= 2) act.discardWork();
         else act.setRating('kasseret');
         break;
       case 'U': act.setRating('ubedomt'); break;
@@ -80,7 +80,7 @@ export default function Toolbar({
 
   return (
     <header className="toolbar">
-      <div className="titel">Stef G Art</div>
+      <div className="titel">Stef G Art{version && <span className="app-version">{version}</span>}</div>
       <nav className="faser">
         {FASER.map(([nr, navn]) => (
           <button
@@ -114,6 +114,15 @@ export default function Toolbar({
             Clear
           </button>
         )}
+        {/* Sorteringen staar lige ved soegefeltet. */}
+        <select
+          value={filter.sort}
+          onChange={(e) => setFilter((f) => ({ ...f, sort: e.target.value }))}
+          title="Sort order"
+        >
+          <option value="navn">Name</option>
+          <option value="dato">Modified</option>
+        </select>
       </div>
       {searchInfo?.error && <span className="soegebesked">{searchInfo.error}</span>}
       <div className="filtre">
@@ -123,14 +132,6 @@ export default function Toolbar({
             <button className={filter.kunKasserede ? 'chip aktiv' : 'chip'} onClick={() => visKun('kunKasserede')} title="Show discarded only">Discarded</button>
           </>
         )}
-        <select
-          value={filter.sort}
-          onChange={(e) => setFilter((f) => ({ ...f, sort: e.target.value }))}
-          title="Sort order"
-        >
-          <option value="navn">Name</option>
-          <option value="dato">Modified</option>
-        </select>
       </div>
       <div className="handlinger">
         {(HANDLINGER[filter.fase] || []).map((h) => (
@@ -145,18 +146,6 @@ export default function Toolbar({
             <span className="handlingsnavn">{h.navn}</span>
           </button>
         ))}
-      </div>
-      <div className="vaerktoejer">
-        <button onClick={onNewFolder}>New folder</button>
-        <button
-          onClick={onRescan}
-          disabled={skanner}
-          title="Go through the folder for new and changed files right now"
-        >
-          {skanner ? 'Scanning …' : 'Scan again'}
-        </button>
-        <button onClick={onCleanup} title="Move files where every version is discarded to the Discarded folder, and delete empty folders in Import">Clean up</button>
-        <button onClick={onChooseLibrary} title="Switch to a different image folder">Switch library</button>
       </div>
     </header>
   );

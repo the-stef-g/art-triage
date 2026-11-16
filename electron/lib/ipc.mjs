@@ -29,6 +29,8 @@ import { debounce, dataDirFor, openFdCount } from './util.mjs';
 // periodiske genskanning er derfor ikke et sikkerhedsnet men den baerende
 // mekanisme: uden den dukker nye filer foerst op efter en genstart.
 const RESCAN_MIN_MS = 90_000;
+// Saa laenge staar et sendt vaerk i koeen, naar koeen er faerdig.
+const KOE_RYD_MS = 5000;
 // Et langsomt drev maa ikke ende med at skanne i et vaek. Naeste skanning
 // planlaegges tidligst naar der er gaaet ti gange saa lang tid som den
 // forrige tog, saa skanningen hoejst fylder en tiendedel af tiden.
@@ -61,6 +63,7 @@ const ARBEJDE = {
   'work:omdoeb': 'renaming the files of a work',
   'work:flytTil': 'moving a file to another work',
   'work:egetVaerk': 'making a work of its own',
+  'work:discard': 'discarding a work',
   'edit:makeMaster': 'making a master',
   'edit:send': 'copying to an editor',
   'work:writeTexts': 'writing texts with Claude',
@@ -797,6 +800,16 @@ export class AppSession {
       this.koeKoerer = false;
       this.koeFremdrift = null;
       this._koeMeld();
+      // Koeen rydder selv: de sendte vaerker forsvinder efter et oejeblik.
+      // Sprunget over og fejl bliver staaende med aarsagen.
+      clearTimeout(this.koeRydTimer);
+      this.koeRydTimer = setTimeout(() => {
+        if (this.koeKoerer) return;
+        const foer = this.koe.length;
+        this.koe = this.koe.filter((k) => k.status !== 'sendt');
+        if (this.koe.length !== foer) this._koeMeld();
+      }, KOE_RYD_MS);
+      this.koeRydTimer.unref?.();
     }
   }
 
@@ -1144,14 +1157,31 @@ export class AppSession {
 
     // Fase 2: kassér et vaerk. Originalen gaar til Discarded, og redigeringerne
     // og den tomme arbejdsmappe gaar i papirkurven.
+    // Kassér et vaerk i fase 2-5: planen foerst, saa dialogen kan vise den.
+    handle('work:discardPlan', ({ versionId }) => {
+      const plan = this.requireCatalog().kasserPlan(versionId);
+      const w = this.works?.get(plan.imageId);
+      return { ...plan, titel: w?.effective?.title ?? plan.work, productId: w?.wooProductId ?? null, status: w?.wooStatus ?? null };
+    });
     handle('work:discard', async ({ versionId }) => {
       const catalog = this.requireCatalog();
+      const plan = catalog.kasserPlan(versionId);
+      const w = this.works?.get(plan.imageId);
+      if (w?.wooStatus === 'publish') {
+        throw new Error('The work is published on the site. Take it off with Remove from shop first.');
+      }
+      // Shoppen foerst: kan produktet ikke fjernes, kasseres intet.
+      if (w?.wooProductId) {
+        const res = await this._shopCall((shop) => shop.slet(plan.imageId), plan.imageId);
+        this.log(`discard work: product ${res.productId} moved to the Trash in the shop`);
+      }
       const { filer, arbejdsmappe } = catalog.kasserVaerk(versionId);
       if (existsSync(arbejdsmappe)) await shell.trashItem(arbejdsmappe);
       else for (const f of filer) await shell.trashItem(f).catch(() => {});
-      this.log(`discard work: ${filer.length} edit file(s) to the Trash`);
+      this.log(`discard work: ${plan.work}, ${plan.tilPapirkurv.length} file(s) and the work folder to the Trash`);
       await this.runSync('kassering');
-      return { edits: filer.length };
+      this.broadcast('changed');
+      return { filer: plan.tilPapirkurv.length, productId: w?.wooProductId ?? null };
     });
 
     // Beskaeringen paa en fil i Master. Den staar i filnavnet, saa filen

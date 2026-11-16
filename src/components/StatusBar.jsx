@@ -1,11 +1,8 @@
-import KoeKnap from './ShopKoe';
-
 export const MIN_KOLONNER = 3;
 export const MAX_KOLONNER = 10;
 
 export default function StatusBar({
-  counts, aiStatus, indexProgress, searchInfo, fejl, library, version, drevMangler, kwStatus, textStatus, thumbStatus, onRetryPreviews,
-  kolonner, setKolonner,
+  aiStatus, indexProgress, fejl, drevMangler, kwStatus, textStatus, thumbStatus, onRetryPreviews,
 }) {
   const aiTekst = (() => {
     if (!aiStatus) return '';
@@ -46,39 +43,12 @@ export default function StatusBar({
 
   return (
     <footer className="statusbar">
-      {/* Skyderen staar yderst til venstre, saa den ikke flytter sig, naar
-          teksten i statuslinjen skifter. */}
-      <label className="kolonnevalg" title="How many images across the grid">
-        <input
-          type="range"
-          min={MIN_KOLONNER}
-          max={MAX_KOLONNER}
-          value={kolonner}
-          onChange={(e) => setKolonner(Number(e.target.value))}
-        />
-        <span className="antal">{kolonner}</span>
-      </label>
-      {version && <span className="version">Stef G Art {version}</span>}
-      <span className="bibliotek" title={library?.root}>{library?.root?.split('/').pop()}</span>
-      {counts && (
-        <span>
-          {counts.total} images
-          {counts.byRating?.godkendt ? ` · ${counts.byRating.godkendt} approved` : ''}
-          {counts.byRating?.kandidat ? ` · ${counts.byRating.kandidat} candidates` : ''}
-          {counts.byRating?.kasseret ? ` · ${counts.byRating.kasseret} discarded` : ''}
-          {` · ${counts.indexed} analysed`}
-        </span>
-      )}
-      {searchInfo && !searchInfo.error && (
-        <span className="soegeinfo">{searchInfo.matched} results</span>
-      )}
       <span className="spacer" />
       {drevMangler && (
         <span className="drev-mangler" title="The catalogue is untouched. Connect the drive and click Scan again.">
           Drive not connected
         </span>
       )}
-      <KoeKnap />
       {kwTekst && <span className="kw-status">{kwTekst}</span>}
       {textTekst && <span className="kw-status">{textTekst}</span>}
       {thumbStatus?.failed > 0 && (
