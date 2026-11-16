@@ -4,7 +4,7 @@ Det der venter. Stef siger "byg", før noget herfra bliver lavet.
 
 ## Venter på "byg"
 
-Intet lige nu.
+- **Product: en Write intro-knap ved Series intro.** Knappen beder Claude om en ny intro til serien med det samme, efter de nuværende regler (kort, som regel én sætning), også når serien allerede har en intro. Har Stef selv rettet i introen, spørger appen først, om den skal overskrives. Seriens farve røres ikke, hvis den er valgt. Bagefter sendes introen med næste Update shop.
 
 ## Venter på en afklaring
 
