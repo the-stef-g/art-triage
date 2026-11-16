@@ -5,6 +5,7 @@ Det der venter. Stef siger "byg", før noget herfra bliver lavet.
 ## Venter på "byg"
 
 - **Edit: værkets navn kan ændres.** Et felt med værkets navn (titlen) øverst i højre kolonne i Edit, som i Product. En ny titel spørger som i Product, om filerne skal omdøbes (værkmappen og alle filer der hedder som værket, også originalen og redigeringerne), og så hedder masteren også det nye navn, når den laves.
+- **Crop: beskæringerne i filmstriben står med bred- og højformat sammen.** Rækkefølgen bliver 1:1, 3:2, 2:1, 2:3, 1:2 (i dag 1:1, 2:3, 3:2, 1:2, 2:1). Det gælder stakkene i filmstriben og formaterne på masteren.
 
 ## Venter på en afklaring
 
