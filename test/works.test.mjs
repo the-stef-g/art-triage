@@ -290,8 +290,8 @@ describe('tekster fra Claude', () => {
     expect(works.get(id).editedTexts).toEqual([]);
     works.saveGeneratedTexts(id, { description: 'Claude D', short_text: 'Claude S', alt_text: 'Claude A' });
     expect(works.get(id).editedTexts).toEqual([]);
-    works.save(id, { short_text: 'Min egen' });
-    expect(works.get(id).editedTexts).toEqual(['short_text']);
+    works.save(id, { alt_text: 'Min egen' });
+    expect(works.get(id).editedTexts).toEqual(['alt_text']);
   });
 
   it('regner en tekst skrevet i haanden for rettet', () => {

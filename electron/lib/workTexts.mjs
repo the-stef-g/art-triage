@@ -16,8 +16,10 @@ export const TEXT_SYSTEM_PROMPT = [
   'to someone standing in front of the picture. Use British English.',
   '',
   'How to write:',
-  '- Short. Only the words that are needed. There is no word count: if there is little to say,',
-  '  the text is one or two sentences.',
+  '- Short. Usually one short sentence, at most two. Only the words that are needed, and never',
+  '  a list of details (the paint, the colours, the bricks, the beam). This is the right length',
+  '  and tone, for a picture of an old, worn brick wall:',
+  '  "A brick wall where time has left its mark."',
   '- Let people see and interpret for themselves. Say briefly what is there, and what could',
   '  easily be missed, and stop. Never tell the reader what to see, feel or think, and never',
   '  explain what the work means. No "seems to", "suggests", "as if", "reminds", "captures" or',
@@ -32,14 +34,13 @@ export const TEXT_SYSTEM_PROMPT = [
   '- The artist\'s own notes come first. When they are given, build the text on them and keep',
   '  their meaning; do not add what they do not say.',
   '',
-  'Return three texts:',
+  'Return two texts:',
   '',
   'DESCRIPTION: the text on the product page, written as above.',
   '',
-  'SHORT TEXT: one sentence, for a card or for sharing.',
-  '',
-  'SERIES: when a series is given, always name it, exactly as given, in the DESCRIPTION and in',
-  'the SHORT TEXT, for instance "part of the series" followed by its name. Never in the ALT TEXT.',
+  'SERIES: when a series is given, always name it, exactly as given, in the DESCRIPTION, for',
+  'instance "part of the series" followed by its name. That may be the second sentence. Never in',
+  'the ALT TEXT.',
   '',
   'ALT TEXT: one sentence, at most about 150 characters. What the picture shows, not what it',
   'means.',
@@ -48,7 +49,7 @@ export const TEXT_SYSTEM_PROMPT = [
   'section the work is shown in on the website. It must make the subject stand out. Do not',
   'simply repeat the strongest colour in the picture; choose a colour that sets the subject off.',
   '',
-  'Rules for all three:',
+  'Rules for both:',
   '- No superlatives and no clichés: never "stunning", "unique", "one-of-a-kind" or "perfect',
   '  gift". No sales tricks.',
   '- No triads such as "Not X. Not Y. But Z." or three adjectives in a row.',
@@ -64,11 +65,10 @@ export const TEXT_SCHEMA = {
   additionalProperties: false,
   properties: {
     description: { type: 'string' },
-    short_text: { type: 'string' },
     alt_text: { type: 'string' },
     section_colour: { type: 'string' },
   },
-  required: ['description', 'short_text', 'alt_text', 'section_colour'],
+  required: ['description', 'alt_text', 'section_colour'],
 };
 
 // Det der skifter fra vaerk til vaerk. Tomme felter udelades helt i stedet
@@ -81,7 +81,7 @@ export function workBrief(work) {
     work.seriesName && `Series: ${work.seriesName}`,
     work.notes && `The artist's own notes:\n${work.notes}`,
   ].filter(Boolean);
-  return `${linjer.join('\n')}\n\nWrite the three texts for this work.`;
+  return `${linjer.join('\n')}\n\nWrite the two texts for this work.`;
 }
 
 export function buildTextRequest({ model, base64, mediaType, work }) {
@@ -122,7 +122,7 @@ export function parseTexts(message) {
     return null;
   }
   const ud = {};
-  for (const field of ['description', 'short_text', 'alt_text']) {
+  for (const field of ['description', 'alt_text']) {
     if (typeof json?.[field] !== 'string' || !json[field].trim()) return null;
     ud[field] = cleanText(json[field]);
   }
@@ -189,7 +189,7 @@ export class ClaudeWorkTexts {
       })
     );
     const texts = parseTexts(svar);
-    if (!texts) throw new Error('Claude did not return all three texts. Try again.');
+    if (!texts) throw new Error('Claude did not return both texts. Try again.');
     return {
       texts,
       warnings: lintTexts(texts),
@@ -223,8 +223,8 @@ export const SERIE_SYSTEM_PROMPT = [
   'will read and correct your draft, so write plainly and do not decorate. Use British English.',
   '',
   'INTRO: what the works in the series share: the place, the light or the subject. Name the',
-  'series exactly as given. Do not list the works one by one. Short, only the words that are',
-  'needed, no word count. Let people see and interpret for themselves: never tell them what to',
+  'series exactly as given. Do not list the works one by one. Usually one short sentence, at',
+  'most two, only the words that are needed. Let people see and interpret for themselves: never tell them what to',
   'see, feel or think, and do not explain what the series means or describe a mood. Everyday',
   'words, short sentences, down to earth. No art talk ("echoing", "invites", "a sense of").',
   '',

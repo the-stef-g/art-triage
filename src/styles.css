@@ -962,3 +962,7 @@ textarea.vaerk-beskrivelse { field-sizing: content; min-height: 7lh; resize: ver
 .farve-proeve.tom::-webkit-color-swatch {
   background: repeating-linear-gradient(45deg, var(--bg-aktiv) 0 4px, transparent 4px 8px) !important;
 }
+
+/* Edit: filens rolle. Den der gaelder nu, staar taendt i fasens farve. */
+.rolle-valg button.aktiv-rolle,
+.rolle-valg button.aktiv-rolle:disabled { opacity: 1; background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }

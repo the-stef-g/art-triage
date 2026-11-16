@@ -660,6 +660,31 @@ describe('gamle mappenavne', () => {
   });
 });
 
+describe('Original, Edit og Master i Edit', () => {
+  it('en redigering bliver originalen, og originalen bliver en redigering', () => {
+    catalog.setRating([raekke('Import/Ahl/x.cr2').version_id], 'godkendt');
+    catalog.sync();
+    skriv('Approved/x/Edits/x-neo.tif', 'e');
+    catalog.sync();
+    const billede = raekke('Approved/x/Original/x.cr2').image_id;
+    const res = catalog.goerTilOriginal(raekke('Approved/x/Edits/x-neo.tif').version_id);
+    expect(res).toEqual({ original: 'Approved/x/Original/x-neo.tif', edit: 'Approved/x/Edits/x.cr2' });
+    catalog.sync();
+    catalog.sync();
+    const ny = raekke('Approved/x/Original/x-neo.tif');
+    const gammel = raekke('Approved/x/Edits/x.cr2');
+    expect(ny.is_master).toBe(1);
+    expect(gammel.is_master).toBe(0);
+    expect([ny.image_id, gammel.image_id]).toEqual([billede, billede]);
+    expect(fase(2)).toEqual(['Approved/x/Edits/x.cr2', 'Approved/x/Original/x-neo.tif']);
+    // Én original, og tilbage igen.
+    catalog.goerTilOriginal(gammel.version_id);
+    catalog.sync();
+    expect(raekke('Approved/x/Original/x.cr2').is_master).toBe(1);
+    expect(raekke('Approved/x/Edits/x-neo.tif').image_id).toBe(billede);
+  });
+});
+
 describe('forfra i Import', () => {
   it('filer der flyttes tilbage til Import i Finder, er ubedoemte og hver for sig, og kan godkendes igen', () => {
     skriv('Import/Fishy/Fishy Fish.png', 'png');

@@ -304,7 +304,7 @@ export function vaerkAftryk(work, { works, catalog, ord = [] }) {
     titel: work.effective?.title, aar: work.effective?.year, nr: work.effective?.catalogueNumber,
     kategori: work.category, teknik: work.technique, skabelon: work.template, farve: work.sectionColour,
     video: work.video, prints: work.prints, maal: work.dimensions, pris: work.price,
-    beskrivelse: work.description, kort: work.shortText, alt: work.altText,
+    beskrivelse: work.description, alt: work.altText,
     serie: work.series ? [work.series.id, work.series.name, work.series.intro, work.series.template, work.series.colour] : null,
     hoved: fil(works.imageFile(work.imageId)), crops, ord, priser: PRISLISTE.version,
   };
@@ -527,7 +527,9 @@ export function buildProduct(work, media, {
   const produkt = {
     name: work.effective.title,
     description: work.description || '',
-    short_description: work.shortText || '',
+    // Kun én tekst: beskrivelsen er produktets description (den sitet
+    // viser), og short description er tom, saa den ikke staar to gange.
+    short_description: '',
     images: [{ id: media.main.id }],
     attributes: mergeAttributes(existingAttributes, work, work.unique ? null : varianter),
     meta_data: acptMeta(work, media),

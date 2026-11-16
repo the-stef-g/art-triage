@@ -8,7 +8,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
   TEXT_SYSTEM_PROMPT, buildTextRequest, workBrief, parseTexts, cleanText, lintTexts,
-  ClaudeWorkTexts, TEXT_IMAGE_SIZE, SERIE_SYSTEM_PROMPT, serieBrief, parseSerie,
+  ClaudeWorkTexts, TEXT_IMAGE_SIZE, SERIE_SYSTEM_PROMPT, serieBrief, parseSerie, TEXT_SCHEMA,
 } from '../electron/lib/workTexts.mjs';
 
 const work = {
@@ -28,14 +28,13 @@ function svar(obj, usage = {}) {
 
 const gode = {
   description: Array.from({ length: 100 }, (_, i) => `word${i}`).join(' '),
-  short_text: 'A canyon at first light.',
   alt_text: 'A red canyon wall under a pale sky.',
 };
 
 describe('instruktionen', () => {
   it('har reglerne fra planen', () => {
     for (const regel of [
-      'There is no word count', 'Eye level with the reader', 'No art talk', 'never',
+      'Usually one short sentence', 'A brick wall where time has left its mark.', 'Eye level with the reader', 'No art talk', 'never',
       'Never open with "This artwork"', 'one sentence', '150 characters',
       'stunning', 'one-of-a-kind', 'perfect', 'Not X. Not Y. But Z.', 'AI', 'Photoshop',
       'Let people see and interpret for themselves', 'Never tell the reader what to see',
@@ -66,7 +65,7 @@ describe('beskeden om vaerket', () => {
 
   it('udelader tomme felter helt', () => {
     const brief = workBrief({ effective: { title: 'X' }, category: null, technique: null, seriesName: null, notes: null });
-    expect(brief).toBe('Title: X\n\nWrite the three texts for this work.');
+    expect(brief).toBe('Title: X\n\nWrite the two texts for this work.');
   });
 
   it('lægger billedet foer teksten og beder om et skema', () => {
@@ -78,12 +77,13 @@ describe('beskeden om vaerket', () => {
 });
 
 describe('svaret', () => {
-  it('tager alle tre tekster', () => {
+  it('tager begge tekster, og ingen kort tekst', () => {
+    expect(TEXT_SCHEMA.required).not.toContain('short_text');
     expect(parseTexts(svar(gode))).toEqual(gode);
   });
 
   it('afviser et svar der mangler en tekst eller er tomt', () => {
-    expect(parseTexts(svar({ description: 'a', short_text: 'b' }))).toBeNull();
+    expect(parseTexts(svar({ description: 'a' }))).toBeNull();
     expect(parseTexts(svar({ ...gode, alt_text: '  ' }))).toBeNull();
     expect(parseTexts({ content: [{ type: 'text', text: 'ikke json' }] })).toBeNull();
   });
@@ -98,7 +98,7 @@ describe('svaret', () => {
 
   it('lader tankestreger staa og rydder mellemrum op', () => {
     expect(cleanText('Light — and  stone')).toBe('Light — and stone');
-    expect(parseTexts(svar({ ...gode, short_text: 'Dawn — cold.' })).short_text).toBe('Dawn — cold.');
+    expect(parseTexts(svar({ ...gode, description: 'Dawn — cold.' })).description).toBe('Dawn — cold.');
     expect(TEXT_SYSTEM_PROMPT).not.toMatch(/em-dash/);
   });
 });
@@ -145,7 +145,7 @@ describe('kaldet', () => {
     writeFileSync(png, 'billede');
     const client = { messages: { create: async () => svar({ description: 'kun denne' }) } };
     const tjeneste = new ClaudeWorkTexts({ apiKey: 'k', client });
-    await expect(tjeneste.write(png, work)).rejects.toThrow(/all three texts/);
+    await expect(tjeneste.write(png, work)).rejects.toThrow(/both texts/);
     rmSync(dir, { recursive: true, force: true });
   });
 });
@@ -173,7 +173,7 @@ describe('serien', () => {
   ];
 
   it('beder om en kort intro og en farve, uden noget der skifter fra serie til serie', () => {
-    expect(SERIE_SYSTEM_PROMPT).toMatch(/no word count/);
+    expect(SERIE_SYSTEM_PROMPT).toMatch(/Usually one short sentence/);
     expect(SERIE_SYSTEM_PROMPT).toMatch(/interpret for themselves/);
     expect(SERIE_SYSTEM_PROMPT).not.toMatch(/\d+ to \d+ words/);
     expect(SERIE_SYSTEM_PROMPT).not.toContain('Desert Canyon');

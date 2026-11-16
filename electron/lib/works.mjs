@@ -22,7 +22,9 @@ export const CATEGORIES = ['Graphic Design', 'Photography', 'Paintings', 'Sculpt
 export const UNIQUE_CATEGORIES = new Set(['Paintings', 'Sculptures']);
 export const TEMPLATES = ['spread', 'poster'];
 export const CROP_FORMATS = ['1:1', '2:3', '3:2', '1:2', '2:1'];
-export const TEXT_FIELDS = ['description', 'short_text', 'alt_text'];
+// Den korte tekst er vaek: der er kun én tekst, beskrivelsen. Gamle korte
+// tekster ligger stadig i kataloget, men bruges ikke.
+export const TEXT_FIELDS = ['description', 'alt_text'];
 
 // Felter der kan rettes, og hvordan hvert ét gøres rent foer det gemmes.
 // Alt der ikke staar her afvises, saa en tastefejl i UI'et ikke ender som

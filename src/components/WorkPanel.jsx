@@ -67,7 +67,7 @@ export default function WorkPanel({ row, versions, tekstRev = 0, hasKey, shop, o
         adopt(w);
         // Et faerdigt vaerk uden tekster faar dem nu, sammen med skabelon,
         // sektionsfarve og noegleord, som et nyt vaerk ville have faaet.
-        if (hasKey && w.eligible && !w.description && !w.shortText && !w.altText) {
+        if (hasKey && w.eligible && !w.description && !w.altText) {
           invoke('work:auto', { imageId }).catch(() => {});
         }
       })
@@ -372,7 +372,6 @@ export default function WorkPanel({ row, versions, tekstRev = 0, hasKey, shop, o
         </ul>
       )}
       {[['description', 'description', 'Description', 7],
-        ['short_text', 'shortText', 'Short text', 2],
         ['alt_text', 'altText', 'Alt text', 2]].map(([column, key, label, rows]) => (
           <label key={column}>
             {label}

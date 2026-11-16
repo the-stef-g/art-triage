@@ -416,7 +416,7 @@ describe('produktet', () => {
   it('opretter som kladde med de felter planen nævner', () => {
     const p = buildProduct(baseWork(), media, { categoryId: 7 });
     expect(p).toMatchObject({
-      name: 'Desert Canyon 04', description: 'D', short_description: 'S',
+      name: 'Desert Canyon 04', description: 'D', short_description: '',
       images: [{ id: 100 }], categories: [{ id: 7 }], status: 'draft', tax_class: '',
     });
     expect(p.attributes.map((a) => a.name)).toEqual(['Year', 'Technique']);

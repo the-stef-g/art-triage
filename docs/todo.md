@@ -4,9 +4,7 @@ Det der venter. Stef siger "byg", før noget herfra bliver lavet.
 
 ## Venter på "byg"
 
-- **Beskrivelsen er stadig for lang: som regel én sætning.** Til Worn Wall skrev Claude fire sætninger, der remser detaljer op (malingen der skaller, farverne, murstenene, bjælken). Stef: "A brick wall where time has left its mark." er nok. Instruktionen får det som eksempel på længde og tone: én kort sætning er det normale, højst to, og aldrig en opremsning af detaljer. Seriens intro følger samme mål.
-- **Kun én tekst: den korte tekst forsvinder.** Feltet Short text fjernes fra Product og fra tjeklisten, Claude skriver kun beskrivelsen (og alt-teksten), og serien nævnes i beskrivelsen. Beskrivelsen sendes som produktets description, som sitet stefg.art viser på værkets side; short description i WooCommerce sendes tom, så den samme sætning ikke står to gange på shoppens produktside. Gamle korte tekster bliver liggende i kataloget, men sendes ikke mere.
-- **Edit: tre knapper, Original, Edit og Master, i stedet for Work-sektionen og Make master.** Sektionen Work (Move to work … og Make it a work of its own) fjernes. På den valgte fil i et værk står tre knapper, der viser filens rolle og kan ændre den: *Original* gør filen til værkets original (den flyttes til Original, og den der lå der før, flyttes til Edits, så der altid er én original), *Edit* er en redigering i Edits, og *Master* laver masteren af filen, som Make master gør i dag. Den knap, der svarer til filens rolle nu, er tændt. Originalen kan ikke gøres til Edit for sig selv: vælg en anden fil som Original. Værket beholder navn, tekster og serie.
+Intet lige nu.
 
 ## Venter på en afklaring
 

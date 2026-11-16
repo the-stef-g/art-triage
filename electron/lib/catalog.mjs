@@ -1725,6 +1725,39 @@ export class Catalog extends EventEmitter {
     rmSync(mappe, { recursive: true, force: true });
   }
 
+  // Edit: en fil i vaerkets Edits bliver vaerkets original, og den der laa
+  // i Original, flyttes til Edits. Filerne bytter plads; vaerket (billedet
+  // med tekster, serie og navn) er det samme. Returnerer de nye stier.
+  goerTilOriginal(versionId) {
+    const v = this.getVersion(versionId);
+    const f = v ? this.getFile(v.effective_file_id) : null;
+    if (!f?.present) throw new Error('The file is not available right now');
+    const am = arbejdsmappeFor(f.rel_path);
+    if (am?.del === 'Original') return { original: f.rel_path };
+    if (am?.del !== 'Edits') throw new Error('Only a file in the work\'s Edits can become the original');
+    const gammel = this.getFile(v.master_file_id);
+    const edits = `Approved/${am.work}/Edits`;
+    const original = `Approved/${am.work}/Original`;
+    if (gammel?.present) this.moveFiles([gammel.id], edits);
+    this.moveFiles([f.id], original);
+    this.db.transaction(() => {
+      // Billedet faar den nye fil som original, og versionen der pegede paa
+      // den, peger nu paa den gamle original.
+      this.db.run('UPDATE images SET master_file_id=? WHERE id=?', f.id, v.image_id);
+      this.db.run('UPDATE versions SET file_id=? WHERE id=?', gammel ? gammel.id : null, versionId);
+      if (gammel) {
+        const stem = stemOf(posix.basename(gammel.rel_path));
+        const nyStem = stemOf(posix.basename(f.rel_path));
+        const rest = stem.startsWith(nyStem) ? stem.slice(nyStem.length).replace(/^[-_. ()]+|[)]+$/g, '') : '';
+        this.db.run('UPDATE versions SET name=? WHERE id=?', rest || stem, versionId);
+      } else {
+        this.db.run('DELETE FROM versions WHERE id=?', versionId);
+      }
+    });
+    this.emit('changed');
+    return { original: this.getFile(f.id).rel_path, edit: gammel ? this.getFile(gammel.id).rel_path : null };
+  }
+
   // Lægger en fil i et andet vaerks Edits. Er filen originalen i sit eget
   // vaerk, flyttes hele det vaerk med (originalen og redigeringerne).
   flytTilVaerk(versionId, til) {

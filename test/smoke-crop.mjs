@@ -111,7 +111,7 @@ try {
   await page.waitForSelector('.tile-navn[title^="Approved/blaa/Original/"]', { timeout: 15000 });
   if (!existsSync(join(lib, 'Approved', 'blaa', 'Masters'))) throw new Error('Master-mappen blev ikke oprettet');
   await page.locator('.tile').first().click();
-  await page.waitForSelector('button:has-text("Make master")', { timeout: 10000 });
+  await page.waitForSelector('.rolle-valg button:has-text("Master")', { timeout: 10000 });
 
   // En masterfil lægges i Master, og appen finder den. Vaerket forlader
   // fase 2 og staar i fase 3 (Crops).

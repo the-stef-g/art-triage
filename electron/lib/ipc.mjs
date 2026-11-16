@@ -62,6 +62,7 @@ const ARBEJDE = {
   'crop:delete': 'removing a crop',
   'work:omdoeb': 'renaming the files of a work',
   'work:flytTil': 'moving a file to another work',
+  'work:goerTilOriginal': 'changing the original of a work',
   'work:egetVaerk': 'making a work of its own',
   'work:discard': 'discarding a work',
   'edit:makeMaster': 'making a master',
@@ -539,7 +540,7 @@ export class AppSession {
       }
       try {
         const work = this.requireWorks().get(imageId);
-        if (!work.eligible || work.description || work.shortText || work.altText) return;
+        if (!work.eligible || work.description || work.altText) return;
         await this._arbejde('writing texts with Claude', () => this.writeWorkTexts({ imageId }));
         this.log(`texts written for new work: ${work.effective.title}`);
         this.broadcast('besked', { tekst: `Texts written for ${work.effective.title}` });
@@ -1066,6 +1067,12 @@ export class AppSession {
     });
     // Filmstrip: de andre skud i samme mappe, i den raekkefoelge de er taget.
     // Fase 2: en fil i et andet vaerk, eller et vaerk for sig.
+    handle('work:goerTilOriginal', async ({ versionId }) => {
+      const res = this.requireCatalog().goerTilOriginal(versionId);
+      this.log(`work: ${res.original} is the original${res.edit ? `, ${res.edit} is an edit` : ''}`);
+      await this.runSync('ny original');
+      return res;
+    });
     handle('work:navne', () => this.requireCatalog().vaerkNavne());
     handle('work:flytTil', async ({ versionId, work }) => {
       const res = this.requireCatalog().flytTilVaerk(versionId, work);
@@ -1421,7 +1428,7 @@ export class AppSession {
     handle('work:auto', ({ imageId }) => {
       if (!this.settings.data.claudeKey) return { started: false };
       const work = this.requireWorks().get(imageId);
-      if (!work.eligible || work.description || work.shortText || work.altText) return { started: false };
+      if (!work.eligible || work.description || work.altText) return { started: false };
       this._nytVaerk(imageId);
       return { started: true };
     });

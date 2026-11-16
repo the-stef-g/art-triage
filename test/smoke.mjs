@@ -414,7 +414,10 @@ try {
     throw new Error(`Mapperne i fase 2: ${mapper.join(', ')}`);
   }
   await page.locator('.tile').first().click();
-  await page.locator('button', { hasText: 'Make master' }).click();
+  // Originalen staar taendt; Edit kan ikke vaelges for originalen selv.
+  await page.waitForSelector('.rolle-valg button.aktiv-rolle:has-text("Original")', { timeout: 10000 });
+  await page.screenshot({ path: join(projectRoot, 'smoke-edit.png') });
+  await page.locator('.rolle-valg button', { hasText: /^Master$/ }).click();
   await page.waitForFunction(() => document.querySelectorAll('.tile').length === 0, null, { timeout: 15000 });
   await page.locator('.fase', { hasText: 'Product' }).click();
   await page.waitForFunction(
