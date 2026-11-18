@@ -636,7 +636,7 @@ export class ShopSync {
       // En ny term faar altid en skabelon; datamodel.md kraever den.
       const ny = await this.client.wpApi('POST', '/series', {
         name: serie.name,
-        meta: { series_data_series_template: 'walkthrough', ...meta },
+        meta: { series_data_series_template: 'wall', ...meta },
       });
       return ny.id;
     }

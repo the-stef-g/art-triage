@@ -745,6 +745,25 @@ describe('Edits uden kendt program, og tomme mapper', () => {
     expect(existsSync(join(root, 'Import/x/y'))).toBe(true);
     expect(existsSync(join(root, 'Approved/w/Edits'))).toBe(true);
   });
+
+  it('tomme mapper i Candidate slettes, men aldrig Candidate selv', () => {
+    skriv('Import/Strand/a.cr2', 'a');
+    catalog.brugMappestruktur();
+    catalog.sync();
+    const v = raekke('Import/Strand/a.cr2').version_id;
+    catalog.setRating([v], 'kandidat');
+    expect(existsSync(join(root, 'Candidate/Strand/a.cr2'))).toBe(true);
+    // Godkendt: filen forlader Candidate, og den tomme mappe forsvinder.
+    catalog.setRating([v], 'godkendt');
+    expect(existsSync(join(root, 'Candidate/Strand'))).toBe(false);
+    expect(existsSync(join(root, 'Candidate'))).toBe(true);
+    // En mappe der var tom i forvejen, ryddes af Clean up.
+    mkdirSync(join(root, 'Candidate/gammel/tom'), { recursive: true });
+    writeFileSync(join(root, 'Candidate/gammel/.DS_Store'), '');
+    expect(catalog.ryddTommeMapper()).toBe(2);
+    expect(existsSync(join(root, 'Candidate/gammel'))).toBe(false);
+    expect(existsSync(join(root, 'Candidate'))).toBe(true);
+  });
 });
 
 describe('beskaering som etiket', () => {

@@ -456,10 +456,10 @@ export class Works {
     return { id: s.id, navn: s.name, intro: s.intro || '', vaerker };
   }
 
-  // En serie uden skabelon faar Walkthrough, som shoppen ogsaa giver en ny.
+  // En serie uden skabelon faar Wall, som shoppen ogsaa giver en ny.
   // Returnerer antallet af serier der fik den.
   standardSkabelon() {
-    return this.db.run("UPDATE series SET template='walkthrough' WHERE template IS NULL OR template = ''").changes || 0;
+    return this.db.run("UPDATE series SET template='wall' WHERE template IS NULL OR template = ''").changes || 0;
   }
 
   // Formater der er slaaet fra i Crop for vaerket.

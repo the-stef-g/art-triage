@@ -4,8 +4,7 @@ Det der venter. Stef siger "byg", før noget herfra bliver lavet.
 
 ## Venter på "byg"
 
-- **Tomme mapper i Candidate slettes af sig selv.** Når en mappe i `Candidate` bliver tom (fordi billederne er godkendt, kasseret eller ryddet tilbage til Import), fjerner appen den ved næste scanning. Kun helt tomme mapper; skjulte systemfiler som `.DS_Store` tæller ikke som indhold. Selve `Candidate`-mappen bliver stående.
-- **Nye serier får skabelonen Wall som standard** i stedet for Walkthrough, både i appen og når serien oprettes i shoppen. Serier, der allerede har en skabelon, bliver som de er.
+Intet lige nu.
 
 ## Venter på en afklaring
 

@@ -378,7 +378,7 @@ describe('serier og print af sig selv', () => {
     expect(works.tekstUdenSerie()).toEqual([]);
   });
 
-  it('serier med tom intro og mindst to vaerker med tekster; tom skabelon bliver walkthrough', () => {
+  it('serier med tom intro og mindst to vaerker med tekster; tom skabelon bliver wall', () => {
     for (const n of ['Sol 1', 'Sol 2']) {
       skriv(`Import/Ahl/${n}.tif`, n);
     }
@@ -404,7 +404,7 @@ describe('serier og print af sig selv', () => {
     expect(sol.navn).toBe('Sol');
     expect(sol.vaerker.map((v) => v.farve)).toEqual([null, '#112233']);
     expect(works.standardSkabelon()).toBe(1);
-    expect(catalog.listSeries()[0].template).toBe('walkthrough');
+    expect(catalog.listSeries()[0].template).toBe('wall');
     catalog.setSeriesShop(sol.id, { intro: 'The sun.' });
     expect(works.serierUdenIntro()).toEqual([]);
     expect(works.serieTilIntro(sol.id)).toMatchObject({ navn: 'Sol', intro: 'The sun.' });

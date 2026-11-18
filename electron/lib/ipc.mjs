@@ -573,7 +573,7 @@ export class AppSession {
     return this.textService;
   }
 
-  // Seriens felter: en tom skabelon bliver Walkthrough, og med en Claude-
+  // Seriens felter: en tom skabelon bliver Wall, og med en Claude-
   // noegle skriver Claude introen og vaelger farven til serier med tom intro
   // og mindst to vaerker med tekster. Koeres efter vaerkernes tekster i
   // samme koe, saa introen bygger paa de nye beskrivelser. En farve Stef
@@ -582,7 +582,7 @@ export class AppSession {
     if (!this.works) return;
     try {
       const n = this.works.standardSkabelon();
-      if (n) this.log(`series: ${n} series got the template walkthrough`);
+      if (n) this.log(`series: ${n} series got the template wall`);
     } catch (err) {
       this.log(`series template failed: ${String(err?.message || err).slice(0, 200)}`);
     }
@@ -1316,9 +1316,9 @@ export class AppSession {
       const catalog = this.requireCatalog();
       const moves = catalog.moveDiscarded();
       this.undoMgr.afterMoves(moves);
-      // Tomme mapper i Import slettes ogsaa.
+      // Tomme mapper i Import og Candidate slettes ogsaa.
       const tomme = catalog.ryddTommeMapper();
-      if (tomme) this.log(`clean up: removed ${tomme} empty folder(s) in ${catalog.importMappe}`);
+      if (tomme) this.log(`clean up: removed ${tomme} empty folder(s) in ${catalog.importMappe} and Candidate`);
       return moves.length;
     });
 

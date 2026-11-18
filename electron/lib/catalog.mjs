@@ -447,8 +447,8 @@ export class Catalog extends EventEmitter {
     return res;
   }
 
-  // Efter en skanning: tomme mapper i Import, fx efter filer er flyttet i
-  // Finder, slettes, naar de har vaeret tomme et stykke tid.
+  // Efter en skanning: tomme mapper i Import og Candidate, fx efter filer er
+  // flyttet i Finder, slettes, naar de har vaeret tomme et stykke tid.
   _ryddEfterSkanning() {
     if (!this.inkluder) return;
     try {
@@ -2218,12 +2218,19 @@ export class Catalog extends EventEmitter {
     return moved;
   }
 
-  // Sletter en mappe i Import hvis den er tom, og de mapper over den der saa
-  // ogsaa bliver tomme, men aldrig Import selv. Skjulte filer som .DS_Store
-  // tael ikke med. Mapper uden for Import roeres aldrig.
+  // De mapper hvis tomme undermapper slettes: Import og Candidate.
+  get _ryddeMapper() {
+    return [this.importMappe, 'Candidate'];
+  }
+
+  // Sletter en mappe i Import eller Candidate hvis den er tom, og de mapper
+  // over den der saa ogsaa bliver tomme, men aldrig Import eller Candidate
+  // selv. Skjulte filer som .DS_Store taeller ikke med. Mapper andre steder
+  // roeres aldrig.
   _fjernTomMappe(dirRel) {
     let dir = dirRel;
-    const top = this.importMappe;
+    const top = this._ryddeMapper.find((t) => dir?.startsWith(`${t}/`));
+    if (!top) return;
     while (dir && dir !== top && dir.startsWith(`${top}/`)) {
       const abs = join(this.root, dir);
       try {
@@ -2238,14 +2245,15 @@ export class Catalog extends EventEmitter {
     }
   }
 
-  // Gennemgaar hele Import og sletter de tomme mapper. Returnerer antallet.
+  // Gennemgaar hele Import og Candidate og sletter de tomme mapper.
+  // Returnerer antallet.
   // minAlderMs skaaner mapper der er aendret for nylig, fx en mappe man
   // lige har lavet med New folder og endnu ikke har lagt noget i.
   ryddTommeMapper({ minAlderMs = 0 } = {}) {
-    const top = this.importMappe;
+    const toppe = this._ryddeMapper;
     const graense = this.now() - minAlderMs;
-    const mapper = walkDirs(this.root, new Set([top]))
-      .filter((d) => d.startsWith(`${top}/`))
+    const mapper = walkDirs(this.root, new Set(toppe))
+      .filter((d) => toppe.some((t) => d.startsWith(`${t}/`)))
       .sort((a, b) => b.length - a.length);
     for (const d of mapper) {
       const abs = join(this.root, d);

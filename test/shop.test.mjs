@@ -794,12 +794,12 @@ describe('serier', () => {
     expect(JSON.parse(prod.body)).toEqual({ series: [900] });
   });
 
-  it('giver en ny serie skabelonen walkthrough naar Stef ikke har valgt en', async () => {
+  it('giver en ny serie skabelonen wall naar Stef ikke har valgt en', async () => {
     const { id } = medSerie('a.png');
     const { kald, fetchImpl } = attrapShop();
     await (await sync(fetchImpl)).send(id);
     const ny = kald.find((k) => sti(k) === 'POST /wp/v2/series');
-    expect(JSON.parse(ny.body).meta).toEqual({ series_data_series_template: 'walkthrough' });
+    expect(JSON.parse(ny.body).meta).toEqual({ series_data_series_template: 'wall' });
   });
 
   it('bruger en serie der findes, uden at oprette en ny', async () => {
