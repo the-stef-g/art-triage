@@ -414,6 +414,7 @@ export default function Inspector({
       {fase === 3 && cropNode && createPortal(
         iMaster(row.rel_path) && row.crop ? (
           <CropVisning
+            navn={<VaerkNavn key={row.image_id} imageId={row.image_id} onError={onError} />}
             row={row}
             crop={crops.find((c) => c.versionId === row.version_id)}
             onFinder={() => invoke('img:openWorkFolder', { versionId: row.version_id }).catch(onError)}
@@ -422,6 +423,7 @@ export default function Inspector({
           ? (
             <CropModal
               key={master.file_id}
+              navn={<VaerkNavn key={row.image_id} imageId={row.image_id} onError={onError} />}
               inline
               row={master}
               crops={crops}
@@ -459,6 +461,9 @@ export default function Inspector({
           beskaeringen, og printfilen laves af den, af sig selv. */}
       {fase === 4 && (
         <>
+          <div className="vaerk">
+            <VaerkNavn key={row.image_id} imageId={row.image_id} onError={onError} />
+          </div>
           <h4>Enlargement</h4>
           <GigapixelMaal row={row} dataRev={dataRev} onBredde={setGigaBredde} onError={onError} />
           <p className="tom">
@@ -656,11 +661,12 @@ function SletCropDialog({ slet, onCancel, onOk }) {
 
 // Crop: en beskaering valgt i filmstriben vises stort, uden ramme og greb.
 // Formaterne og Save crop hoerer til masteren.
-function CropVisning({ row, crop, onFinder }) {
+function CropVisning({ row, crop, onFinder, navn = null }) {
   return (
     <div className="crop-inline crop-visning">
       <div className="crop-vindue">
         <div className="crop-top">
+          {navn}
           <strong title={row.rel_path}>{fileName(row.rel_path)}</strong>
           <span className={`badge beskaering ${crop?.foraeldet ? 'foraeldet' : ''}`}>{row.crop}</span>
           <span className="detaljer crop-meta">

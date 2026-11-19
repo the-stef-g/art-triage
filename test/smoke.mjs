@@ -425,6 +425,25 @@ try {
   await page.screenshot({ path: join(projectRoot, 'smoke-edit.png') });
   await page.locator('.rolle-valg button', { hasText: /^Master$/ }).click();
   await page.waitForFunction(() => document.querySelectorAll('.tile').length === 0, null, { timeout: 15000 });
+  // Cmd+Z fortryder Master: masteren gaar i papirkurven, og vaerket er
+  // tilbage i Edit. Saa laves masteren igen.
+  // Menuen hedder nu Undo Master; den klikkes som i macOS' menulinje.
+  await page.evaluate(() => document.activeElement?.blur());
+  const undoNavn = await app.evaluate(async ({ Menu }) => {
+    for (let i = 0; i < 50; i++) {
+      const item = Menu.getApplicationMenu()?.items.find((m) => m.label === 'Edit')?.submenu.items
+        .find((m) => m.label.startsWith('Undo'));
+      if (item?.label === 'Undo Master') { item.click(); return item.label; }
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    return Menu.getApplicationMenu()?.items.find((m) => m.label === 'Edit')?.submenu.items.find((m) => m.label.startsWith('Undo'))?.label;
+  });
+  if (undoNavn !== 'Undo Master') throw new Error(`Edit-menuen viste ${undoNavn}, ikke Undo Master`);
+  await page.waitForFunction(() => document.querySelectorAll('.tile').length === 1, null, { timeout: 15000 })
+    .catch(() => { throw new Error('Cmd+Z fortrod ikke Master: vaerket kom ikke tilbage i Edit'); });
+  await page.locator('.tile').first().click();
+  await page.locator('.rolle-valg button', { hasText: /^Master$/ }).click();
+  await page.waitForFunction(() => document.querySelectorAll('.tile').length === 0, null, { timeout: 15000 });
   await page.locator('.fase', { hasText: 'Product' }).click();
   await page.waitForFunction(
     () => document.querySelectorAll('.tile').length === 1

@@ -132,6 +132,9 @@ try {
   // Metadata ved titlen og Show in Finder i hjoernet.
   await page.waitForSelector('.crop-top .crop-meta >> text=/Last edit/', { timeout: 10000 });
   await page.waitForSelector('.crop-top button:has-text("Show in Finder")', { timeout: 10000 });
+  // Vaerkets navn kan rettes i Crop ogsaa.
+  await page.waitForSelector('.crop-top .vaerk-navn input', { timeout: 10000 });
+  await page.screenshot({ path: join(projectRoot, 'smoke-crop-navn.png') });
   await page.waitForFunction(() => document.querySelector('.crop-flade img')?.naturalWidth > 0, null, { timeout: 10000 });
   // Masteren er 400 × 200, saa beskaeringen starter i 2:1.
   await page.waitForSelector('.crop-formater button.primaer:has-text("2:1")', { timeout: 10000 });

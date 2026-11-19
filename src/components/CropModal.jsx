@@ -73,7 +73,7 @@ function krymp(r, vinkel, A, ax, ay) {
 // knappen fjerner beskaeringen. meta og onFinder staar i toppen.
 export default function CropModal({
   row, onClose, onDone, onError, inline = false, crops = [], meta = null, onFinder = null, onSletCrop = null,
-  fra = [], onFra = null,
+  fra = [], onFra = null, navn = null,
 }) {
   const [A, setA] = useState(1.5);
   const [format, setFormat] = useState('3:2');
@@ -272,6 +272,7 @@ export default function CropModal({
     <div className={inline ? 'crop-inline' : 'crop-bag'} onClick={inline ? undefined : onClose}>
       <div className="crop-vindue" onClick={(e) => e.stopPropagation()}>
         <div className="crop-top">
+          {navn}
           <strong title={row.rel_path}>Crop {fileName(row.rel_path)}</strong>
           {meta && <span className="detaljer crop-meta">{meta}</span>}
           {onFinder && <button className="crop-finder" onClick={onFinder}>Show in Finder</button>}

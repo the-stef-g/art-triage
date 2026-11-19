@@ -2,7 +2,7 @@
 // Tekster rettes kun her; Woo er en kopi (docs/plan-shop.md). Alt gemmes
 // i kataloget, saa det overlever genstart og genscanning.
 import { basename } from 'node:path';
-import { stemOf, beskaeringFraSti } from './util.mjs';
+import { stemOf, beskaeringFraSti, vaerkNavnFra } from './util.mjs';
 import { statSync } from 'node:fs';
 import { exifYear } from './exif.mjs';
 
@@ -315,6 +315,48 @@ export class Works {
   }
 
   // patch bruger de samme navne som kolonnerne. Ukendte felter afvises.
+  // Omdoeber Stef vaerkets mappe eller originalens fil i Finder, foelger
+  // titlen med, hvis den var det gamle navn (eller aldrig er sat). En titel
+  // der er skrevet i appen og er en anden, roeres ikke. Appen husker hvert
+  // vaerks mappe og original fra skanning til skanning. Returnerer antallet
+  // af titler der fulgte med.
+  foelgFinderNavne() {
+    let sidst = {};
+    try { sidst = JSON.parse(this.catalog.getMeta('vaerkNavneSidst') || '{}'); } catch { sidst = {}; }
+    const nu = {};
+    let antal = 0;
+    const rows = this.db.all(
+      `SELECT i.id, f.id AS file_id, f.rel_path, w.title FROM images i
+       JOIN files f ON f.id = i.master_file_id
+       LEFT JOIN works w ON w.image_id = i.id
+       WHERE f.present=1 AND f.rel_path LIKE 'Approved/%/Original/%'`
+    );
+    const ens = (a, b) => String(a ?? '').trim().toLowerCase() === String(b ?? '').trim().toLowerCase();
+    for (const r of rows) {
+      const m = /^Approved\/([^/]+)\/Original\/([^/]+)$/.exec(r.rel_path);
+      if (!m) continue;
+      const stem = stemOf(m[2]);
+      nu[r.id] = { mappe: m[1], fil: r.file_id, stem };
+      const f = sidst[r.id];
+      if (!f) continue;
+      let ny = null;
+      const gammelt = (navn) => !String(r.title ?? '').trim() || ens(r.title, navn);
+      if (f.mappe !== m[1]) {
+        // Mappen er omdoebt: titlen bliver mappens navn.
+        if (gammelt(f.mappe) || ens(r.title, vaerkNavnFra(f.stem))) ny = m[1];
+      } else if (f.fil === r.file_id && f.stem !== stem) {
+        // Samme fil med et nyt navn: titlen bliver filens navn til foerste bindestreg.
+        if (gammelt(f.mappe) || ens(r.title, vaerkNavnFra(f.stem))) ny = vaerkNavnFra(stem);
+      }
+      if (ny && !ens(r.title, ny)) {
+        this.save(r.id, { title: ny });
+        antal += 1;
+      }
+    }
+    this.catalog.setMeta('vaerkNavneSidst', JSON.stringify(nu));
+    return antal;
+  }
+
   save(imageId, patch) {
     const img = this._image(imageId);
     this._ensure(img);

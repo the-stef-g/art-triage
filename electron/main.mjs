@@ -315,6 +315,8 @@ async function rasterizeSvg(absPath, size, outPath) {
   }
 }
 
+// Hvad Undo og Redo vil goere, fx Undo Master. Saettes af sessionen.
+let undoNavne = { undo: null, redo: null };
 function buildMenu() {
   const template = [
     ...(process.platform === 'darwin'
@@ -334,12 +336,12 @@ function buildMenu() {
         // Egne handlers: i tekstfelter laves tekst-fortryd, ellers
         // fortrydes seneste katalog-handling. Renderer afgoer.
         {
-          label: 'Undo',
+          label: undoNavne.undo ? `Undo ${undoNavne.undo}` : 'Undo',
           accelerator: 'CmdOrCtrl+Z',
           click: () => mainWin?.webContents.send('evt', { type: 'genvej', cmd: 'undo' }),
         },
         {
-          label: 'Redo',
+          label: undoNavne.redo ? `Redo ${undoNavne.redo}` : 'Redo',
           accelerator: 'Shift+CmdOrCtrl+Z',
           click: () => mainWin?.webContents.send('evt', { type: 'genvej', cmd: 'redo' }),
         },
@@ -504,6 +506,11 @@ app.whenReady().then(() => {
     return net.fetch(req, { bypassCustomProtocolHandlers: true });
   });
   session.registerIpc();
+  session.onUndoChange = (undo, redo) => {
+    if (undo === undoNavne.undo && redo === undoNavne.redo) return;
+    undoNavne = { undo, redo };
+    buildMenu();
+  };
   buildMenu();
   createMainWindow();
   // ART_TRIAGE_DISABLE_AI=1 bruges i CI, hvor modeldownload ikke giver mening.

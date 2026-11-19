@@ -1,14 +1,32 @@
+import { existsSync } from 'node:fs';
 // Fortryd/gentag for katalog-handlinger. Hver optagelse gemmer et snapshot
 // af tilstanden FOER handlingen; apply() genskaber snapshottet og
 // returnerer en ny post der kan genskabe tilstanden fra FOER fortrydelsen,
 // saa undo og redo er symmetriske.
 const MAX_ENTRIES = 100;
 
+// Navnet i Edit-menuen: Undo Master, Redo Rename ...
+const MENUNAVN = {
+  bedømmelse: 'Rating', edits: 'Edits', serie: 'Series', omdøbning: 'Version Name',
+  'virtuel kopi': 'Virtual Copy', flytning: 'Move', master: 'Master', original: 'Original',
+  'omdøb værk': 'Rename', beskæring: 'Save Crop',
+};
+
+// trash(abs) laegger en fil i papirkurven; works er vaerkerne (titler);
+// onChange(undoNavn, redoNavn) faar menuens navne, naar stakkene aendres.
 export class UndoManager {
-  constructor(catalog) {
+  constructor(catalog, { trash = null, works = null, onChange = null } = {}) {
     this.catalog = catalog;
+    this.trash = trash;
+    this.works = works;
+    this.onChange = onChange;
     this.undoStack = [];
     this.redoStack = [];
+  }
+
+  _meld() {
+    const navn = (e) => (e ? MENUNAVN[e.label] || e.label : null);
+    this.onChange?.(navn(this.undoStack.at(-1)), navn(this.redoStack.at(-1)));
   }
 
   _push(entry) {
@@ -16,6 +34,7 @@ export class UndoManager {
     this.undoStack.push(entry);
     if (this.undoStack.length > MAX_ENTRIES) this.undoStack.shift();
     this.redoStack = [];
+    this._meld();
   }
 
   canUndo() {
@@ -26,20 +45,82 @@ export class UndoManager {
     return this.redoStack.length > 0;
   }
 
-  undo() {
+  async undo() {
     const entry = this.undoStack.pop();
     if (!entry) return null;
-    const redoEntry = entry.apply();
-    if (redoEntry) this.redoStack.push(redoEntry);
-    return entry.label;
+    try {
+      const redoEntry = await entry.apply();
+      if (redoEntry) this.redoStack.push(redoEntry);
+    } finally {
+      this._meld();
+    }
+    return MENUNAVN[entry.label] || entry.label;
   }
 
-  redo() {
+  async redo() {
     const entry = this.redoStack.pop();
     if (!entry) return null;
-    const undoEntry = entry.apply();
-    if (undoEntry) this.undoStack.push(undoEntry);
-    return entry.label;
+    try {
+      const undoEntry = await entry.apply();
+      if (undoEntry) this.undoStack.push(undoEntry);
+    } finally {
+      this._meld();
+    }
+    return MENUNAVN[entry.label] || entry.label;
+  }
+
+  // ---------- Vaerkets trin ----------
+
+  // Kaldes EFTER at en fil er lavet (masteren eller en beskaering): fortryd
+  // laegger den i papirkurven. Der er ingen gentag; trinnet laves igen.
+  afterNyFil(rel, label) {
+    this._push({
+      label,
+      apply: async () => {
+        const abs = this.catalog.abs(rel);
+        if (this.trash && existsSync(abs)) await this.trash(abs);
+        return null;
+      },
+    });
+  }
+
+  // Kaldes EFTER Original/Edit: gammelFileId er den fil der var originalen.
+  afterNyOriginal(imageId, gammelFileId) {
+    if (gammelFileId) this._push(this._originalEntry(imageId, gammelFileId));
+  }
+
+  _originalEntry(imageId, fileId) {
+    return {
+      label: 'original',
+      apply: () => {
+        const nu = this.catalog.db.get('SELECT master_file_id FROM images WHERE id=?', imageId)?.master_file_id;
+        const v = this.catalog.db.get('SELECT id FROM versions WHERE image_id=? AND file_id=?', imageId, fileId);
+        if (!v || !nu || nu === fileId) return null;
+        this.catalog.goerTilOriginal(v.id);
+        return this._originalEntry(imageId, nu);
+      },
+    };
+  }
+
+  // Kaldes FOER et vaerk omdoebes: mappen og titlen som de var.
+  beforeOmdoebVaerk(imageId) {
+    const plan = this.catalog.omdoebPlan(imageId, '');
+    if (!plan) return;
+    const titel = this.works?.get(imageId)?.title ?? null;
+    this._push(this._omdoebEntry(imageId, plan.fra, titel));
+  }
+
+  _omdoebEntry(imageId, mappe, titel) {
+    return {
+      label: 'omdøb værk',
+      apply: () => {
+        const nu = this.catalog.omdoebPlan(imageId, '');
+        const nuTitel = this.works?.get(imageId)?.title ?? null;
+        if (nu && nu.fra !== mappe) this.catalog.omdoeb(imageId, mappe);
+        this.works?.save(imageId, { title: titel ?? '' });
+        return nu ? this._omdoebEntry(imageId, nu.fra, nuTitel) : null;
+      },
+    };
   }
 
   // ---------- Optagelser (kaldes FOER handlingen, medmindre andet staar) ----------

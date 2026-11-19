@@ -417,7 +417,9 @@ export default function App() {
       if (iTekstfelt) {
         document.execCommand(evt.cmd === 'redo' ? 'redo' : 'undo');
       } else {
-        invoke(evt.cmd === 'redo' ? 'app:redo' : 'app:undo').catch(() => {});
+        invoke(evt.cmd === 'redo' ? 'app:redo' : 'app:undo')
+          .then((navn) => visBesked(navn ? `${evt.cmd === 'redo' ? 'Redone' : 'Undone'}: ${navn}` : 'Nothing to undo', 3000))
+          .catch(visFejl);
       }
     } else if (evt.type === 'index') {
       setIndexProgress(evt.progress);

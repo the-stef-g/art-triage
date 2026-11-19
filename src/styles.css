@@ -617,6 +617,8 @@ button.stor {
 .crop-top { display: flex; align-items: baseline; gap: 16px; }
 .crop-top .crop-meta { margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .crop-top .crop-finder { margin-left: auto; align-self: center; flex: none; }
+.crop-top .vaerk-navn { display: flex; align-items: baseline; gap: 6px; margin: 0; flex: none; }
+.crop-top .vaerk-navn input { width: 16em; }
 .crop-top strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 40vw; }
 .crop-formater { display: flex; gap: 8px; }
 /* Et format der er beskaaret: fluebenet paa knappen og et minus i hjoernet,

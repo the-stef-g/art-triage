@@ -180,6 +180,8 @@ export class AppSession {
         // Ét vaerk, én original: to filer med samme navn i Original flettes.
         const flyttet = katalog.rydDobbelteOriginaler();
         if (flyttet) this.log(`one original per work (same name, or the name plus more words): ${flyttet} file(s) moved to Edits`);
+        const fulgte = this.works.foelgFinderNavne();
+        if (fulgte) this.log(`titles: ${fulgte} work(s) follow a name changed in Finder`);
         const antal = this.works.autoSerier();
         if (antal) this.log(`auto series: ${antal} work(s)`);
         // En serie deler de ord de fleste af dens vaerker har.
@@ -341,8 +343,13 @@ export class AppSession {
     // Statuslinjen viser hvor mange forhaandsvisninger der fejlede.
     this.thumbs.onFailedChange = debounce((failed) => this.broadcast('thumbs', { failed }), 300);
     this.searchIndex = new SearchIndex(this.catalog, MODEL_ID);
-    this.undoMgr = new UndoManager(this.catalog);
     this.works = new Works(this.catalog);
+    this.undoMgr = new UndoManager(this.catalog, {
+      trash: (abs) => shell.trashItem(abs),
+      works: this.works,
+      onChange: (u, r) => this.onUndoChange?.(u, r),
+    });
+    this.onUndoChange?.(null, null);
     // Et andet bibliotek: dets vaerker har andre numre.
     if (!this.koeKoerer) { this.koe = []; this.koeStart = null; this._koeMeld(); }
     this.indexer = new Indexer({
@@ -464,6 +471,7 @@ export class AppSession {
     this.thumbs = null;
     this.searchIndex = null;
     this.undoMgr = null;
+    this.onUndoChange?.(null, null);
     this.works = null;
   }
 
@@ -1079,7 +1087,11 @@ export class AppSession {
     // Filmstrip: de andre skud i samme mappe, i den raekkefoelge de er taget.
     // Fase 2: en fil i et andet vaerk, eller et vaerk for sig.
     handle('work:goerTilOriginal', async ({ versionId }) => {
-      const res = this.requireCatalog().goerTilOriginal(versionId);
+      const catalog = this.requireCatalog();
+      const imageId = catalog.getVersion(versionId)?.image_id;
+      const foer = imageId ? catalog.db.get('SELECT master_file_id FROM images WHERE id=?', imageId)?.master_file_id : null;
+      const res = catalog.goerTilOriginal(versionId);
+      if (res.edit) this.undoMgr?.afterNyOriginal(imageId, foer);
       this.log(`work: ${res.original} is the original${res.edit ? `, ${res.edit} is an edit` : ''}`);
       await this.runSync('ny original');
       return res;
@@ -1132,6 +1144,7 @@ export class AppSession {
       const catalog = this.requireCatalog();
       const res = await lavMaster(catalog.masterMaal(versionId));
       this.log(`master: ${res.path.slice(catalog.root.length + 1)}${res.konverteret ? ' (converted to TIFF)' : ''}`);
+      this.undoMgr?.afterNyFil(res.path.slice(catalog.root.length + 1), 'master');
       await this.runSync('master');
       return { rel: res.path.slice(catalog.root.length + 1), konverteret: res.konverteret };
     });
@@ -1235,6 +1248,7 @@ export class AppSession {
         kilde: catalog.abs(f.rel_path), rect, rotation: f.rotation || 0, ratio, vinkel: Number(vinkel) || 0,
       });
       this.log(`crop: ${f.rel_path} -> ${res.path.slice(catalog.root.length + 1)}${res.bit8 ? ' (8 bit)' : ''}`);
+      this.undoMgr?.afterNyFil(res.path.slice(catalog.root.length + 1), 'beskæring');
       // Den nye fil bliver en version af vaerket med det samme.
       await this.runSync('beskaering');
       return { rel: res.path.slice(catalog.root.length + 1), bit8: res.bit8 };
@@ -1322,8 +1336,18 @@ export class AppSession {
       return moves.length;
     });
 
-    handle('app:undo', () => (this.undoMgr ? this.undoMgr.undo() : null));
-    handle('app:redo', () => (this.undoMgr ? this.undoMgr.redo() : null));
+    // Fortryd og gentag; bagefter skannes, saa filer der er lagt i
+    // papirkurven eller flyttet, er vaek fra kataloget.
+    handle('app:undo', async () => {
+      const navn = this.undoMgr ? await this.undoMgr.undo() : null;
+      if (navn) { this.log(`undo: ${navn}`); await this.runSync('fortryd'); }
+      return navn;
+    });
+    handle('app:redo', async () => {
+      const navn = this.undoMgr ? await this.undoMgr.redo() : null;
+      if (navn) { this.log(`redo: ${navn}`); await this.runSync('fortryd'); }
+      return navn;
+    });
 
     handle('ed:list', () => detectEditors(this.settings.data.customEditors));
     handle('ed:statusNames', () => statusNavne(this.settings.data.customEditors));
@@ -1401,6 +1425,7 @@ export class AppSession {
     handle('work:saetFormatFra', ({ imageId, format, fra }) => this.requireWorks().saetFormatFra(imageId, format, Boolean(fra)));
     handle('work:omdoebPlan', ({ imageId, title }) => this.requireCatalog().omdoebPlan(imageId, title));
     handle('work:omdoeb', async ({ imageId, title }) => {
+      this.undoMgr?.beforeOmdoebVaerk(imageId);
       const plan = this.requireCatalog().omdoeb(imageId, title);
       this.log(`rename: Approved/${plan.fra} -> Approved/${plan.til} (${plan.filer.length} file(s))`);
       const work = this.requireWorks().save(imageId, { title });
