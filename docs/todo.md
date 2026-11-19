@@ -4,7 +4,14 @@ Det der venter. Stef siger "byg", før noget herfra bliver lavet.
 
 ## Venter på "byg"
 
-Intet lige nu.
+- **Værkets navn kan ændres i alle faser.** I dag står navnefeltet kun i Edit og Product; i Crop og Print er der ingen højre kolonne, så et værk der er gået videre med Master, kan ikke omdøbes der. Nyt: navnet står som et felt øverst i Crop og Print også (ved filens navn), med samme dialog som i Edit og Product (*Rename files* eller *Only the title*). I Shop kan titlen også rettes; den sendes med næste Update shop.
+- **Omdøbes værkets mappe i Finder, følger titlen med.** I dag gemmer appen titlen, så den gamle bliver hængende. Nyt: ved scanningen ser appen, at værkets filer nu ligger i en mappe med et nyt navn, og titlen bliver mappens navn, hvis titlen var det gamle navn (har Stef skrevet en anden titel i appen, røres den ikke). Det samme gælder, når originalens fil omdøbes i Finder. Teksterne skrives ikke om af sig selv; Stef kan bruge Write texts.
+- **Fortryd (⌘Z) for værkets trin.** I dag kan ⌘Z kun fortryde bedømmelser, serier, omdøbte versioner og flyttede filer. Nyt: ⌘Z fortryder også de seneste trin i Edit og de andre faser, i omvendt rækkefølge:
+  - **Master:** masterfilen i `Masters` går i papirkurven, og værket er tilbage i Edit.
+  - **Original / Edit:** filerne bytter plads tilbage.
+  - **Omdøb værk:** mappen, filerne og titlen får det gamle navn igen.
+  - **Save crop:** beskæringen går i papirkurven.
+  Fortryd virker for det, der er gjort, mens appen har været åben. Kassér værk og det, der er sendt til shoppen, kan ikke fortrydes med ⌘Z (filer i papirkurven kan lægges tilbage fra Finder). Edit-menuen viser, hvad Undo vil fortryde, fx *Undo Master*.
 
 ## Venter på en afklaring
 
