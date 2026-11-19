@@ -4,7 +4,10 @@ Det der venter. Stef siger "byg", før noget herfra bliver lavet.
 
 ## Venter på "byg"
 
-Intet lige nu.
+- **Product: først når alle printfilerne er lavet.** I dag står et værk i Product, så snart det har en master, samtidig med at det står i Crop og Print. Nyt: et værk kommer først i Product, når det er færdigt i Crop og Print:
+  - alle de fem formater er beskåret eller slået fra i Crop, og
+  - hver beskæring har en printfil, der ikke er forældet (lavet af den nuværende beskæring og forstørrelse).
+  Et værk der kun sælges som original (Paintings og Sculptures), skal kun have sin beskæring; det har ingen printfiler. Et værk der allerede er i shoppen (Shop), bliver i Shop. Værker der står i Product i dag uden alle printfiler, forsvinder fra Product, til de er færdige i Print. Fanen Print viser stadig, hvad der mangler.
 
 ## Venter på en afklaring
 
