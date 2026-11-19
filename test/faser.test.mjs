@@ -1,12 +1,12 @@
 // De seks faser: Sort, Edit, Crops, Print, Product og Shop. Fasen er ikke en status
 // man saetter, den foelger af mapperne, og det er det testene holder oeje med.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, writeFileSync, mkdirSync, rmSync, existsSync, readFileSync, utimesSync, renameSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, mkdirSync, rmSync, existsSync, readFileSync, utimesSync, renameSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { openDatabase } from '../electron/lib/db.mjs';
 import { Catalog } from '../electron/lib/catalog.mjs';
-import { editorFraSti, udenEditorSuffiks, masterNavn, walkImages } from '../electron/lib/util.mjs';
+import { editorFraSti, udenEditorSuffiks, masterNavn, walkImages, vaerkNavnFra } from '../electron/lib/util.mjs';
 import { exifTidFromBuffer } from '../electron/lib/exif.mjs';
 import { lavMaster } from '../electron/lib/master.mjs';
 import { Works, serieNavnFraTitel } from '../electron/lib/works.mjs';
@@ -126,6 +126,11 @@ describe('programmet staar i filnavnet', () => {
     expect(editorFraSti('Approved/w/Edits/neon.tif')).toBe(null);
     expect(editorFraSti('Approved/w/Masters/a-neo.tif')).toBe(null);
     expect(udenEditorSuffiks('Desert-neo-tp')).toBe('Desert');
+    // Vaerkets navn stopper ved foerste bindestreg, men en dato beholdes.
+    expect(vaerkNavnFra('Blue Sky Sunset-Pano-denoise')).toBe('Blue Sky Sunset');
+    expect(vaerkNavnFra('IMG_1234-Denoise')).toBe('IMG_1234');
+    expect(vaerkNavnFra('2023-05-01 Strand')).toBe('2023-05-01 Strand');
+    expect(vaerkNavnFra('Desert Canyon 04')).toBe('Desert Canyon 04');
     // Masterens navn: vaerkets navn naar redigeringen begynder med det,
     // ellers uden de kendte endelser, uanset store og smaa bogstaver og
     // med eller uden bindestreg.
@@ -547,14 +552,14 @@ describe('ét vaerk pr. navn', () => {
     skriv('Import/A/Desert-Pano.tif', 'pano');
     skriv('Import/A/Desert_edit-tp.tif', 'edit');
     skriv('Import/A/Desert 02.tif', 'et andet vaerk');
-    skriv('Import/A/Desert-wide.tif', 'ikke en endelse');
+    skriv('Import/A/Desert-wide.tif', 'ogsaa en endelse: alt efter bindestregen');
     catalog.sync();
     // Redigeringen godkendes foer originalen.
     for (const n of ['Desert-denoise', 'Desert', 'Desert-Pano', 'Desert_edit-tp', 'Desert 02', 'Desert-wide']) {
       catalog.setRating([raekke(`Import/A/${n}.tif`).version_id], 'godkendt');
       catalog.sync();
     }
-    for (const n of ['Desert-denoise', 'Desert-Pano', 'Desert_edit-tp']) {
+    for (const n of ['Desert-denoise', 'Desert-Pano', 'Desert_edit-tp', 'Desert-wide']) {
       expect(existsSync(join(root, 'Approved', 'Desert', 'Edits', `${n}.tif`))).toBe(true);
       expect(existsSync(join(root, 'Approved', n))).toBe(false);
     }
@@ -562,12 +567,11 @@ describe('ét vaerk pr. navn', () => {
     expect(new Set(r.map((x) => x.image_id)).size).toBe(1);
     expect(existsSync(join(root, 'Approved', 'Desert', 'Original', 'Desert.tif'))).toBe(true);
     expect(existsSync(join(root, 'Approved', 'Desert 02', 'Original', 'Desert 02.tif'))).toBe(true);
-    expect(existsSync(join(root, 'Approved', 'Desert-wide', 'Original', 'Desert-wide.tif'))).toBe(true);
     // Den flettede fil hedder straks efter sin endelse, ikke Original.
     expect(raekke('Approved/Desert/Edits/Desert-denoise.tif').version_name).toBe('denoise');
   });
 
-  it('en kaede af endelser lander i vaerket med det laengste navn der findes', () => {
+  it('vaerkets navn stopper ved foerste bindestreg; filerne beholder deres navne', () => {
     skriv('Import/A/Sky-Pano.dng', 'original');
     skriv('Import/A/Sky-Pano-denoise.tif', 'denoise');
     skriv('Import/A/Sky-Pano-denoise-neo.tif', 'neo');
@@ -576,13 +580,35 @@ describe('ét vaerk pr. navn', () => {
       catalog.setRating([raekke(`Import/A/${n}`).version_id], 'godkendt');
       catalog.sync();
     }
+    expect(existsSync(join(root, 'Approved', 'Sky', 'Original', 'Sky-Pano.dng'))).toBe(true);
     for (const n of ['Sky-Pano-denoise', 'Sky-Pano-denoise-neo']) {
-      expect(existsSync(join(root, 'Approved', 'Sky-Pano', 'Edits', `${n}.tif`))).toBe(true);
-      expect(existsSync(join(root, 'Approved', n))).toBe(false);
+      expect(existsSync(join(root, 'Approved', 'Sky', 'Edits', `${n}.tif`))).toBe(true);
     }
-    const r = alle().filter((x) => x.rel_path.startsWith('Approved/Sky-Pano/'));
+    expect(readdirSync(join(root, 'Approved')).sort()).toEqual(['Sky']);
+    const r = alle().filter((x) => x.rel_path.startsWith('Approved/Sky/'));
     expect(new Set(r.map((x) => x.image_id)).size).toBe(1);
-    expect(raekke('Approved/Sky-Pano/Edits/Sky-Pano-denoise-neo.tif').version_name).toBe('denoise-neo');
+    expect(raekke('Approved/Sky/Edits/Sky-Pano-denoise-neo.tif').version_name).toBe('denoise-neo');
+    expect(new Works(catalog).get(raekke('Approved/Sky/Original/Sky-Pano.dng').image_id).effective.title).toBe('Sky');
+  });
+
+  it('et vaerk fra foer med bindestreg i navnet faar det korte navn ved skanningen', () => {
+    skriv('Import/A/Sky-Pano.dng', 'original');
+    skriv('Import/B/Mur-Pano.tif', 'har en master');
+    catalog.sync();
+    // Som i 0.59: mappen hed hele filnavnet.
+    catalog.mappestyring = false;
+    catalog.moveFiles([raekke('Import/A/Sky-Pano.dng').file_id], 'Approved/Sky-Pano/Original');
+    catalog.moveFiles([raekke('Import/B/Mur-Pano.tif').file_id], 'Approved/Mur-Pano/Original');
+    skriv('Approved/Mur-Pano/Masters/Mur-Pano.tif', 'master');
+    catalog.sync();
+    catalog.setRating(alle().filter((x) => x.rel_path.startsWith('Approved/')).map((x) => x.version_id), 'godkendt');
+    catalog.mappestyring = true;
+    catalog.rydDobbelteOriginaler();
+    catalog.sync();
+    expect(existsSync(join(root, 'Approved', 'Sky', 'Original', 'Sky-Pano.dng'))).toBe(true);
+    expect(existsSync(join(root, 'Approved', 'Sky-Pano'))).toBe(false);
+    // Et vaerk med en master roeres ikke.
+    expect(existsSync(join(root, 'Approved', 'Mur-Pano', 'Original', 'Mur-Pano.tif'))).toBe(true);
   });
 
   it('fletter to vaerker der allerede er delt, og kan skille dem ad igen', () => {

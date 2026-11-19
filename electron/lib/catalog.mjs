@@ -12,7 +12,7 @@ import { FARVER } from './keywords.mjs';
 const FARVE_ORD = new Set(FARVER);
 import {
   walkImages, walkImagesAsync, walkDirs, findImportMappe, beskaeringFraSti, navnMedBeskaering,
-  editorFraSti, masterNavn, navneUdenEndelser, quickHash, quickHashAsync, mapGraense, stemOf, slug, uniquePath, extOf, daCollator,
+  editorFraSti, masterNavn, navneUdenEndelser, vaerkNavnFra, quickHash, quickHashAsync, mapGraense, stemOf, slug, uniquePath, extOf, daCollator,
   libraryAvailable,
 } from './util.mjs';
 
@@ -1584,19 +1584,21 @@ export class Catalog extends EventEmitter {
       `${escapeLike(praefiks)}Original/%`
     ).filter((f) => posix.dirname(f.rel_path) === `${praefiks}Original`);
     const grupper = new Map();
+    // Filer med samme navn til foerste bindestreg er ét vaerk
+    // (Desert.tif og Desert-denoise.tif); originalen er den uden endelser.
+    const noegle = (f) => vaerkNavnFra(stemOf(posix.basename(f.rel_path))).toLowerCase();
+    const harEndelse = (f) => (stemOf(posix.basename(f.rel_path)).toLowerCase() === noegle(f) ? 0 : 1);
     for (const f of originaler) {
-      const stem = stemOf(posix.basename(f.rel_path)).toLowerCase();
-      if (!grupper.has(stem)) grupper.set(stem, []);
-      grupper.get(stem).push(f);
+      const k = noegle(f);
+      if (!grupper.has(k)) grupper.set(k, []);
+      grupper.get(k).push(f);
     }
     const billedeFor = (fileId) => this.db.get('SELECT id FROM images WHERE master_file_id=?', fileId)
       || this.db.get('SELECT image_id AS id FROM versions WHERE file_id=?', fileId);
     let flyttet = 0;
     for (const filer of grupper.values()) {
       if (filer.length < 2) continue;
-      const endelser = new Set(filer.map((f) => extname(f.rel_path).toLowerCase()));
-      if (endelser.size < filer.length) continue;
-      filer.sort((a, b) => a.mtime - b.mtime || a.id - b.id);
+      filer.sort((a, b) => harEndelse(a) - harEndelse(b) || a.mtime - b.mtime || a.id - b.id);
       const ejer = billedeFor(filer[0].id);
       if (!ejer) continue;
       mkdirSync(join(this.root, praefiks, 'Edits'), { recursive: true });
@@ -1645,7 +1647,40 @@ export class Catalog extends EventEmitter {
     ).map((f) => arbejdsmappeFor(f.rel_path)?.work).filter(Boolean));
     let antal = 0;
     for (const w of vaerker) antal += this._enOriginal(w);
+    antal += this.kortVaerkNavne();
     return antal + this.fletLaengereNavne();
+  }
+
+  // Et vaerk hvis navn har en bindestreg, faar navnet til den foerste
+  // (*Blue Sky Sunset-Pano* -> *Blue Sky Sunset*): mappen omdoebes, og
+  // filerne beholder deres navne. Kun et vaerk uden master, printfiler og
+  // produkt i shoppen, og ikke naar et vaerk med det korte navn findes (det
+  // flettes saa ind af fletLaengereNavne). Returnerer antallet af flyttede filer.
+  kortVaerkNavne() {
+    const vaerker = this._vaerkFiler();
+    const egne = this._egneVaerker();
+    const findes = new Set([...vaerker.keys()].map((n) => n.toLowerCase()));
+    let flyttet = 0;
+    for (const [w, d] of vaerker) {
+      const kort = vaerkNavnFra(w);
+      if (kort === w || egne.has(w) || !d.Original.length) continue;
+      if (d.Masters.length || d['Print files'].length) continue;
+      if (findes.has(kort.toLowerCase()) || existsSync(join(this.root, 'Approved', kort))) continue;
+      const billede = this.db.get('SELECT id FROM images WHERE master_file_id=?', d.Original[0].id);
+      if (billede && this.db.get('SELECT woo_product_id FROM works WHERE image_id=?', billede.id)?.woo_product_id) continue;
+      try {
+        for (const del of ARBEJDSMAPPER) {
+          mkdirSync(join(this.root, 'Approved', kort, del), { recursive: true });
+          if (d[del].length) flyttet += this.moveFiles(d[del].map((f) => f.id), `Approved/${kort}/${del}`).length;
+        }
+        this._fjernTomVaerkmappe(w);
+        findes.add(kort.toLowerCase());
+      } catch {
+        // Kan en fil ikke flyttes nu (fx aaben), proeves det igen naeste gang.
+      }
+    }
+    if (flyttet) this.emit('changed');
+    return flyttet;
   }
 
   // Filerne i vaerkmapperne, pr. vaerk og del.
@@ -1692,7 +1727,7 @@ export class Catalog extends EventEmitter {
       // fjernes én ad gangen, og vaerket med det laengste navn der findes,
       // faar filen (Sky-Pano-denoise-neo -> Sky-Pano-denoise -> Sky-Pano).
       let v = null;
-      for (const kandidat of navneUdenEndelser(w)) {
+      for (const kandidat of [...navneUdenEndelser(w), vaerkNavnFra(w)]) {
         v = navne.find((n) => harOriginal(n) && n.toLowerCase() === kandidat.toLowerCase());
         if (v) break;
       }
@@ -1843,7 +1878,7 @@ export class Catalog extends EventEmitter {
     const styret = rel.includes('/') && this._styredeTopmapper().includes(topmappe);
     if (rating === 'godkendt') {
       if (arbejdsmappeFor(rel)?.del === 'Original') return null;
-      const stem = stemOf(posix.basename(rel)).replace(/[/:\\]/g, '-');
+      const stem = vaerkNavnFra(stemOf(posix.basename(rel))).replace(/[/:\\]/g, '-');
       return `Approved/${stem}/Original`;
     }
     // En fil der ligger uden for de styrede mapper og ikke er bedoemt, bliver

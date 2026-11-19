@@ -91,7 +91,11 @@ export function serieNavnFraTitel(title) {
   return base;
 }
 
+// For en original i en vaerkmappe er det vaerkets navn (mappen), som er
+// filnavnet til foerste bindestreg: Blue Sky Sunset-Pano.dng -> Blue Sky Sunset.
 export function defaultTitle(relPath) {
+  const vaerk = /^Approved\/([^/]+)\/Original\/[^/]+$/.exec(String(relPath || ''));
+  if (vaerk) return vaerk[1];
   return stemOf(basename(relPath));
 }
 

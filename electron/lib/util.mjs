@@ -289,6 +289,18 @@ export function masterNavn(stem, work = '') {
   return navn || stem;
 }
 
+// Vaerkets navn ud fra en fils navn: Stef bruger aldrig bindestreger i
+// titler, saa alt fra den foerste bindestreg er endelser:
+// "Blue Sky Sunset-Pano-denoise" -> "Blue Sky Sunset". Et navn der kun er
+// tal foran bindestregen (en dato som 2023-05-01), beholdes helt.
+export function vaerkNavnFra(stem) {
+  const s = String(stem || '');
+  const i = s.indexOf('-');
+  if (i <= 0) return s;
+  const kort = s.slice(0, i).replace(/[\s_.]+$/, '');
+  return /\p{L}/u.test(kort) ? kort : s;
+}
+
 // Navnet med endelserne fjernet én ad gangen bagfra, laengste foerst:
 // "Sky-Pano-denoise-neo" -> ["Sky-Pano-denoise", "Sky-Pano", "Sky"].
 export function navneUdenEndelser(stem) {
