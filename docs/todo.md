@@ -4,7 +4,7 @@ Det der venter. Stef siger "byg", før noget herfra bliver lavet.
 
 ## Venter på "byg"
 
-Intet lige nu.
+- **Værkets navn stopper ved den første bindestreg.** Stef bruger aldrig bindestreger i titler, så alt fra den første bindestreg er endelser (-Pano, -denoise, -neo, også endelser appen ikke kender). Når en fil godkendes, hedder værket (mappen og titlen) filens navn uden det: `Blue Sky Sunset-Pano.dng` bliver værket *Blue Sky Sunset*, og `-Pano-denoise.tif` og `-Pano-denoise-neo.tif` lægges i dets Edits. Selve filerne beholder deres navne. Kendte endelser med mellemrum eller understreg (*Desert Pano*, *Desert_edit*) fjernes stadig som i dag, og et tal (*Desert 02*) er stadig et nyt værk i en serie. Ved næste scanning omdøbes et værk, der allerede har en bindestreg i navnet, men kun hvis det ikke har en master og ikke er i shoppen, og ikke hvis der findes et værk med det korte navn i forvejen (så flettes det i stedet ind i det). *Blue Sky Sunset-Pano* bliver altså til *Blue Sky Sunset*.
 
 ## Venter på en afklaring
 
