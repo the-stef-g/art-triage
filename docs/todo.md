@@ -4,7 +4,7 @@ Det der venter. Stef siger "byg", før noget herfra bliver lavet.
 
 ## Venter på "byg"
 
-Intet lige nu.
+- **Edit: knappen Edit under "This file is" skal virke på originalen.** I dag er knappen kun en visning: den er altid grå og lyser kun for en fil i Edits, så et klik på originalen gør intet. Nyt: et klik på Edit, mens originalen er valgt, gør den til en redigering (den flyttes til værkets `Edits`), og en anden fil bliver originalen. Har værket kun én anden fil, bliver den originalen med det samme; har det flere, viser en lille dialog dem, så Stef vælger (Enter vælger den markerede). Har værket ingen anden fil, er knappen grå, for et værk har altid én original. Værket beholder navn, tekster og serie, som ved Original-knappen.
 
 ## Venter på en afklaring
 
