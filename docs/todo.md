@@ -4,7 +4,7 @@ Det der venter. Stef siger "byg", før noget herfra bliver lavet.
 
 ## Venter på "byg"
 
-Intet lige nu.
+- **Fejl i 0.62: masteren og beskæringerne omdøbes ikke (Orange Sunset).** Titlen er *Orange Sunset*, men masteren hedder stadig `Ahl 23.tiff`, og Enter i titelfeltet gør intet. Sandsynlig årsag: mappen og originalen hedder allerede *Orange Sunset* (omdøbt i Finder, og titlen fulgte med i 0.61), så appen kender ikke længere det gamle navn *Ahl 23* og finder ingen filer at omdøbe. Rettelse: appen læser også det gamle navn fra masterens filnavn i `Masters` (masteren er altid opkaldt efter værket, da den blev lavet), så masteren, beskæringerne (`Ahl 23 2-3.tiff`), deres -giga-filer og printfilerne får titlen. Det tjekkes også ved hver scanning, så Stef ikke behøver at trykke Enter.
 
 ## Venter på en afklaring
 
