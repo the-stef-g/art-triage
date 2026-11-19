@@ -97,22 +97,23 @@ export default function WorkPanel({ row, versions, tekstRev = 0, hasKey, shop, o
     if (String(draft[draftKey] ?? '') !== String(saved ?? '')) commit({ [column]: draft[draftKey] });
   };
 
-  // En ny titel kan omdoebe vaerkets filer. Foerst en plan; har den noget
-  // at omdoebe, spoerger en dialog, ellers gemmes titlen bare.
+  // Titel og filnavn er det samme: en titel omdoeber vaerkmappen og filerne.
+  // Foerst en plan; har den noget at omdoebe, viser en dialog hvad, ellers
+  // gemmes titlen bare. Ogsaa en uaendret titel retter filer der hedder
+  // noget andet.
   const gemTitel = async () => {
     const ny = String(draft.title ?? '').trim();
-    if (ny === String(work.title ?? '')) return;
+    if (!ny && !String(work.title ?? '')) return;
     if (!ny) {
       commit({ title: draft.title });
       return;
     }
     try {
       const plan = await invoke('work:omdoebPlan', { imageId, title: ny });
-      if (plan && plan.til !== plan.fra) setOmdoeb({ ...plan, titel: ny });
-      else commit({ title: ny });
+      if (plan && (plan.til !== plan.fra || plan.filer.length)) setOmdoeb({ ...plan, titel: ny });
+      else if (ny !== String(work.title ?? '')) commit({ title: ny });
     } catch (err) {
       onError(err);
-      commit({ title: ny });
     }
   };
   const udfoerOmdoeb = async () => {
@@ -124,11 +125,6 @@ export default function WorkPanel({ row, versions, tekstRev = 0, hasKey, shop, o
       onError(err);
       adopt(work);
     }
-  };
-  const kunTitel = () => {
-    const { titel } = omdoeb;
-    setOmdoeb(null);
-    commit({ title: titel });
   };
   const fortryd = () => {
     setOmdoeb(null);
@@ -522,7 +518,7 @@ export default function WorkPanel({ row, versions, tekstRev = 0, hasKey, shop, o
       {form}
       {shopNode ? createPortal(shopDel, shopNode) : shopDel}
       {omdoeb && createPortal(
-        <OmdoebDialog plan={omdoeb} onRename={udfoerOmdoeb} onTitle={kunTitel} onCancel={fortryd} />,
+        <OmdoebDialog plan={omdoeb} onRename={udfoerOmdoeb} onCancel={fortryd} />,
         document.body
       )}
     </>
@@ -530,7 +526,8 @@ export default function WorkPanel({ row, versions, tekstRev = 0, hasKey, shop, o
 }
 
 // Dialogen naar titlen aendres: hvad der omdoebes, og et valg.
-function OmdoebDialog({ plan, onRename, onTitle, onCancel }) {
+function OmdoebDialog({ plan, onRename, onCancel }) {
+  const nyMappe = plan.til !== plan.fra;
   const kan = !plan.problemer.length;
   // Enter og Retur trykker den blaa knap (Rename files), Escape fortryder.
   useEffect(() => {
@@ -546,9 +543,9 @@ function OmdoebDialog({ plan, onRename, onTitle, onCancel }) {
     <div className="dialog-bag" onClick={onCancel}>
       <div className="dialog omdoeb-dialog" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
         <h3>Rename the files to «{plan.til}»?</h3>
-        <p>The work folder and {plan.filer.length} file{plan.filer.length === 1 ? '' : 's'}:</p>
+        <p>{nyMappe ? 'The work folder and ' : ''}{plan.filer.length} file{plan.filer.length === 1 ? '' : 's'}{nyMappe ? '' : ' that do not have the title yet'}:</p>
         <ul className="dialog-filer">
-          <li><span className="tom">Folder</span> {plan.mappe.fra} → {plan.mappe.til}</li>
+          {nyMappe && <li><span className="tom">Folder</span> {plan.mappe.fra} → {plan.mappe.til}</li>}
           {plan.filer.map((f) => (
             <li key={f.fra} title={`${f.fra} → ${f.til}`}>{f.fra} → {f.til.split('/').pop()}</li>
           ))}
@@ -561,7 +558,6 @@ function OmdoebDialog({ plan, onRename, onTitle, onCancel }) {
         </p>
         <div className="knapraekke dialog-knapper">
           <button onClick={onCancel}>Cancel</button>
-          <button onClick={onTitle}>Only the title</button>
           <button className="primaer" disabled={!kan} onClick={onRename}>Rename files</button>
         </div>
       </div>
@@ -588,13 +584,13 @@ export function VaerkNavn({ imageId, onError, onChanged }) {
   };
   const blur = async () => {
     const ny = String(titel ?? '').trim();
-    if (ny === String(work.title ?? '')) return;
+    if (!ny && !String(work.title ?? '')) return;
     if (!ny) { gem({ title: titel }); return; }
     try {
       const plan = await invoke('work:omdoebPlan', { imageId, title: ny });
-      if (plan && plan.til !== plan.fra) setOmdoeb({ ...plan, titel: ny });
-      else gem({ title: ny });
-    } catch (err) { onError(err); gem({ title: ny }); }
+      if (plan && (plan.til !== plan.fra || plan.filer.length)) setOmdoeb({ ...plan, titel: ny });
+      else if (ny !== String(work.title ?? '')) gem({ title: ny });
+    } catch (err) { onError(err); }
   };
   return (
     <>
@@ -620,7 +616,6 @@ export function VaerkNavn({ imageId, onError, onChanged }) {
               onChanged?.();
             } catch (err) { onError(err); hent(); }
           }}
-          onTitle={() => { const t = omdoeb.titel; setOmdoeb(null); gem({ title: t }); }}
           onCancel={() => { setOmdoeb(null); setTitel(work.title ?? ''); }}
         />,
         document.body,

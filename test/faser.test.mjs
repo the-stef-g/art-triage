@@ -708,6 +708,31 @@ describe('ny titel', () => {
     expect(() => catalog.omdoeb(sand, 'Red Canyon 01')).toThrow(/already exists/);
     expect(existsSync(join(root, 'Approved', 'Sand', 'Original', 'Sand.tif'))).toBe(true);
   });
+
+  it('titel og filnavn er det samme: ogsaa filer med originalens eller den gamle titels navn, og mappen kan allerede hedde det', () => {
+    skriv('Import/Ahl/Desert.tif', 'o');
+    catalog.sync();
+    catalog.setRating([raekke('Import/Ahl/Desert.tif').version_id], 'godkendt');
+    catalog.sync();
+    // Mappen er omdoebt i Finder; filerne hedder stadig Desert.
+    renameSync(join(root, 'Approved', 'Desert'), join(root, 'Approved', 'Dune'));
+    skriv('Approved/Dune/Edits/Desert-denoise.tif', 'd');
+    skriv('Approved/Dune/Edits/Desertscape.tif', 'et andet ord');
+    skriv('Approved/Dune/Masters/Dune.tif', 'm');
+    catalog.sync();
+    const id = raekke('Approved/Dune/Original/Desert.tif').image_id;
+    const plan = catalog.omdoebPlan(id, 'Dune');
+    expect(plan.fra).toBe('Dune');
+    expect(plan.problemer).toEqual([]);
+    expect(plan.filer.map((f) => f.til).sort()).toEqual(['Edits/Dune-denoise.tif', 'Original/Dune.tif']);
+    catalog.omdoeb(id, 'Dune');
+    catalog.sync();
+    expect(raekke('Approved/Dune/Original/Dune.tif').image_id).toBe(id);
+    expect(existsSync(join(root, 'Approved', 'Dune', 'Edits', 'Dune-denoise.tif'))).toBe(true);
+    expect(existsSync(join(root, 'Approved', 'Dune', 'Edits', 'Desertscape.tif'))).toBe(true);
+    // Nu er der intet at rette.
+    expect(catalog.omdoebPlan(id, 'Dune').filer).toEqual([]);
+  });
 });
 
 describe('gamle mappenavne', () => {

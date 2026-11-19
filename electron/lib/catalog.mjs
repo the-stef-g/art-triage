@@ -1291,7 +1291,11 @@ export class Catalog extends EventEmitter {
   // vaerkets navn, faar den nye titel i stedet ("Desert 01 2-3.tif" ->
   // "Red 01 2-3.tif"). Planen viser, hvad der vil ske, og hvad der staar i
   // vejen; intet roeres. Returnerer null for et vaerk uden vaerkmappe.
-  omdoebPlan(imageId, nyTitel) {
+  // Titel og filnavn er det samme: filer hvis navn begynder med mappens
+  // navn, den gamle titel eller originalens navn til foerste bindestreg
+  // (eller et af gamleNavne), faar den nye titel foran og beholder deres
+  // endelser. Ogsaa naar mappen allerede har det nye navn.
+  omdoebPlan(imageId, nyTitel, { gamleNavne = [] } = {}) {
     const master = this.db.get(
       'SELECT f.rel_path FROM images i JOIN files f ON f.id = i.master_file_id WHERE i.id=?', imageId
     );
@@ -1300,7 +1304,7 @@ export class Catalog extends EventEmitter {
     const work = am.work;
     const navn = String(nyTitel ?? '').replace(/[/\\:]/g, '-').replace(/\s+/g, ' ').trim();
     const plan = { fra: work, til: navn, mappe: { fra: `Approved/${work}`, til: `Approved/${navn}` }, filer: [], problemer: [] };
-    if (!navn || navn === work) return { ...plan, filer: [] };
+    if (!navn) return { ...plan, filer: [] };
     const rod = join(this.root, 'Approved', work);
     if (!existsSync(rod)) {
       plan.problemer.push(`The folder Approved/${work} is not there`);
@@ -1309,16 +1313,29 @@ export class Catalog extends EventEmitter {
     if (navn.toLowerCase() !== work.toLowerCase() && existsSync(join(this.root, 'Approved', navn))) {
       plan.problemer.push(`A work folder named ${navn} already exists`);
     }
+    const titel = this.db.get('SELECT title FROM works WHERE image_id=?', imageId)?.title;
+    const praefikser = [...new Set([work, titel, vaerkNavnFra(stemOf(posix.basename(master.rel_path))), ...gamleNavne]
+      .map((n) => String(n ?? '').trim()).filter(Boolean))]
+      .sort((a, b) => b.length - a.length);
+    // Navnet efter praefikset maa ikke fortsaette ordet ("Sky" er ikke
+    // praefiks i "Skyline").
+    const praefiksFor = (filnavn) => praefikser.find((p) => filnavn.toLowerCase().startsWith(p.toLowerCase())
+      && !/\p{L}/u.test(filnavn.charAt(p.length)));
     const gaa = (dir, rel) => {
       for (const e of readdirSync(dir, { withFileTypes: true })) {
         if (e.name === '.DS_Store') continue;
         const r = rel ? `${rel}/${e.name}` : e.name;
+        const p = e.isDirectory() ? null : praefiksFor(e.name);
         if (e.isDirectory()) gaa(join(dir, e.name), r);
-        else if (e.name.startsWith(work)) {
-          const nyNavn = navn + e.name.slice(work.length);
+        else if (p) {
+          const nyNavn = navn + e.name.slice(p.length);
+          if (nyNavn === e.name) continue;
           const ny = rel ? `${rel}/${nyNavn}` : nyNavn;
           if (nyNavn.toLowerCase() !== e.name.toLowerCase() && existsSync(join(dir, nyNavn))) {
             plan.problemer.push(`${r.split('/').slice(0, -1).concat(nyNavn).join('/')} already exists`);
+          }
+          if (plan.filer.some((f) => f.til.toLowerCase() === ny.toLowerCase())) {
+            plan.problemer.push(`Two files would both be called ${ny}`);
           }
           plan.filer.push({ fra: r, til: ny });
         }
@@ -1331,11 +1348,11 @@ export class Catalog extends EventEmitter {
   // Udfoerer planen: foerst filerne inde i mappen, saa mappen, saa
   // kataloget. Gaar noget galt undervejs, rulles det tilbage, saa der aldrig
   // ligger halvt omdoebte filer. Returnerer planen.
-  omdoeb(imageId, nyTitel) {
-    const plan = this.omdoebPlan(imageId, nyTitel);
+  omdoeb(imageId, nyTitel, valg = {}) {
+    const plan = this.omdoebPlan(imageId, nyTitel, valg);
     if (!plan) throw new Error('This work has no work folder');
     if (plan.problemer.length) throw new Error(plan.problemer.join('. '));
-    if (plan.til === plan.fra) return plan;
+    if (plan.til === plan.fra && !plan.filer.length) return plan;
     const rod = join(this.root, 'Approved', plan.fra);
     const gjort = [];
     try {
@@ -1343,7 +1360,7 @@ export class Catalog extends EventEmitter {
         renameSync(join(rod, f.fra), join(rod, f.til));
         gjort.push(f);
       }
-      renameSync(rod, join(this.root, 'Approved', plan.til));
+      if (plan.til !== plan.fra) renameSync(rod, join(this.root, 'Approved', plan.til));
     } catch (err) {
       for (const f of gjort.reverse()) {
         try { renameSync(join(rod, f.til), join(rod, f.fra)); } catch { /* bedste forsoeg */ }

@@ -233,12 +233,19 @@ describe('titlen foelger Finder', () => {
     expect(works.foelgFinderNavne()).toBe(1);
     expect(works.get(desert).effective.title).toBe('Dune');
     expect(works.get(mur).effective.title).toBe('Wall of Time');
-    // Originalens fil omdoebes i Finder.
-    renameSync(join(root, 'Approved/Dune/Original/Desert.tif'), join(root, 'Approved/Dune/Original/Sand.tif'));
+    // Titel og filnavn er det samme: originalen hedder nu ogsaa Dune.
     catalog.sync();
-    const sand = raekke('Approved/Dune/Original/Sand.tif').image_id;
-    expect(sand).toBe(desert);
+    expect(existsSync(join(root, 'Approved/Dune/Original/Dune.tif'))).toBe(true);
+    expect(existsSync(join(root, 'Approved/Muren/Original/Mur.tif'))).toBe(true);
+    expect(works.foelgFinderNavne()).toBe(0);
+    // Originalens fil omdoebes i Finder: titlen og mappen foelger.
+    renameSync(join(root, 'Approved/Dune/Original/Dune.tif'), join(root, 'Approved/Dune/Original/Sand.tif'));
+    catalog.sync();
+    expect(raekke('Approved/Dune/Original/Sand.tif').image_id).toBe(desert);
     expect(works.foelgFinderNavne()).toBe(1);
     expect(works.get(desert).effective.title).toBe('Sand');
+    catalog.sync();
+    expect(existsSync(join(root, 'Approved/Sand/Original/Sand.tif'))).toBe(true);
+    expect(works.foelgFinderNavne()).toBe(0);
   });
 });

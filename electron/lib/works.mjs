@@ -348,9 +348,20 @@ export class Works {
         // Samme fil med et nyt navn: titlen bliver filens navn til foerste bindestreg.
         if (gammelt(f.mappe) || ens(r.title, vaerkNavnFra(f.stem))) ny = vaerkNavnFra(stem);
       }
-      if (ny && !ens(r.title, ny)) {
-        this.save(r.id, { title: ny });
-        antal += 1;
+      if (ny) {
+        if (!ens(r.title, ny)) {
+          this.save(r.id, { title: ny });
+          antal += 1;
+        }
+        // Titel og filnavn er det samme: mappen og filerne faar navnet ogsaa.
+        try {
+          const plan = this.catalog.omdoeb(r.id, ny, { gamleNavne: [f.mappe, r.title, vaerkNavnFra(f.stem)] });
+          if (plan.til !== plan.fra) nu[r.id].mappe = plan.til;
+          const original = plan.filer.find((x) => x.fra === `Original/${m[2]}`);
+          if (original) nu[r.id].stem = stemOf(original.til.split('/').pop());
+        } catch {
+          // Kan det ikke omdoebes nu (fx en fil med det navn findes), bliver filerne som de er.
+        }
       }
     }
     this.catalog.setMeta('vaerkNavneSidst', JSON.stringify(nu));
