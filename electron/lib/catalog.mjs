@@ -1314,7 +1314,12 @@ export class Catalog extends EventEmitter {
       plan.problemer.push(`A work folder named ${navn} already exists`);
     }
     const titel = this.db.get('SELECT title FROM works WHERE image_id=?', imageId)?.title;
-    const praefikser = [...new Set([work, titel, vaerkNavnFra(stemOf(posix.basename(master.rel_path))), ...gamleNavne]
+    // Masteren er opkaldt efter vaerket, som det hed da den blev lavet, saa
+    // dens navn er ogsaa et gammelt navn (Ahl 23.tiff i Orange Sunset).
+    const masterNavne = existsSync(join(rod, 'Masters'))
+      ? readdirSync(join(rod, 'Masters')).filter((n) => !n.startsWith('.') && !beskaeringFraSti(`Approved/${work}/Masters/${n}`)).map((n) => stemOf(n))
+      : [];
+    const praefikser = [...new Set([work, titel, vaerkNavnFra(stemOf(posix.basename(master.rel_path))), ...masterNavne, ...gamleNavne]
       .map((n) => String(n ?? '').trim()).filter(Boolean))]
       .sort((a, b) => b.length - a.length);
     // Navnet efter praefikset maa ikke fortsaette ordet ("Sky" er ikke
@@ -1698,6 +1703,30 @@ export class Catalog extends EventEmitter {
     }
     if (flyttet) this.emit('changed');
     return flyttet;
+  }
+
+  // Titel og filnavn er det samme: ved hver skanning faar filer i et vaerk,
+  // hvis mappe hedder som titlen, titlen foran, naar de hedder et gammelt
+  // navn (masteren og beskaeringerne efter en omdoebning i Finder). Mappen
+  // roeres ikke her. Returnerer antallet af omdoebte filer.
+  retFilnavne() {
+    let antal = 0;
+    for (const [w, d] of this._vaerkFiler()) {
+      if (!d.Original.length) continue;
+      const billede = this.db.get('SELECT id FROM images WHERE master_file_id=?', d.Original[0].id);
+      if (!billede) continue;
+      const titel = this.db.get('SELECT title FROM works WHERE image_id=?', billede.id)?.title;
+      if (titel && titel.trim() !== w) continue;
+      try {
+        const plan = this.omdoebPlan(billede.id, w);
+        if (!plan || plan.problemer.length || !plan.filer.length) continue;
+        this.omdoeb(billede.id, w);
+        antal += plan.filer.length;
+      } catch {
+        // Kan det ikke omdoebes nu (fx en aaben fil), proeves det igen naeste gang.
+      }
+    }
+    return antal;
   }
 
   // Filerne i vaerkmapperne, pr. vaerk og del.

@@ -733,6 +733,33 @@ describe('ny titel', () => {
     // Nu er der intet at rette.
     expect(catalog.omdoebPlan(id, 'Dune').filer).toEqual([]);
   });
+
+  it('masterens navn er et gammelt navn: masteren og beskaeringerne faar titlen ved skanningen', () => {
+    skriv('Import/Ahl/Ahl 23.tif', 'o');
+    catalog.sync();
+    catalog.setRating([raekke('Import/Ahl/Ahl 23.tif').version_id], 'godkendt');
+    skriv('Approved/Ahl 23/Masters/Ahl 23.tiff', 'm');
+    skriv('Approved/Ahl 23/Masters/Ahl 23 2-3.tiff', 'k');
+    skriv('Approved/Ahl 23/Edits/Ahl 23 2-3-giga.tif', 'g');
+    mkdirSync(join(root, 'Approved', 'Ahl 23', 'Print files'), { recursive: true });
+    writeFileSync(join(root, 'Approved', 'Ahl 23', 'Print files', 'Ahl 23 2-3.jpg'), 'p');
+    catalog.sync();
+    // Som hos Stef: mappen og originalen hedder allerede Orange Sunset.
+    renameSync(join(root, 'Approved', 'Ahl 23'), join(root, 'Approved', 'Orange Sunset'));
+    renameSync(join(root, 'Approved', 'Orange Sunset', 'Original', 'Ahl 23.tif'), join(root, 'Approved', 'Orange Sunset', 'Original', 'Orange Sunset.tif'));
+    catalog.sync();
+    const id = raekke('Approved/Orange Sunset/Original/Orange Sunset.tif').image_id;
+    expect(catalog.omdoebPlan(id, 'Orange Sunset').filer.map((f) => f.til).sort()).toEqual([
+      'Edits/Orange Sunset 2-3-giga.tif', 'Masters/Orange Sunset 2-3.tiff', 'Masters/Orange Sunset.tiff', 'Print files/Orange Sunset 2-3.jpg',
+    ]);
+    expect(catalog.retFilnavne()).toBe(4);
+    catalog.sync();
+    const nu = join(root, 'Approved', 'Orange Sunset');
+    expect(existsSync(join(nu, 'Masters', 'Orange Sunset.tiff'))).toBe(true);
+    expect(existsSync(join(nu, 'Masters', 'Orange Sunset 2-3.tiff'))).toBe(true);
+    expect(raekke('Approved/Orange Sunset/Masters/Orange Sunset 2-3.tiff').crop).toBe('2:3');
+    expect(catalog.retFilnavne()).toBe(0);
+  });
 });
 
 describe('gamle mappenavne', () => {

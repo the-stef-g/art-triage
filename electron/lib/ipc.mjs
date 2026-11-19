@@ -180,6 +180,9 @@ export class AppSession {
         // Ét vaerk, én original: to filer med samme navn i Original flettes.
         const flyttet = katalog.rydDobbelteOriginaler();
         if (flyttet) this.log(`one original per work (same name, or the name plus more words): ${flyttet} file(s) moved to Edits`);
+        // Titel og filnavn er det samme.
+        const omdoebt = katalog.retFilnavne();
+        if (omdoebt) this.log(`file names follow the title: ${omdoebt} file(s) renamed`);
         const fulgte = this.works.foelgFinderNavne();
         if (fulgte) this.log(`titles: ${fulgte} work(s) follow a name changed in Finder`);
         const antal = this.works.autoSerier();
