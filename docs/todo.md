@@ -5,7 +5,7 @@ Det der venter. Stef siger "byg", før noget herfra bliver lavet.
 ## Venter på "byg"
 
 - **Fejl i 0.59: en kæde af endelser bliver ikke flettet (Blue Sky Sunset).** Originalen hedder `Blue Sky Sunset-Pano.dng`, og redigeringerne `Blue Sky Sunset-Pano-denoise.tif` og `Blue Sky Sunset-Pano-denoise-neo.tif`. Appen fjernede *alle* endelser på én gang og ledte efter et værk ved navn *Blue Sky Sunset*, som ikke findes, så de blev tre værker med én fil hver, og Edit-knappen er grå. Rettelse: endelserne fjernes én ad gangen bagfra, og filen lægges i det værk med det længste navn, der findes (`-Pano-denoise-neo` → `-Pano-denoise` → `-Pano`). De tre værker flettes ved næste scanning.
-- **Fejl i 0.59: flettede redigeringer har mærket "Original" (Ahl Strand).** Når et værk flettes ind i et andet, beholder dets fil versionsnavnet *Original*, til næste scanning retter det. Rettelse: navnet sættes med det samme til det, der står efter værkets navn (*denoise*, *denoise-neo*).
+- **Fejl i 0.59: flettede redigeringer har mærket "Original" (Ahl Beach).** Når et værk flettes ind i et andet, beholder dets fil versionsnavnet *Original*, til næste scanning retter det (det skete af sig selv for Ahl Beach, som nu viser *denoise* og *Luminar Neo*). Rettelse: navnet sættes med det samme til det, der står efter værkets navn (*denoise*, *denoise-neo*).
 
 ## Venter på en afklaring
 
