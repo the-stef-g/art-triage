@@ -289,6 +289,22 @@ export function masterNavn(stem, work = '') {
   return navn || stem;
 }
 
+// Navnet med endelserne fjernet én ad gangen bagfra, laengste foerst:
+// "Sky-Pano-denoise-neo" -> ["Sky-Pano-denoise", "Sky-Pano", "Sky"].
+export function navneUdenEndelser(stem) {
+  const ud = [];
+  let navn = stem;
+  for (;;) {
+    let kortere = navn.replace(LANG_RE, '');
+    if (kortere === navn) kortere = navn.replace(KORT_RE, '');
+    kortere = kortere.replace(/[-_ .]+$/, '');
+    if (!kortere || kortere === navn) break;
+    ud.push(kortere);
+    navn = kortere;
+  }
+  return ud;
+}
+
 export function stemOf(fileName) {
   const e = extname(fileName);
   return e ? fileName.slice(0, -e.length) : fileName;

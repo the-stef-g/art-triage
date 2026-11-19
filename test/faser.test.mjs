@@ -563,6 +563,26 @@ describe('ét vaerk pr. navn', () => {
     expect(existsSync(join(root, 'Approved', 'Desert', 'Original', 'Desert.tif'))).toBe(true);
     expect(existsSync(join(root, 'Approved', 'Desert 02', 'Original', 'Desert 02.tif'))).toBe(true);
     expect(existsSync(join(root, 'Approved', 'Desert-wide', 'Original', 'Desert-wide.tif'))).toBe(true);
+    // Den flettede fil hedder straks efter sin endelse, ikke Original.
+    expect(raekke('Approved/Desert/Edits/Desert-denoise.tif').version_name).toBe('denoise');
+  });
+
+  it('en kaede af endelser lander i vaerket med det laengste navn der findes', () => {
+    skriv('Import/A/Sky-Pano.dng', 'original');
+    skriv('Import/A/Sky-Pano-denoise.tif', 'denoise');
+    skriv('Import/A/Sky-Pano-denoise-neo.tif', 'neo');
+    catalog.sync();
+    for (const n of ['Sky-Pano-denoise-neo.tif', 'Sky-Pano-denoise.tif', 'Sky-Pano.dng']) {
+      catalog.setRating([raekke(`Import/A/${n}`).version_id], 'godkendt');
+      catalog.sync();
+    }
+    for (const n of ['Sky-Pano-denoise', 'Sky-Pano-denoise-neo']) {
+      expect(existsSync(join(root, 'Approved', 'Sky-Pano', 'Edits', `${n}.tif`))).toBe(true);
+      expect(existsSync(join(root, 'Approved', n))).toBe(false);
+    }
+    const r = alle().filter((x) => x.rel_path.startsWith('Approved/Sky-Pano/'));
+    expect(new Set(r.map((x) => x.image_id)).size).toBe(1);
+    expect(raekke('Approved/Sky-Pano/Edits/Sky-Pano-denoise-neo.tif').version_name).toBe('denoise-neo');
   });
 
   it('fletter to vaerker der allerede er delt, og kan skille dem ad igen', () => {

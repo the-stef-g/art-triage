@@ -12,7 +12,7 @@ import { FARVER } from './keywords.mjs';
 const FARVE_ORD = new Set(FARVER);
 import {
   walkImages, walkImagesAsync, walkDirs, findImportMappe, beskaeringFraSti, navnMedBeskaering,
-  editorFraSti, masterNavn, quickHash, quickHashAsync, mapGraense, stemOf, slug, uniquePath, extOf, daCollator,
+  editorFraSti, masterNavn, navneUdenEndelser, quickHash, quickHashAsync, mapGraense, stemOf, slug, uniquePath, extOf, daCollator,
   libraryAvailable,
 } from './util.mjs';
 
@@ -728,13 +728,17 @@ export class Catalog extends EventEmitter {
   // ind i sit vaerk), hedder stadig "Original". Den faar sit navn fra filen:
   // det der staar efter originalens navn (*sketch+pencil*), ellers hele
   // filnavnet uden endelse. Returnerer antallet af omdoebte.
-  _retVersionsnavne() {
+  // Med versionIds: de versioner faar navn efter billedets nuvaerende
+  // original, fx efter en fletning (Sky-Pano-denoise-neo hedder denoise-neo
+  // i Sky-Pano, ogsaa naar den foerst hed neo i Sky-Pano-denoise).
+  _retVersionsnavne(versionIds = null) {
     const rows = this.db.all(
       `SELECT v.id, f.rel_path, mf.rel_path AS master_rel FROM versions v
        JOIN files f ON f.id = v.file_id
        JOIN images i ON i.id = v.image_id
        JOIN files mf ON mf.id = i.master_file_id
-       WHERE v.is_master=0 AND v.name='Original'`
+       WHERE v.is_master=0 AND ${versionIds == null ? "v.name='Original'" : `v.id IN (${versionIds.map(() => '?').join(',') || 'NULL'})`}`,
+      ...(versionIds || [])
     );
     for (const r of rows) {
       const stem = stemOf(posix.basename(r.rel_path));
@@ -1618,6 +1622,7 @@ export class Catalog extends EventEmitter {
     const fra = this.db.get('SELECT id, master_file_id, series_id FROM images WHERE id=?', fraId);
     const til = this.db.get('SELECT id, series_id FROM images WHERE id=?', tilId);
     if (!fra || !til || fraId === tilId) return;
+    const flyttede = this.db.all('SELECT id FROM versions WHERE image_id=?', fraId).map((r) => r.id);
     this.db.transaction(() => {
       this.db.run(
         'UPDATE versions SET file_id=COALESCE(file_id, ?), is_master=0, image_id=? WHERE image_id=?',
@@ -1628,6 +1633,9 @@ export class Catalog extends EventEmitter {
       this.db.run('DELETE FROM works WHERE image_id=?', fraId);
       this.db.run('DELETE FROM images WHERE id=?', fraId);
     });
+    // Den flettede original er nu en redigering: den faar sit navn med det
+    // samme (denoise, denoise-neo) og ikke Original til naeste skanning.
+    this._retVersionsnavne(flyttede);
   }
 
   // Alle vaerkmapper: én original hver. Koeres efter en skanning.
@@ -1680,9 +1688,14 @@ export class Catalog extends EventEmitter {
       if (egne.has(w) || !d.Original.length || d.Masters.length || d['Print files'].length) continue;
       const lille = w.toLowerCase();
       const harOriginal = (n) => n !== w && vaerker.get(n)?.Original.length;
-      // Kun kendte endelser efter navnet: en redigering, uanset filtype.
-      const grund = masterNavn(w).toLowerCase();
-      let v = grund !== lille ? navne.find((n) => harOriginal(n) && n.toLowerCase() === grund) : null;
+      // Kun kendte endelser efter navnet: en redigering, uanset filtype. De
+      // fjernes én ad gangen, og vaerket med det laengste navn der findes,
+      // faar filen (Sky-Pano-denoise-neo -> Sky-Pano-denoise -> Sky-Pano).
+      let v = null;
+      for (const kandidat of navneUdenEndelser(w)) {
+        v = navne.find((n) => harOriginal(n) && n.toLowerCase() === kandidat.toLowerCase());
+        if (v) break;
+      }
       if (!v) {
         v = navne.find((n) => harOriginal(n) && lille.startsWith(`${n.toLowerCase()} `));
         if (!v) continue;
