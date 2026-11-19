@@ -1665,7 +1665,10 @@ export class Catalog extends EventEmitter {
   // Fish sketch+pencil.psd* er Photoshop-arbejdet paa *Fishy Fish.png*. Dets
   // filer flyttes til det andet vaerks Edits, og billederne flettes. Ord
   // der kun er et tal (*Desert Canyon 04*), er et nyt vaerk i en serie, og
-  // et vaerk med en master roeres ikke. Returnerer antallet af flyttede filer.
+  // et vaerk med en master roeres ikke. Det samme gaelder et navn, hvor der
+  // efter det andet vaerks navn kun staar kendte redigeringsendelser
+  // (*Desert-denoise*, *Desert Pano*, *Desert_edit-tp*), ogsaa med samme
+  // filtype. Returnerer antallet af flyttede filer.
   fletLaengereNavne() {
     const vaerker = this._vaerkFiler();
     const egne = this._egneVaerker();
@@ -1676,14 +1679,19 @@ export class Catalog extends EventEmitter {
       const d = vaerker.get(w);
       if (egne.has(w) || !d.Original.length || d.Masters.length || d['Print files'].length) continue;
       const lille = w.toLowerCase();
-      const v = navne.find((n) => n !== w && vaerker.get(n)?.Original.length
-        && lille.startsWith(`${n.toLowerCase()} `));
-      if (!v) continue;
-      const rest = w.slice(v.length + 1);
-      const ew = endelser(w);
-      const ev = endelser(v);
-      if ([...ew].some((e) => ev.has(e))) continue;
-      if (!erRedigeretUdgave(rest, [...ew][0], [...ev][0])) continue;
+      const harOriginal = (n) => n !== w && vaerker.get(n)?.Original.length;
+      // Kun kendte endelser efter navnet: en redigering, uanset filtype.
+      const grund = masterNavn(w).toLowerCase();
+      let v = grund !== lille ? navne.find((n) => harOriginal(n) && n.toLowerCase() === grund) : null;
+      if (!v) {
+        v = navne.find((n) => harOriginal(n) && lille.startsWith(`${n.toLowerCase()} `));
+        if (!v) continue;
+        const rest = w.slice(v.length + 1);
+        const ew = endelser(w);
+        const ev = endelser(v);
+        if ([...ew].some((e) => ev.has(e))) continue;
+        if (!erRedigeretUdgave(rest, [...ew][0], [...ev][0])) continue;
+      }
       try {
         flyttet += this._fletVaerk(w, v);
       } catch {

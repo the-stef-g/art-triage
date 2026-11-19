@@ -414,8 +414,12 @@ try {
     throw new Error(`Mapperne i fase 2: ${mapper.join(', ')}`);
   }
   await page.locator('.tile').first().click();
-  // Originalen staar taendt; Edit kan ikke vaelges for originalen selv.
+  // Originalen staar taendt.
   await page.waitForSelector('.rolle-valg button.aktiv-rolle:has-text("Original")', { timeout: 10000 });
+  // Uden en anden fil i vaerket er Edit graa: et vaerk har altid én original.
+  if (!(await page.locator('.rolle-valg button', { hasText: /^Edit$/ }).isDisabled())) {
+    throw new Error('Edit kan vaelges paa originalen, selvom vaerket ingen anden fil har');
+  }
   // Vaerkets navn kan rettes i Edit.
   await page.waitForSelector('.vaerk-navn input', { timeout: 10000 });
   await page.screenshot({ path: join(projectRoot, 'smoke-edit.png') });

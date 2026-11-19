@@ -18,6 +18,8 @@ export default function Inspector({
   const [nytOrd, setNytOrd] = useState('');
   // Beskaeringen der er ved at blive fjernet, med filerne i dens kaede.
   const [slet, setSlet] = useState(null);
+  // Edit paa originalen med flere redigeringer: hvilken bliver originalen.
+  const [nyOriginal, setNyOriginal] = useState(null);
   // Crop: formaterne der er slaaet fra for vaerket.
   const [formaterFra, setFormaterFra] = useState([]);
   useEffect(() => {
@@ -137,6 +139,13 @@ export default function Inspector({
   const iArbejde = row.rel_path.startsWith('Approved/');
   const iEdits = /^Approved\/[^/]+\/Edits\//.test(row.rel_path);
   const rolle = /^Approved\/[^/]+\/Original\//.test(row.rel_path) ? 'Original' : iEdits ? 'Edits' : null;
+  // Edit paa originalen: en anden fil i vaerkets Edits bliver originalen.
+  // Med én er det den; med flere vaelger Stef i en dialog.
+  const editFiler = versions.filter((v) => v.present !== 0 && /^Approved\/[^/]+\/Edits\//.test(v.rel_path));
+  const goerTilEdit = () => {
+    if (editFiler.length === 1) invoke('work:goerTilOriginal', { versionId: editFiler[0].id }).catch(onError);
+    else if (editFiler.length > 1) setNyOriginal(editFiler);
+  };
   const PROGRAMMER = [['Luminar Neo', 'neo'], ['Topaz Photo AI', 'tp'], ['Photoshop', 'ps']];
   const installeret = new Set(editors.map((e) => e.label));
 
@@ -288,8 +297,11 @@ export default function Inspector({
             </button>
             <button
               className={rolle === 'Edits' ? 'aktiv-rolle' : ''}
-              disabled
-              title={rolle === 'Edits' ? 'This file is an edit in Edits' : 'Choose another file as Original, and this one becomes an edit'}
+              disabled={rolle !== 'Original' || !editFiler.length || selectedCount > 1}
+              onClick={goerTilEdit}
+              title={rolle === 'Edits' ? 'This file is an edit in Edits'
+                : rolle === 'Original' && editFiler.length ? 'Make this file an edit. It moves to Edits, and another file becomes the original.'
+                  : rolle === 'Original' ? 'The work has no other file to make the original' : 'Only a file in the work can be an edit'}
             >
               Edit
             </button>
@@ -430,6 +442,14 @@ export default function Inspector({
           : <p className="tom crop-tom">Select a work to crop its master.</p>,
         cropNode
       )}
+      {nyOriginal && createPortal(
+        <NyOriginalDialog
+          filer={nyOriginal}
+          onCancel={() => setNyOriginal(null)}
+          onOk={(v) => { setNyOriginal(null); invoke('work:goerTilOriginal', { versionId: v.id }).catch(onError); }}
+        />,
+        document.body
+      )}
       {fase === 3 && slet && createPortal(
         <SletCropDialog slet={slet} onCancel={() => setSlet(null)} onOk={bekraeftSlet} />,
         document.body
@@ -554,6 +574,45 @@ function GigapixelMaal({ row, dataRev, onBredde, onError }) {
       {' '}px{kopieret && <span className="kopieret"> Copied</span>} ({maal.bredde} × {maal.hoejde}
       {gange ? `, ×${gange.toFixed(2)}` : ''}) for the largest print, {info.cm} cm on the long side, at 300 DPI.
     </p>
+  );
+}
+
+// Edit paa originalen, naar vaerket har flere redigeringer: hvilken af dem
+// bliver originalen. Pilene flytter markeringen, Enter vaelger den.
+function NyOriginalDialog({ filer, onCancel, onOk }) {
+  const [valgt, setValgt] = useState(0);
+  useEffect(() => {
+    const taste = (e) => {
+      e.stopImmediatePropagation();
+      if (e.key === 'Escape') onCancel();
+      if (e.key === 'Enter') { e.preventDefault(); onOk(filer[valgt]); }
+      if (e.key === 'ArrowDown') { e.preventDefault(); setValgt((i) => Math.min(filer.length - 1, i + 1)); }
+      if (e.key === 'ArrowUp') { e.preventDefault(); setValgt((i) => Math.max(0, i - 1)); }
+    };
+    window.addEventListener('keydown', taste, true);
+    return () => window.removeEventListener('keydown', taste, true);
+  }, [filer, valgt, onCancel, onOk]);
+  return (
+    <div className="dialog-bag" onClick={onCancel}>
+      <div className="dialog" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+        <h3>Which file becomes the original?</h3>
+        <p>The original moves to Edits, and the file you choose becomes the original.</p>
+        <ul className="dialog-filer ny-original">
+          {filer.map((f, i) => (
+            <li key={f.id} title={f.rel_path}>
+              <label>
+                <input type="radio" name="ny-original" checked={i === valgt} onChange={() => setValgt(i)} />
+                {' '}{fileName(f.rel_path)}
+              </label>
+            </li>
+          ))}
+        </ul>
+        <div className="knapraekke dialog-knapper">
+          <button onClick={onCancel}>Cancel</button>
+          <button className="primaer" onClick={() => onOk(filer[valgt])}>Make original</button>
+        </div>
+      </div>
+    </div>
   );
 }
 

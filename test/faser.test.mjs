@@ -541,6 +541,30 @@ describe('ét vaerk pr. navn', () => {
     expect(existsSync(join(root, 'Approved', 'Fishy Fish blue', 'Original', 'Fishy Fish blue.png'))).toBe(true);
   });
 
+  it('kendte redigeringsendelser er redigeringer, ogsaa med samme filtype og i vilkaarlig raekkefoelge', () => {
+    skriv('Import/A/Desert.tif', 'original');
+    skriv('Import/A/Desert-denoise.tif', 'denoise');
+    skriv('Import/A/Desert-Pano.tif', 'pano');
+    skriv('Import/A/Desert_edit-tp.tif', 'edit');
+    skriv('Import/A/Desert 02.tif', 'et andet vaerk');
+    skriv('Import/A/Desert-wide.tif', 'ikke en endelse');
+    catalog.sync();
+    // Redigeringen godkendes foer originalen.
+    for (const n of ['Desert-denoise', 'Desert', 'Desert-Pano', 'Desert_edit-tp', 'Desert 02', 'Desert-wide']) {
+      catalog.setRating([raekke(`Import/A/${n}.tif`).version_id], 'godkendt');
+      catalog.sync();
+    }
+    for (const n of ['Desert-denoise', 'Desert-Pano', 'Desert_edit-tp']) {
+      expect(existsSync(join(root, 'Approved', 'Desert', 'Edits', `${n}.tif`))).toBe(true);
+      expect(existsSync(join(root, 'Approved', n))).toBe(false);
+    }
+    const r = alle().filter((x) => x.rel_path.startsWith('Approved/Desert/'));
+    expect(new Set(r.map((x) => x.image_id)).size).toBe(1);
+    expect(existsSync(join(root, 'Approved', 'Desert', 'Original', 'Desert.tif'))).toBe(true);
+    expect(existsSync(join(root, 'Approved', 'Desert 02', 'Original', 'Desert 02.tif'))).toBe(true);
+    expect(existsSync(join(root, 'Approved', 'Desert-wide', 'Original', 'Desert-wide.tif'))).toBe(true);
+  });
+
   it('fletter to vaerker der allerede er delt, og kan skille dem ad igen', () => {
     skriv('Import/A/Fishy Fish.png', 'ai');
     skriv('Import/B/Fishy Fish sketch+pencil.psd', 'photoshop');
