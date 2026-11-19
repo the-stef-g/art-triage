@@ -8,7 +8,7 @@ Det der venter. Stef siger "byg", før noget herfra bliver lavet.
   - En ny titel omdøber altid værkmappen og filerne; *Only the title* forsvinder. Dialogen viser stadig, hvilke filer der omdøbes, før det sker (Enter = Rename files).
   - Filer hvis navn begynder med mappens navn, den gamle titel eller originalens navn til første bindestreg, får den nye titel foran og beholder deres endelser (`Desert-denoise.tif` → `Dune-denoise.tif`, `Desert 2-1.tif` → `Dune 2-1.tif`).
   - Står titlen allerede som mappens navn, men filerne hedder noget andet, retter appen filerne, når titlen gemmes igen.
-  - Titlen følger fortsat mappen, når den omdøbes i Finder; filerne omdøbes så også ved næste scanning, så alt igen hedder det samme (ikke for et værk der er i shoppen, for billedernes adresser i shoppen ændres ikke).
+  - Titlen følger fortsat mappen, når den omdøbes i Finder; filerne omdøbes så også ved næste scanning, så alt igen hedder det samme.
 
 ## Venter på en afklaring
 
