@@ -1042,8 +1042,11 @@ export class AppSession {
       this.requireCatalog().listVersionsForImage(imageId));
     handle('img:setRating', ({ versionIds, rating }) => {
       const catalog = this.requireCatalog();
-      this.undoMgr.beforeRatings(versionIds);
-      catalog.setRating(versionIds, rating);
+      // En kandidats redigeringer i Candidate foelger med, naar den
+      // godkendes eller kasseres.
+      const ids = rating === 'godkendt' || rating === 'kasseret' ? catalog.medKandidatRedigeringer(versionIds) : versionIds;
+      this.undoMgr.beforeRatings(ids);
+      catalog.setRating(ids, rating);
     });
     // Status under Edits er navnet paa et af de programmer appen kender
     // (Luminar Neo, Topaz Photo AI ...). Appen opfinder aldrig et nyt.

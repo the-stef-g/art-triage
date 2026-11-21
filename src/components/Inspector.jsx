@@ -138,6 +138,7 @@ export default function Inspector({
 
   const iArbejde = row.rel_path.startsWith('Approved/');
   const iEdits = /^Approved\/[^/]+\/Edits\//.test(row.rel_path);
+  const kandidat = row.rating === 'kandidat';
   const rolle = /^Approved\/[^/]+\/Original\//.test(row.rel_path) ? 'Original' : iEdits ? 'Edits' : null;
   // Edit paa originalen: en anden fil i vaerkets Edits bliver originalen.
   // Med én er det den; med flere vaelger Stef i en dialog.
@@ -243,14 +244,24 @@ export default function Inspector({
 
       {fase === 2 && (
         <>
-          <div className="vaerk">
-            <VaerkNavn key={row.image_id} imageId={row.image_id} onError={onError} />
-          </div>
+          {kandidat ? (
+            <p className="tom kandidat-note">
+              A candidate: edit it to decide whether it is good enough. It moves on to Crop once it is approved.
+            </p>
+          ) : (
+            <div className="vaerk">
+              <VaerkNavn key={row.image_id} imageId={row.image_id} onError={onError} />
+            </div>
+          )}
           <h4>Edits</h4>
           <p className="tom">
-            {row.editor ? `Edited in ${row.editor}.` : iEdits ? 'An edit. The program is not in the file name.' : 'The original.'}
+            {row.editor ? `Edited in ${row.editor}.` : iEdits ? 'An edit. The program is not in the file name.' : kandidat ? 'The candidate.' : 'The original.'}
           </p>
-          <p className="tom">Luminar Neo opens the file itself; export your result to the work&apos;s Edits folder. Topaz Photo AI and Photoshop get a copy in Edits with the program&apos;s ending (-tp, -ps); save your result in Edits too.</p>
+          <p className="tom">
+            {kandidat
+              ? 'Luminar Neo opens the file itself; export your result next to it in Candidate. Topaz Photo AI and Photoshop get a copy next to it with the program\'s ending (-tp, -ps). The edits follow the candidate when it is approved or discarded.'
+              : 'Luminar Neo opens the file itself; export your result to the work\'s Edits folder. Topaz Photo AI and Photoshop get a copy in Edits with the program\'s ending (-tp, -ps); save your result in Edits too.'}
+          </p>
           <div className="knapraekke">
             {PROGRAMMER.map(([navn, endelse]) => (
               <button
@@ -268,8 +279,8 @@ export default function Inspector({
             ))}
             <button className="lille" onClick={act.editInOther} title="Open the file in another program, without a copy">Other app …</button>
           </div>
-          <p className="tom">Mark as edited in{selectedCount > 1 ? ` (all ${selectedCount} selected)` : ''}:</p>
-          <div className="knapraekke">
+          {!kandidat && <p className="tom">Mark as edited in{selectedCount > 1 ? ` (all ${selectedCount} selected)` : ''}:</p>}
+          {!kandidat && <div className="knapraekke">
             {[...new Set([...statusNavne, ...(row.editor ? [row.editor] : [])])].map((navn) => (
               <button
                 key={navn}
@@ -280,8 +291,21 @@ export default function Inspector({
                 {navn}
               </button>
             ))}
-          </div>
+          </div>}
 
+          {/* En kandidat bedoemmes her: godkendt bliver den et vaerk, med
+              redigeringerne i Edits; kasseret gaar den med dem til Discarded. */}
+          {kandidat && (
+            <>
+              <h4>Decide</h4>
+              <div className="knapraekke">
+                <button className="primaer" onClick={() => act.setRating('godkendt')} title="It is good enough: it becomes a work, and its edits go in the work's Edits folder (shortcut A)">Approve</button>
+                <button className="fare" onClick={() => act.setRating('kasseret')} title="Not good enough: it goes to Discarded with its edits (shortcut X)">Discard</button>
+              </div>
+            </>
+          )}
+          {!kandidat && (
+          <>
           {/* Filens rolle i vaerket: originalen, en redigering eller den
               der skal vaere masteren. Original bytter plads med den fil, der
               er originalen nu, saa der altid er én original. */}
@@ -324,6 +348,8 @@ export default function Inspector({
               Show in Finder
             </button>
           </div>
+          </>
+          )}
         </>
       )}
 

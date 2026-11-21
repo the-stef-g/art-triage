@@ -78,12 +78,76 @@ describe('fasen foelger af mapperne', () => {
     catalog.sync();
 
     expect(fase(1)).toEqual(['Candidate/Ahl/z.cr2']);
-    expect(fase(2)).toEqual(['Approved/x/Edits/x-neo.tif', 'Approved/x/Original/x.cr2']);
+    // Kandidaten staar ogsaa i Edit, saa den kan redigeres.
+    expect(fase(2)).toEqual(['Approved/x/Edits/x-neo.tif', 'Approved/x/Original/x.cr2', 'Candidate/Ahl/z.cr2']);
     expect(catalog.editVaerker()).toEqual(['x']);
-    expect(fase(5)).toEqual(['Approved/y/Masters/y.tif']); // én flise pr. vaerk
+    // Product foerst naar Crop og Print er faerdige: fire formater mangler.
+    expect(fase(5)).toEqual([]);
     expect(fase(3)).toEqual(['Approved/y/Masters/y 2-3.tif', 'Approved/y/Masters/y.tif']);
     expect(fase(4)).toEqual(['Approved/y/Masters/y 2-3.tif']);
-    expect(catalog.faseTal()).toEqual({ 1: 1, 2: 1, 3: 1, 4: 1, 5: 1, 6: 0 });
+    expect(catalog.faseTal()).toEqual({ 1: 1, 2: 2, 3: 1, 4: 1, 5: 0, 6: 0 });
+  });
+
+  it('en kandidat redigeres ved siden af sig selv, og redigeringerne foelger med, naar den godkendes', () => {
+    const z = raekke('Import/Ahl/z.cr2').version_id;
+    catalog.setRating([z], 'kandidat');
+    // Topaz og Photoshop: kopien ligger ved siden af kandidaten.
+    const kopi = catalog.kopiTilEdits(z, 'tp');
+    expect(kopi).toBe(join(root, 'Candidate/Ahl/z-tp.cr2'));
+    skriv('Candidate/Ahl/z-neo.tif', 'neo-eksport');
+    catalog.sync();
+    expect(raekke('Candidate/Ahl/z-tp.cr2').rating).toBe('kandidat');
+    expect(raekke('Candidate/Ahl/z-neo.tif').rating).toBe('kandidat');
+    expect(fase(2)).toEqual(['Candidate/Ahl/z-neo.tif', 'Candidate/Ahl/z-tp.cr2', 'Candidate/Ahl/z.cr2']);
+    // Kan ikke blive master foer den er godkendt.
+    expect(() => catalog.masterMaal(raekke('Candidate/Ahl/z-neo.tif').version_id)).toThrow();
+    // Godkendt: et vaerk med redigeringerne i Edits.
+    const ids = catalog.medKandidatRedigeringer([z]);
+    expect(ids).toHaveLength(3);
+    catalog.setRating(ids, 'godkendt');
+    catalog.sync();
+    expect(existsSync(join(root, 'Approved/z/Original/z.cr2'))).toBe(true);
+    expect(existsSync(join(root, 'Approved/z/Edits/z-tp.cr2'))).toBe(true);
+    expect(existsSync(join(root, 'Approved/z/Edits/z-neo.tif'))).toBe(true);
+    const r = alle().filter((x) => x.rel_path.startsWith('Approved/z/'));
+    expect(new Set(r.map((x) => x.image_id)).size).toBe(1);
+    expect(fase(2).filter((x) => x.startsWith('Candidate/'))).toEqual([]);
+  });
+
+  it('en kasseret kandidat tager sine redigeringer med til Discarded', () => {
+    const z = raekke('Import/Ahl/z.cr2').version_id;
+    catalog.setRating([z], 'kandidat');
+    skriv('Candidate/Ahl/z-neo.tif', 'neo-eksport');
+    catalog.sync();
+    catalog.setRating(catalog.medKandidatRedigeringer([z]), 'kasseret');
+    catalog.sync();
+    expect(existsSync(join(root, 'Discarded/Ahl/z.cr2'))).toBe(true);
+    expect(existsSync(join(root, 'Discarded/Ahl/z-neo.tif'))).toBe(true);
+  });
+
+  it('Product: foerst naar alle formater er beskaaret eller slaaet fra, og hver beskaering har sin printfil', () => {
+    catalog.setRating([raekke('Import/Ahl/y.cr2').version_id], 'godkendt');
+    skriv('Approved/y/Masters/y.tif', 'm');
+    skriv('Approved/y/Masters/y 2-3.tif', 'c');
+    skriv('Approved/y/Masters/y 1-1.tif', 'c1');
+    catalog.sync();
+    const imageId = raekke('Approved/y/Masters/y.tif').image_id;
+    db.run('INSERT OR IGNORE INTO works(image_id, updated_at) VALUES(?, 0)', imageId);
+    db.run('UPDATE works SET formater_fra=? WHERE image_id=?', JSON.stringify(['3:2', '2:1', '1:2']), imageId);
+    expect(fase(5)).toEqual([]); // ingen printfiler endnu
+    skriv('Approved/y/Print files/y 2-3.jpg', 'p');
+    expect(fase(5)).toEqual([]); // 1:1 mangler sin
+    skriv('Approved/y/Print files/y 1-1.jpg', 'p1');
+    expect(fase(5)).toEqual(['Approved/y/Masters/y.tif']);
+    // En printfil der er aeldre end sin forstoerrelse, er foraeldet.
+    skriv('Approved/y/Edits/y 1-1-giga.tif', 'g');
+    const gammel = new Date(Date.now() - 60_000);
+    utimesSync(join(root, 'Approved/y/Print files/y 1-1.jpg'), gammel, gammel);
+    catalog.sync();
+    expect(fase(5)).toEqual([]);
+    // Et unikt vaerk (Paintings) skal kun have sin beskaering.
+    db.run("UPDATE works SET category='Paintings' WHERE image_id=?", imageId);
+    expect(fase(5)).toEqual(['Approved/y/Masters/y.tif']);
   });
 
   it('et publiceret vaerk staar i 6 Shop og ikke i 3 til 5, til en ny beskaering mangler sin printfil', () => {
@@ -91,11 +155,11 @@ describe('fasen foelger af mapperne', () => {
     skriv('Approved/y/Masters/y.tif', 'm');
     skriv('Approved/y/Masters/y 2-3.tif', 'c');
     catalog.sync();
-    const imageId = catalog.listVersions({ fase: 5 })[0].image_id;
+    const imageId = raekke('Approved/y/Masters/y.tif').image_id;
     db.run("INSERT OR IGNORE INTO works(image_id, updated_at) VALUES(?, 0)", imageId);
     db.run("UPDATE works SET woo_product_id=7, woo_status='draft' WHERE image_id=?", imageId);
-    // Et udkast er stadig i arbejde.
-    expect(fase(5)).toEqual(['Approved/y/Masters/y.tif']);
+    // Et udkast er stadig i arbejde (og Crop og Print er ikke faerdige).
+    expect(fase(5)).toEqual([]);
     expect(fase(6)).toEqual([]);
 
     db.run("UPDATE works SET woo_status='publish' WHERE image_id=?", imageId);
@@ -113,6 +177,10 @@ describe('fasen foelger af mapperne', () => {
     catalog.setRating([raekke('Import/Ahl/x.cr2').version_id], 'godkendt');
     skriv('Approved/x/Masters/x 1-1.tif', 'c');
     catalog.sync();
+    // Et unikt vaerk skal kun have sin beskaering for at komme i Product.
+    const imageId = raekke('Approved/x/Masters/x 1-1.tif').image_id;
+    db.run("INSERT OR IGNORE INTO works(image_id, category, updated_at) VALUES(?, 'Paintings', 0)", imageId);
+    db.run("UPDATE works SET category='Paintings' WHERE image_id=?", imageId);
     expect(fase(5)).toEqual(['Approved/x/Masters/x 1-1.tif']);
   });
 });
@@ -185,7 +253,7 @@ describe('fase 2', () => {
     expect(res.konverteret).toBe(false);
     catalog.sync();
     expect(fase(2)).toEqual([]);
-    expect(fase(5)).toEqual(['Approved/x/Masters/x.tif']);
+    expect(fase(3)).toEqual(['Approved/x/Masters/x.tif']);
     expect(raekke('Approved/x/Original/x.cr2').finished).toBe(1);
   });
 

@@ -146,7 +146,7 @@ function Noegleordskoe({ status, act }) {
 }
 
 const FASE_TEKST = {
-  2: ['Edit', 'Approved works without a master. Send a copy to an editor, and make the master as the last step.'],
+  2: ['Edit', 'Approved works without a master, and candidates to edit before you decide. Send a copy to an editor, and make the master as the last step.'],
   3: ['Crop', 'The masters and their crops. Each crop is its own file in Masters.'],
   4: ['Print', 'The crops and their enlargements. Each enlargement becomes a print file for Prodigi: a PNG in sRGB at full size, in the work\'s Print files folder.'],
 };

@@ -444,6 +444,19 @@ try {
   await page.locator('.tile').first().click();
   await page.locator('.rolle-valg button', { hasText: /^Master$/ }).click();
   await page.waitForFunction(() => document.querySelectorAll('.tile').length === 0, null, { timeout: 15000 });
+  // Product kommer foerst, naar Crop og Print er faerdige: uden beskaeringer
+  // er vaerket der ikke. Slaas alle fem formater fra, er det faerdigt.
+  await page.locator('.fase', { hasText: 'Product' }).click();
+  await page.waitForTimeout(500);
+  if (await page.locator('.tile').count() !== 0) throw new Error('Vaerket stod i Product foer Crop og Print var faerdige');
+  await page.evaluate(async () => {
+    const { rows } = await window.artTriage.invoke('img:list', { fase: 3 });
+    const imageId = rows[0].image_id;
+    for (const format of ['1:1', '3:2', '2:1', '2:3', '1:2']) {
+      await window.artTriage.invoke('work:saetFormatFra', { imageId, format, fra: true });
+    }
+  });
+  await page.locator('.fase', { hasText: 'Crop' }).click();
   await page.locator('.fase', { hasText: 'Product' }).click();
   await page.waitForFunction(
     () => document.querySelectorAll('.tile').length === 1
@@ -502,6 +515,26 @@ try {
   await page.locator('input[type="search"], .soeg input, input').first().focus();
   await page.keyboard.press('Control+6');
   await page.waitForSelector('.fase.aktiv:has-text("Shop")', { timeout: 5000 });
+  await page.keyboard.press('Control+1');
+  await page.waitForSelector('.fase.aktiv:has-text("Sort")', { timeout: 5000 });
+
+  // En kandidat staar ogsaa i Edit, med Approve og Discard i stedet for
+  // Original, Edit og Master.
+  const kandidatId = await page.evaluate(async () => {
+    const { rows } = await window.artTriage.invoke('img:list', { fase: 1 });
+    const r = rows.find((x) => x.rating === 'ubedomt') || rows[0];
+    await window.artTriage.invoke('img:setRating', { versionIds: [r.version_id], rating: 'kandidat' });
+    return r.version_id;
+  });
+  if (!kandidatId) throw new Error('Ingen kandidat at teste med');
+  await page.keyboard.press('Control+2');
+  await page.waitForSelector('.fase.aktiv:has-text("Edit")', { timeout: 5000 });
+  await page.locator('.mappe', { hasText: 'All works' }).click().catch(() => {});
+  await page.waitForSelector('.tile.kandidat', { timeout: 10000 });
+  await page.locator('.tile.kandidat').first().click();
+  await page.waitForSelector('.inspector button:has-text("Approve")', { timeout: 10000 });
+  if (await page.locator('.inspector .rolle-valg').count()) throw new Error('En kandidat i Edit viser Original, Edit og Master');
+  await page.screenshot({ path: join(projectRoot, 'smoke-kandidat-edit.png') });
   await page.keyboard.press('Control+1');
   await page.waitForSelector('.fase.aktiv:has-text("Sort")', { timeout: 5000 });
 

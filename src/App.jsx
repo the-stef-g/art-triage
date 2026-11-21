@@ -877,13 +877,13 @@ export default function App() {
               ankerRef.current = 0;
               setActive(rs[0].version_id);
             }
-          } else if (fase === 1) {
+          } else if (fase === 1 || (fase === 2 && rs[idx]?.rating === 'kandidat')) {
             act.setRating('godkendt');
           }
           break;
         case 'c': if (fase === 1) act.setRating('kandidat'); break;
         case 'x':
-          if (fase === 1) act.setRating('kasseret');
+          if (fase === 1 || (fase === 2 && rs[idx]?.rating === 'kandidat')) act.setRating('kasseret');
           else if (fase >= 2 && fase <= 5) act.discardWork();
           break;
         case 'u': if (fase === 1) act.setRating('ubedomt'); break;

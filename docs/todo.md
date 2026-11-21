@@ -4,17 +4,7 @@ Det der venter. Stef siger "byg", før noget herfra bliver lavet.
 
 ## Venter på "byg"
 
-- **Product: først når alle printfilerne er lavet.** I dag står et værk i Product, så snart det har en master, samtidig med at det står i Crop og Print. Nyt: et værk kommer først i Product, når det er færdigt i Crop og Print:
-  - alle de fem formater er beskåret eller slået fra i Crop, og
-  - hver beskæring har en printfil, der ikke er forældet (lavet af den nuværende beskæring og forstørrelse).
-  Et værk der kun sælges som original (Paintings og Sculptures), skal kun have sin beskæring; det har ingen printfiler. Et værk der allerede er i shoppen (Shop), bliver i Shop. Værker der står i Product i dag uden alle printfiler, forsvinder fra Product, til de er færdige i Print. Fanen Print viser stadig, hvad der mangler.
-
-- **Kandidater kan redigeres i Edit.** Nogle billeder skal redigeres, før Stef kan afgøre, om de teknisk er gode nok. Nyt:
-  - En kandidat (C i Sort) står også i Edit, med et gult *?* så den kan skelnes fra de godkendte værker.
-  - Program-knapperne virker på den: Luminar Neo åbner filen selv; Topaz Photo AI og Photoshop laver kopien ved siden af den i `Candidate` (`Strand-tp.tif`), og et resultat gemt der (fx en .tif eksporteret fra Neo) hører til kandidaten.
-  - I Edit har en kandidat knapperne **Approve** (A) og **Discard** (X) i stedet for Original/Edit/Master. Master kan ikke trykkes, før den er godkendt, så en kandidat kommer aldrig videre til Crop.
-  - Godkendes den, bliver den et værk som i dag, og redigeringerne ved siden af den (samme navn til første bindestreg) følger med i værkets `Edits`. Kasseres den, går redigeringerne med til `Discarded`.
-  - Kandidaten står stadig i Sort som i dag, indtil den er godkendt eller kasseret.
+Intet lige nu.
 
 ## Venter på en afklaring
 

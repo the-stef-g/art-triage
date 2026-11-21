@@ -8,6 +8,7 @@ import {
 import { join, dirname, basename, extname, posix } from 'node:path';
 import { printfilNavn, gammelPrintfilNavn } from './printfil.mjs';
 import { FARVER } from './keywords.mjs';
+import { CROP_FORMATS, UNIQUE_CATEGORIES } from './works.mjs';
 
 const FARVE_ORD = new Set(FARVER);
 import {
@@ -611,6 +612,7 @@ export class Catalog extends EventEmitter {
       if (this._tilknytArbejdsmapper()) changedFileIds.push(-1);
       if (this._importErUbedoemt()) changedFileIds.push(-1);
       if (this._retVersionsnavne()) changedFileIds.push(-1);
+      if (this._kandidatRedigeringer()) changedFileIds.push(-1);
     });
 
     if (changedFileIds.length || missing.length) this.emit('changed');
@@ -747,6 +749,51 @@ export class Catalog extends EventEmitter {
       this.db.run('UPDATE versions SET name=? WHERE id=?', rest || stem, r.id);
     }
     return rows.length;
+  }
+
+  // Kandidaternes filer i Candidate, pr. mappe og navn til foerste
+  // bindestreg: { noegle -> [{ vid, rating, rel }] }.
+  _kandidatGrupper() {
+    const grupper = new Map();
+    for (const r of this.db.all(
+      `SELECT v.id AS vid, v.rating, f.rel_path FROM versions v
+       JOIN images i ON i.id = v.image_id JOIN files f ON f.id = i.master_file_id
+       WHERE v.is_master=1 AND f.present=1 AND f.rel_path LIKE 'Candidate/%'`
+    )) {
+      const k = `${posix.dirname(r.rel_path)}/${vaerkNavnFra(stemOf(posix.basename(r.rel_path))).toLowerCase()}`;
+      if (!grupper.has(k)) grupper.set(k, []);
+      grupper.get(k).push({ vid: r.vid, rating: r.rating, rel: r.rel_path });
+    }
+    return grupper;
+  }
+
+  // En ny fil ved siden af en kandidat, med samme navn til foerste
+  // bindestreg (Strand-tp.tif ved Strand.cr2), er en redigering af den og
+  // bliver selv kandidat. Returnerer antallet.
+  _kandidatRedigeringer() {
+    let antal = 0;
+    for (const g of this._kandidatGrupper().values()) {
+      if (!g.some((x) => x.rating === 'kandidat')) continue;
+      for (const x of g) {
+        if (x.rating !== 'ubedomt') continue;
+        this.db.run("UPDATE versions SET rating='kandidat' WHERE id=?", x.vid);
+        antal += 1;
+      }
+    }
+    return antal;
+  }
+
+  // Godkendes eller kasseres en kandidat, foelger dens redigeringer i
+  // Candidate med. Returnerer versionIds plus deres.
+  medKandidatRedigeringer(versionIds) {
+    const ids = new Set(versionIds);
+    const grupper = [...this._kandidatGrupper().values()];
+    for (const id of versionIds) {
+      const g = grupper.find((x) => x.some((y) => y.vid === id));
+      if (!g) continue;
+      for (const y of g) if (y.rating === 'kandidat') ids.add(y.vid);
+    }
+    return [...ids];
   }
 
   // Mappen er sandheden: en fil i Import er ikke bedoemt og har ingen
@@ -1143,6 +1190,46 @@ export class Catalog extends EventEmitter {
     return new Set(this.db.all("SELECT image_id FROM works WHERE woo_status='publish'").map((r) => r.image_id));
   }
 
+  // Vaerker der er faerdige i Crop og Print og derfor hoerer til i Product:
+  // hvert af de fem formater er beskaaret eller slaaet fra, og hver
+  // beskaering har en printfil der ikke er foraeldet (og er lavet af den
+  // nuvaerende master). Et unikt vaerk (Paintings, Sculptures) saelges kun
+  // som original og skal kun have én beskaering, uden printfil.
+  _faerdigeTilProduct(rows) {
+    const crops = new Map();
+    for (const r of rows) {
+      if (r.rating !== 'godkendt' || !r.crop || r.crop === 'free') continue;
+      if (!/^Approved\/[^/]+\/Masters\//.test(r.rel_path)) continue;
+      if (!crops.has(r.image_id)) crops.set(r.image_id, []);
+      crops.get(r.image_id).push(r);
+    }
+    const vaerker = new Map(this.db.all('SELECT image_id, category, formater_fra FROM works').map((w) => [w.image_id, w]));
+    const faerdig = new Set();
+    for (const imageId of new Set(rows.map((r) => r.image_id))) {
+      const liste = crops.get(imageId) || [];
+      const w = vaerker.get(imageId);
+      const master = this.masterFil(imageId);
+      const frisk = (c) => !(master && master.id !== c.file_id && master.mtime > c.mtime + FORAELDET_MS);
+      if (UNIQUE_CATEGORIES.has(w?.category)) {
+        if (liste.some(frisk)) faerdig.add(imageId);
+        continue;
+      }
+      let fra = [];
+      try { fra = JSON.parse(w?.formater_fra || '[]'); } catch { fra = []; }
+      const har = new Set(liste.map((c) => c.crop));
+      if (!CROP_FORMATS.every((f) => har.has(f) || fra.includes(f))) continue;
+      const ok = liste.every((c) => {
+        if (!frisk(c)) return false;
+        const print = this._printfilInfo(c.rel_path);
+        if (!print) return false;
+        const giga = this._printDele(c.rel_path)?.forstoerrelser.reduce((m, g) => Math.max(m, g.mtime), 0) || 0;
+        return print.mtime + FORAELDET_MS >= Math.max(c.mtime, giga);
+      });
+      if (ok) faerdig.add(imageId);
+    }
+    return faerdig;
+  }
+
   _filtrerFase(rows, fase) {
     const { medMaster } = this._mastersInfo();
     const shop = this._iShoppen();
@@ -1150,16 +1237,21 @@ export class Catalog extends EventEmitter {
     const godk = (r) => r.rating === 'godkendt';
     switch (fase) {
       case 1: return rows.filter((r) => !godk(r));
-      case 2: return rows.filter((r) => godk(r) && !medMaster.has(r.image_id));
+      // Edit: godkendte vaerker uden master, og kandidaterne, som Stef kan
+      // redigere for at afgoere om de er gode nok. De kan ikke blive master.
+      case 2: return rows.filter((r) => (godk(r) && !medMaster.has(r.image_id)) || r.rating === 'kandidat');
       case 5:
       case 6: {
         // Én flise pr. vaerk: masteren uden et format i navnet, ellers den
         // foerste. Fase 5 er dem der ikke er publiceret endnu, fase 6 dem
         // der er.
         const valgt = new Map();
+        // Product: foerst naar Crop og Print er faerdige.
+        const faerdig = fase === 5 ? this._faerdigeTilProduct(rows) : null;
         for (const r of rows) {
           if (!godk(r) || !iMaster(r)) continue;
           if (shop.has(r.image_id) !== (fase === 6)) continue;
+          if (faerdig && !faerdig.has(r.image_id)) continue;
           const nu = valgt.get(r.image_id);
           if (!nu || (nu.crop && !r.crop)) valgt.set(r.image_id, r);
         }
@@ -1199,7 +1291,14 @@ export class Catalog extends EventEmitter {
       else vaerker += 1;
     }
     const print = [...medBeskaering].filter((id) => !shop.has(id)).length;
-    return { 1: sort, 2: edit, 3: vaerker, 4: print, 5: vaerker, 6: online };
+    edit += this.db.get(
+      `SELECT COUNT(*) AS c FROM versions v JOIN images i ON i.id = v.image_id
+       JOIN files f ON f.id = i.master_file_id
+       WHERE v.is_master=1 AND f.present=1 AND v.rating='kandidat'`
+    ).c;
+    // Product: kun de vaerker der er faerdige i Crop og Print.
+    const product = new Set(this.listVersions({ fase: 5 }).map((r) => r.image_id)).size;
+    return { 1: sort, 2: edit, 3: vaerker, 4: print, 5: product, 6: online };
   }
 
   // Vaerkets master i Master: helst den uden et format i navnet.
@@ -1390,7 +1489,19 @@ export class Catalog extends EventEmitter {
   kopiTilEdits(versionId, suffiks) {
     if (!/^[a-z]+$/.test(String(suffiks))) throw new Error('Unknown program');
     const vaerk = this._vaerkFor(versionId);
-    if (!vaerk) throw new Error('Only Approved works can be sent to an editor');
+    if (!vaerk) {
+      // En kandidat: kopien ligger ved siden af den i Candidate og hoerer
+      // til den, til den er godkendt eller kasseret.
+      const v = this.getVersion(versionId);
+      const f = v ? this.getFile(v.effective_file_id) : null;
+      if (v?.rating !== 'kandidat' || !f?.rel_path.startsWith('Candidate/')) {
+        throw new Error('Only Approved works and candidates can be sent to an editor');
+      }
+      if (!f.present) throw new Error('The file is not available right now');
+      const dest = uniquePath(join(this.root, posix.dirname(f.rel_path), `${stemOf(basename(f.rel_path))}-${suffiks}${extname(f.rel_path)}`));
+      copyFileSync(this.abs(f.rel_path), dest);
+      return dest;
+    }
     const f = this.getFile(vaerk.v.effective_file_id);
     if (!f || !f.present) throw new Error('The file is not available right now');
     const ext = extname(f.rel_path);
