@@ -4,7 +4,7 @@ Det der venter. Stef siger "byg", før noget herfra bliver lavet.
 
 ## Venter på "byg"
 
-Intet lige nu.
+- **Crop: lærredets kant skal kunne ses.** Den stiplede linje (50 % grå, halvt gennemsigtig) og teksten forsvinder i billedet. Nyt: linjen tegnes som en tynd hvid stiplet linje med en mørk kant ved siden af, så den ses på både lyse og mørke billeder, og området uden for den (det der havner på siderne) får en let mørk tone. Teksten *Canvas edge: 30 × 30 cm* står i en lille mørk boks med hvid skrift. Stadig kun i Crop, ikke i den gemte fil.
 
 ## Venter på en afklaring
 
