@@ -8,6 +8,8 @@ Det der venter. Stef siger "byg", før noget herfra bliver lavet.
 
 - **Product: forslag når et keyword skrives.** Når Stef skriver i feltet til et nyt keyword, viser en lille liste under feltet de keywords, der allerede er brugt i biblioteket og begynder med (eller indeholder) det skrevne, de mest brugte først og højst 8. Pil ned/op vælger, Enter eller Tab tilføjer det valgte, og Escape lukker listen. Et nyt ord, der ikke er brugt før, kan stadig skrives og tilføjes med Enter. Ord, værket allerede har, vises ikke i listen.
 
+- **Product: Series colour vises som Section colour.** I dag er Series colour kun et tekstfelt med koden. Nyt: den får det samme farvefelt som Section colour, en farveprøve man kan se og klikke på for at vælge farven, ved siden af koden. Feltet er stribet, når serien ingen farve har. En valgt farve gemmes på serien og sendes med næste Update shop som i dag.
+
 ## Venter på en afklaring
 
 Intet lige nu. Fortrydelsesret og betaling er afgjort 30. oktober 2026: prints har 14 dages fortrydelsesret, og beløbet reserveres ved bestilling og trækkes ved afsendelse. Hele beslutningen står i sitets repo, `docs/fortrydelsesret-og-betaling.md` i `the-stef-g/stefs.cloud`.
