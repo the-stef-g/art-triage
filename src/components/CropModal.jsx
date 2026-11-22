@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { invoke, thumbUrl } from '../api';
 import { fileName } from '../util';
+import { CANVAS_KANT_CM, mindsteCanvas } from '../printmaal';
 
 // Formaterne er de samme som printfilerne: forholdet er bredde / hoejde.
 const FORMATER = [
@@ -23,16 +24,16 @@ function stoerste(forhold, A) {
 
 const klem = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
-// Det format der ligner billedet mest, saa beskaeringen starter der.
-// Formater der allerede er beskaaret, springes over, hvis der er andre.
-function naermeste(A, optaget = new Set()) {
-  const frie = FORMATER.filter(([f]) => !optaget.has(f));
-  const kandidater = frie.length ? frie : FORMATER;
-  let bedst = kandidater[0];
-  for (const f of kandidater) {
-    if (Math.abs(Math.log(f[1] / A)) < Math.abs(Math.log(bedst[1] / A))) bedst = f;
+// Formaterne tages i knappernes raekkefoelge: det foerste ledige fra
+// venstre, og efter Save crop det naeste ledige til hoejre. Beskaarne og
+// slaaede-fra formater springes over.
+function naeste(optaget = new Set(), efter = null) {
+  const start = efter ? FORMATER.findIndex(([f]) => f === efter) + 1 : 0;
+  for (let i = 0; i < FORMATER.length; i++) {
+    const [f] = FORMATER[(start + i) % FORMATER.length];
+    if (!optaget.has(f)) return f;
   }
-  return bedst[0];
+  return FORMATER[0][0];
 }
 
 // Ligger rammens fire hjoerner inde i billedet, naar det er drejet vinkel
@@ -71,6 +72,20 @@ function krymp(r, vinkel, A, ax, ay) {
 // crops: vaerkets beskaeringer, { format, versionId, foraeldet }. Et format
 // der allerede er beskaaret, kan ikke vaelges igen; minus i hjoernet af
 // knappen fjerner beskaeringen. meta og onFinder staar i toppen.
+// Lærredets kant: det der havner paa siderne af det mindste canvas i
+// formatet, som en svag stiplet linje inde i rammen. Kun til at se paa.
+function CanvasKant({ format }) {
+  const c = mindsteCanvas(format);
+  if (!c) return null;
+  const x = (CANVAS_KANT_CM / c.bredde) * 100;
+  const y = (CANVAS_KANT_CM / c.hoejde) * 100;
+  return (
+    <div className="crop-canvas-kant" style={{ left: `${x}%`, right: `${x}%`, top: `${y}%`, bottom: `${y}%` }}>
+      <span>Canvas edge: {c.bredde} × {c.hoejde} cm</span>
+    </div>
+  );
+}
+
 export default function CropModal({
   row, onClose, onDone, onError, inline = false, crops = [], meta = null, onFinder = null, onSletCrop = null,
   fra = [], onFra = null, navn = null,
@@ -130,7 +145,7 @@ export default function CropModal({
   // ledige, saa den naeste beskaering kan laves med det samme.
   const cropNoegle = `${crops.map((c) => c.format).sort().join(',')}|${[...slaaetFra].sort().join(',')}`;
   useEffect(() => {
-    if (optaget.has(format) && !intetAtBeskaere) vaelgFormat(naermeste(A, optaget));
+    if (optaget.has(format) && !intetAtBeskaere) vaelgFormat(naeste(optaget, format));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cropNoegle]);
 
@@ -302,7 +317,7 @@ export default function CropModal({
                 }}
                 onLoad={(e) => {
                   const nyA = e.currentTarget.naturalWidth / e.currentTarget.naturalHeight;
-                  const f = naermeste(nyA, optaget);
+                  const f = naeste(optaget);
                   setA(nyA);
                   setFormat(f);
                   setRect(stoersteInde(f, nyA));
@@ -318,6 +333,7 @@ export default function CropModal({
                 onPointerDown={(e) => start(e, 'flyt')}
               >
                 {traekker && <Net format={format} bredde={rect.w * felt.w} />}
+                <CanvasKant format={format} />
               </div>
               )}
             </div>

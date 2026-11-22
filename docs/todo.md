@@ -4,8 +4,7 @@ Det der venter. Stef siger "byg", før noget herfra bliver lavet.
 
 ## Venter på "byg"
 
-- **Crop: formaterne tages i knappernes rækkefølge.** I dag vælger appen efter *Save crop* det ledige format, der ligner masterens form mest, så valget springer frem og tilbage. Nyt: Crop starter i det første ledige format fra venstre (1:1, 3:2, 2:1, 2:3, 1:2), og efter *Save crop* går valget til det næste ledige format til højre. Slåede-fra og beskårne formater springes over.
-- **Crop: en diskret markering af lærredets kant.** På et canvas med *ImageWrap* bøjes yderkanten af motivet om på siderne af blindrammen. Nyt: inden for beskæringsrammen tegnes en tynd, svag linje (stiplet, 50 % grå som rammen) dér, hvor fronten slutter, så Stef kan se, hvor meget af motivet der havner på kanten. Kanten er blindrammens dybde målt mod det mindste canvas i formatet (fx 30 × 30 cm i 1:1), for der er andelen størst; i hjørnet står fx *Canvas edge: 30 × 30 cm*. Kanten regnes som 45 mm: blindrammen er 38 mm dyb, og Prodigi printer lidt større for at undgå hvide kanter (Stef, 22. november 2026). Linjen vises kun i Crop, ikke i den gemte fil.
+Intet lige nu.
 
 ## Venter på en afklaring
 

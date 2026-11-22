@@ -136,9 +136,15 @@ try {
   await page.waitForSelector('.crop-top .vaerk-navn input', { timeout: 10000 });
   await page.screenshot({ path: join(projectRoot, 'smoke-crop-navn.png') });
   await page.waitForFunction(() => document.querySelector('.crop-flade img')?.naturalWidth > 0, null, { timeout: 10000 });
-  // Masteren er 400 × 200, saa beskaeringen starter i 2:1.
-  await page.waitForSelector('.crop-formater button.primaer:has-text("2:1")', { timeout: 10000 });
-  await page.locator('.crop-formater button', { hasText: '1:1' }).click();
+  // Formaterne tages i knappernes raekkefoelge: Crop starter i 1:1.
+  await page.waitForSelector('.crop-formater button.primaer:has-text("1:1")', { timeout: 10000 });
+  // Laerredets kant staar svagt inde i rammen.
+  await page.waitForFunction(
+    () => document.querySelector('.crop-ramme .crop-canvas-kant')?.textContent.replace(/\s+/g, ' ').trim() === 'Canvas edge: 30 × 30 cm',
+    null,
+    { timeout: 10000 }
+  );
+  await page.screenshot({ path: join(projectRoot, 'smoke-crop-kant.png') });
   // Drejet 5 grader og holdt inde i billedet: rammen bliver mindre end
   // billedets hoejde, og der kommer ingen tomme hjoerner i filen.
   // Fri drejning: traek uden for rammen, saa drejer billedet.
@@ -227,25 +233,25 @@ try {
   if (hjoerne[3] !== 255) throw new Error(`Den drejede beskaering har et tomt hjoerne (alpha ${hjoerne[3]})`);
   if (await page.locator('.badge.kasseret').count() !== 0) throw new Error('X ramte et billede bag beskaeringsvinduet');
 
-  // Valget er gaaet videre til et ledigt format (2:1, som ligner billedet
-  // mest). Den beskaering fjernes igen med minus paa knappen.
-  await page.waitForSelector('.crop-formater button.primaer:has-text("2:1")', { timeout: 10000 });
+  // Valget er gaaet videre til et ledigt format (3:2, det naeste til hoejre
+  // for 1:1). Den beskaering fjernes igen med minus paa knappen.
+  await page.waitForSelector('.crop-formater button.primaer:has-text("3:2")', { timeout: 10000 });
   await page.locator('button', { hasText: 'Save crop' }).click();
-  await page.waitForSelector('.crop-format.findes:has-text("2:1") .crop-minus', { timeout: 20000 });
+  await page.waitForSelector('.crop-format.findes:has-text("3:2") .crop-minus', { timeout: 20000 });
   // Minus fjerner hele kaeden: ogsaa forstoerrelsen i Edits. Foerst en
   // dialog, der viser filerne.
   mkdirSync(join(lib, 'Approved', 'blaa', 'Edits'), { recursive: true });
-  const giga21 = join(lib, 'Approved', 'blaa', 'Edits', 'blaa 2-1-giga.png');
-  copyFileSync(join(lib, 'Approved', 'blaa', 'Masters', 'blaa 2-1.png'), giga21);
+  const giga32 = join(lib, 'Approved', 'blaa', 'Edits', 'blaa 3-2-giga.png');
+  copyFileSync(join(lib, 'Approved', 'blaa', 'Masters', 'blaa 3-2.png'), giga32);
   await skanIgen();
   await page.waitForTimeout(1500);
-  await page.locator('.crop-format.findes:has-text("2:1") .crop-minus').click();
-  await page.waitForSelector('.dialog >> text=blaa 2-1-giga.png', { timeout: 10000 });
+  await page.locator('.crop-format.findes:has-text("3:2") .crop-minus').click();
+  await page.waitForSelector('.dialog >> text=blaa 3-2-giga.png', { timeout: 10000 });
   await page.screenshot({ path: join(projectRoot, 'smoke-crop-slet.png') });
   await page.locator('.dialog button', { hasText: 'Move to Trash' }).click();
-  await page.waitForSelector('.crop-format:not(.findes) button:has-text("2:1")', { timeout: 20000 });
-  if (existsSync(join(lib, 'Approved', 'blaa', 'Masters', 'blaa 2-1.png'))) throw new Error('Minus fjernede ikke beskaeringen');
-  if (existsSync(giga21)) throw new Error('Minus fjernede ikke forstoerrelsen');
+  await page.waitForSelector('.crop-format:not(.findes) button:has-text("3:2")', { timeout: 20000 });
+  if (existsSync(join(lib, 'Approved', 'blaa', 'Masters', 'blaa 3-2.png'))) throw new Error('Minus fjernede ikke beskaeringen');
+  if (existsSync(giga32)) throw new Error('Minus fjernede ikke forstoerrelsen');
   if (!existsSync(join(lib, 'Approved', 'blaa', 'Masters', 'blaa 1-1.png'))) throw new Error('Minus fjernede den forkerte beskaering');
 
   // Omdoeber man den selv i Finder, foelger appen med efter en genscanning.

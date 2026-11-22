@@ -685,6 +685,19 @@ button.stor {
   box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.55);
   cursor: move;
 }
+.crop-canvas-kant {
+  position: absolute;
+  border: 1px dashed rgba(128, 128, 128, 0.5);
+  pointer-events: none;
+}
+.crop-canvas-kant span {
+  position: absolute;
+  right: 4px;
+  bottom: 2px;
+  font-size: 10px;
+  color: rgba(160, 160, 160, 0.75);
+  white-space: nowrap;
+}
 .crop-greb-lag { position: absolute; inset: 0; pointer-events: none; }
 .crop-greb-ramme { position: absolute; outline: 1.5px solid #808080; }
 /* Firkantede greb med midten paa hjoernet, ogsaa naar de stikker ud over
