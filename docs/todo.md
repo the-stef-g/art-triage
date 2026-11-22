@@ -4,11 +4,7 @@ Det der venter. Stef siger "byg", før noget herfra bliver lavet.
 
 ## Venter på "byg"
 
-- **Crop: lærredets kant skal kunne ses.** Den stiplede linje (50 % grå, halvt gennemsigtig) og teksten forsvinder i billedet. Nyt: linjen tegnes som en tynd hvid stiplet linje med en mørk kant ved siden af, så den ses på både lyse og mørke billeder, og området uden for den (det der havner på siderne) får en let mørk tone. Teksten *Canvas edge: 30 × 30 cm* står i en lille mørk boks med hvid skrift. Stadig kun i Crop, ikke i den gemte fil.
-
-- **Product: forslag når et keyword skrives.** Når Stef skriver i feltet til et nyt keyword, viser en lille liste under feltet de keywords, der allerede er brugt i biblioteket og begynder med (eller indeholder) det skrevne, de mest brugte først og højst 8. Pil ned/op vælger, Enter eller Tab tilføjer det valgte, og Escape lukker listen. Et nyt ord, der ikke er brugt før, kan stadig skrives og tilføjes med Enter. Ord, værket allerede har, vises ikke i listen.
-
-- **Product: Series colour vises som Section colour.** I dag er Series colour kun et tekstfelt med koden. Nyt: den får det samme farvefelt som Section colour, en farveprøve man kan se og klikke på for at vælge farven, ved siden af koden. Feltet er stribet, når serien ingen farve har. En valgt farve gemmes på serien og sendes med næste Update shop som i dag.
+Intet lige nu.
 
 ## Venter på en afklaring
 

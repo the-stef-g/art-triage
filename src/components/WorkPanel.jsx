@@ -500,11 +500,10 @@ export default function WorkPanel({ row, versions, tekstRev = 0, hasKey, shop, o
               </select>
             </label>
             <label>Series colour
-              <input
-                defaultValue={work.series.colour ?? ''}
+              <SerieFarve
                 key={`colour-${work.series.id}-${work.series.colour}`}
-                placeholder="#dd9933"
-                onBlur={(e) => { if (e.target.value !== (work.series.colour ?? '')) saveSeries({ colour: e.target.value }); }}
+                colour={work.series.colour ?? ''}
+                onSave={(colour) => saveSeries({ colour })}
               />
             </label>
           </div>
@@ -526,6 +525,36 @@ export default function WorkPanel({ row, versions, tekstRev = 0, hasKey, shop, o
 }
 
 // Dialogen naar titlen aendres: hvad der omdoebes, og et valg.
+// Seriens farve som Section colour: en farveproeve man kan se og klikke paa,
+// ved siden af koden. Stribet naar serien ingen farve har.
+function SerieFarve({ colour, onSave }) {
+  const [v, setV] = useState(colour);
+  const timer = useRef(null);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  return (
+    <span className="farve-felt">
+      <input
+        type="color"
+        className={`farve-proeve ${HEX.test(v) ? '' : 'tom'}`}
+        value={HEX.test(v) ? v.toLowerCase() : '#000000'}
+        title="Choose the colour"
+        onChange={(e) => {
+          const ny = e.target.value;
+          setV(ny);
+          clearTimeout(timer.current);
+          timer.current = setTimeout(() => onSave(ny), 500);
+        }}
+      />
+      <input
+        value={v}
+        placeholder="#dd9933"
+        onChange={(e) => setV(e.target.value)}
+        onBlur={() => { if (v !== colour) onSave(v); }}
+      />
+    </span>
+  );
+}
+
 function OmdoebDialog({ plan, onRename, onCancel }) {
   const nyMappe = plan.til !== plan.fra;
   const kan = !plan.problemer.length;

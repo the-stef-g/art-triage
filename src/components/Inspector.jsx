@@ -44,8 +44,8 @@ export default function Inspector({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [row?.version_id, row?.file_id, row?.image_id, row?.mtime, dataRev]);
 
-  const tilfoejOrd = async () => {
-    const ord = nytOrd.trim();
+  const tilfoejOrd = async (valgtOrd = null) => {
+    const ord = String(valgtOrd ?? nytOrd).trim();
     if (!ord || !row) return;
     try {
       await invoke('kw:add', { fileId: row.file_id, word: ord });
@@ -414,15 +414,13 @@ export default function Inspector({
               </p>
             )}
             <div className="knapraekke">
-              <input
+              <OrdFelt
                 value={nytOrd}
-                placeholder="Add keyword"
-                onChange={(e) => setNytOrd(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') tilfoejOrd();
-                }}
+                onChange={setNytOrd}
+                onAdd={(ord) => tilfoejOrd(ord)}
+                har={keywords.map((k) => k.word)}
               />
-              <button className="lille" onClick={tilfoejOrd}>Add</button>
+              <button className="lille" onClick={() => tilfoejOrd()}>Add</button>
             </div>
           </WorkPanel>
         </>
@@ -605,6 +603,69 @@ function GigapixelMaal({ row, dataRev, onBredde, onError }) {
       {' '}px{kopieret && <span className="kopieret"> Copied</span>} ({maal.bredde} × {maal.hoejde}
       {gange ? `, ×${gange.toFixed(2)}` : ''}) for the largest print, {info.cm} cm on the long side, at 300 DPI.
     </p>
+  );
+}
+
+// Feltet til et nyt keyword: forslag fra de ord der allerede er brugt i
+// biblioteket, dem der begynder med det skrevne foerst, ellers de mest
+// brugte. Pilene vaelger, Enter eller Tab tilfoejer, Escape lukker. Et nyt
+// ord kan stadig skrives og tilfoejes med Enter.
+function OrdFelt({ value, onChange, onAdd, har }) {
+  const [alle, setAlle] = useState(null);
+  const [aaben, setAaben] = useState(false);
+  const [valgt, setValgt] = useState(-1);
+  const hent = () => {
+    if (!alle) invoke('kw:top', { limit: 20000 }).then((l) => setAlle(l || [])).catch(() => setAlle([]));
+  };
+  const q = value.trim().toLowerCase();
+  const harSet = new Set(har.map((w) => w.toLowerCase()));
+  const forslag = q
+    ? (alle || [])
+      .filter((k) => k.word.toLowerCase().includes(q) && !harSet.has(k.word.toLowerCase()))
+      .sort((a, b) => (Number(b.word.toLowerCase().startsWith(q)) - Number(a.word.toLowerCase().startsWith(q)))
+        || b.antal - a.antal || a.word.localeCompare(b.word))
+      .slice(0, 8)
+    : [];
+  const vis = aaben && forslag.length > 0;
+  const tilfoej = (ord) => {
+    onAdd(ord);
+    setValgt(-1);
+    setAlle(null); // tallene aendres; hentes igen naeste gang
+  };
+  return (
+    <span className="kw-felt">
+      <input
+        value={value}
+        placeholder="Add keyword"
+        onFocus={() => { hent(); setAaben(true); }}
+        onBlur={() => setTimeout(() => setAaben(false), 150)}
+        onChange={(e) => { onChange(e.target.value); setAaben(true); setValgt(-1); hent(); }}
+        onKeyDown={(e) => {
+          if (e.key === 'ArrowDown' && vis) { e.preventDefault(); setValgt((i) => Math.min(forslag.length - 1, i + 1)); }
+          else if (e.key === 'ArrowUp' && vis) { e.preventDefault(); setValgt((i) => Math.max(-1, i - 1)); }
+          else if (e.key === 'Escape' && vis) { e.preventDefault(); e.stopPropagation(); setAaben(false); }
+          else if (e.key === 'Tab' && vis) { e.preventDefault(); tilfoej(forslag[Math.max(0, valgt)].word); }
+          else if (e.key === 'Enter') { e.preventDefault(); tilfoej(vis && valgt >= 0 ? forslag[valgt].word : value); }
+        }}
+      />
+      {vis && (
+        <ul className="kw-forslag" role="listbox">
+          {forslag.map((k, i) => (
+            <li
+              key={k.word}
+              role="option"
+              aria-selected={i === valgt}
+              className={i === valgt ? 'valgt' : ''}
+              onMouseDown={(e) => { e.preventDefault(); tilfoej(k.word); }}
+              onMouseEnter={() => setValgt(i)}
+            >
+              <span>{k.word}</span>
+              <span className="tom">{k.antal}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </span>
   );
 }
 

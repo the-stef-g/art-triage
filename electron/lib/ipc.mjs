@@ -1412,7 +1412,7 @@ export class AppSession {
       return { antal, ...this.keywordStatus() };
     });
 
-    handle('kw:top', () => this.requireCatalog().topKeywords());
+    handle('kw:top', ({ limit } = {}) => this.requireCatalog().topKeywords(Number(limit) > 0 ? Math.min(Number(limit), 20000) : undefined));
     handle('kw:forFile', ({ fileId }) => this.requireCatalog().keywordsForFile(fileId));
     // Ingen genberegning laengere: appen gaetter ikke selv noegleord, saa
     // det der staar, er det Stef selv har skrevet ind.

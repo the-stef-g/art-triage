@@ -685,17 +685,27 @@ button.stor {
   box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.55);
   cursor: move;
 }
+/* Laerredets kant: en hvid stiplet linje med en moerk kant ved siden af,
+   saa den ses paa lyse og moerke billeder, og en let moerk tone over det
+   der havner paa siderne. Tonen holdes inde i rammen af overflow. */
+.crop-ramme { overflow: hidden; }
 .crop-canvas-kant {
   position: absolute;
-  border: 1px dashed rgba(128, 128, 128, 0.5);
+  border: 1px dashed rgba(255, 255, 255, 0.95);
+  outline: 1px solid rgba(0, 0, 0, 0.6);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), 0 0 0 9999px rgba(0, 0, 0, 0.22);
   pointer-events: none;
 }
 .crop-canvas-kant span {
   position: absolute;
-  right: 4px;
-  bottom: 2px;
-  font-size: 10px;
-  color: rgba(160, 160, 160, 0.75);
+  right: 6px;
+  bottom: 6px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.72);
+  color: #fff;
+  font-size: 11px;
+  line-height: 1.3;
   white-space: nowrap;
 }
 .crop-greb-lag { position: absolute; inset: 0; pointer-events: none; }
@@ -959,6 +969,30 @@ textarea.serie-intro { field-sizing: content; min-height: 4lh; resize: vertical;
 textarea.vaerk-beskrivelse { field-sizing: content; min-height: 7lh; resize: vertical; }
 
 /* Section colour: farven selv ved siden af koden. */
+.kw-felt { position: relative; flex: 1 1 0; min-width: 0; display: flex; }
+.kw-felt > input { flex: 1 1 auto; min-width: 0; }
+.kw-forslag {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  margin: 2px 0 0;
+  padding: 4px 0;
+  list-style: none;
+  background: var(--bg-panel);
+  border: 1px solid rgba(128, 128, 128, 0.35);
+  border-radius: 6px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+.kw-forslag li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+.kw-forslag li.valgt { background: rgba(128, 128, 128, 0.25); }
 .farve-felt { display: flex; align-items: center; gap: 6px; }
 .farve-felt > input:not([type='color']) { flex: 1 1 auto; min-width: 0; width: auto; }
 .farve-felt > input.farve-proeve {

@@ -467,6 +467,22 @@ try {
     const t = await page.locator('.tile-navn').evaluateAll((e) => e.map((x) => x.title));
     throw new Error(`Product viser ${JSON.stringify(t)}: ${err.message}`);
   });
+  // Et keyword faar forslag fra de ord der allerede er brugt i biblioteket.
+  await page.evaluate(async () => {
+    const { rows } = await window.artTriage.invoke('img:list', { fase: 1 });
+    await window.artTriage.invoke('kw:add', { fileId: rows[0].file_id, word: 'havblaa' });
+  });
+  await page.locator('.tile').first().click();
+  await page.locator('.kw-felt input').fill('havb');
+  await page.waitForSelector('.kw-forslag li:has-text("havblaa")', { timeout: 10000 });
+  await page.screenshot({ path: join(projectRoot, 'smoke-kw-forslag.png') });
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(
+    () => [...document.querySelectorAll('.kw-chips .chip, .chip')].some((c) => c.textContent.includes('havblaa')),
+    null,
+    { timeout: 10000 }
+  ).catch(() => { throw new Error('Forslaget blev ikke tilfoejet som keyword'); });
   // Fase 5 har serier og noegleord i sidepanelet. Uden API-noegle skal
   // noegleordspanelet sige hvor noeglen saettes, ikke bare vaere tomt.
   await page.waitForSelector('.kw-koe', { timeout: 10000 });
