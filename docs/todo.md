@@ -4,7 +4,13 @@ Det der venter. Stef siger "byg", før noget herfra bliver lavet.
 
 ## Venter på "byg"
 
-Intet lige nu.
+- **Forståelige fejl fra Claude.** I dag står Claudes rå svar i bundlinjen (*Error invoking remote method 'work:writeTexts': Error: 401 {"type":"error",…"invalid x-api-key"…}*). Nyt: appen oversætter de kendte fejl til en kort sætning på engelsk, som resten af appen:
+  - 401 (nøglen afvist): *Claude rejected your API key. Add a new one under Help > Claude API key.*
+  - 403 (ingen adgang): *Your Claude API key does not have access. Check it in the Claude Console.*
+  - 429 (for mange på én gang) og 529 (Claude er overbelastet): *Claude is busy right now. Try again in a minute.*
+  - Kredit brugt op (400 med "credit balance"): *Your Claude credit is used up. Add credit in the Claude Console.*
+  - Ingen forbindelse: *No connection to Claude. Check the internet connection.*
+  Det gælder alle steder, hvor appen bruger Claude (Write texts, Write intro, keywords og de automatiske tekster). Den fulde fejl skrives stadig i loggen (Help > Show AI log).
 
 ## Venter på en afklaring
 
