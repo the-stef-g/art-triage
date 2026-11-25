@@ -4,7 +4,7 @@ Det der venter. Stef siger "byg", før noget herfra bliver lavet.
 
 ## Venter på "byg"
 
-Intet lige nu.
+- **Appen til Apple Silicon (MacBook Air M5).** Stefs iMac er død; den nye Mac har en M5. Appen skrives ikke om: det er de samme filer, bygget til arm64 i stedet for Intel (x64). Byggeriet på GitHub flytter til en Apple Silicon-maskine (macos-15), sharp hentes i arm64-udgaven, og tjekket af den pakkede app ser efter `darwin-arm64`. Zip-filen hedder `Stef-G-Art-<version>-mac-arm64.zip`. Intel-udgaven bygges ikke længere. Indtil da kan Intel-udgaven køre på M5 gennem Rosetta 2 (macOS spørger én gang), bare langsommere.
 
 ## Venter på en afklaring
 
