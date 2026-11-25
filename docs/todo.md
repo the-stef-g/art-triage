@@ -12,6 +12,8 @@ Det der venter. Stef siger "byg", før noget herfra bliver lavet.
   - Ingen forbindelse: *No connection to Claude. Check the internet connection.*
   Det gælder alle steder, hvor appen bruger Claude (Write texts, Write intro, keywords og de automatiske tekster). Den fulde fejl skrives stadig i loggen (Help > Show AI log).
 
+- **Beskederne i bundlinjen bliver stående i 30 sekunder.** I dag forsvinder de efter 3 til 7 sekunder. Nyt: alle beskeder og fejl står i 30 sekunder, eller til der kommer en ny besked. Et klik på beskeden fjerner den før. Beskeder der i dag står til næste besked (fx mens noget kører), gør det stadig.
+
 ## Venter på en afklaring
 
 Intet lige nu. Fortrydelsesret og betaling er afgjort 30. oktober 2026: prints har 14 dages fortrydelsesret, og beløbet reserveres ved bestilling og trækkes ved afsendelse. Hele beslutningen står i sitets repo, `docs/fortrydelsesret-og-betaling.md` i `the-stef-g/stefs.cloud`.
