@@ -4,7 +4,7 @@
 // asar kan ikke indlaeses. Begge dele giver foerst en fejl naar appen
 // koeres, saa tjekket sker i byggeriet.
 //
-// Brug: node scripts/check-packaged-sharp.mjs <Resources-mappen> <darwin-x64|linux-x64>
+// Brug: node scripts/check-packaged-sharp.mjs <Resources-mappen> <darwin-arm64|darwin-x64|linux-x64>
 // Resources-mappen er "Stef G Art.app/Contents/Resources" paa macOS.
 import { existsSync, readdirSync, openSync, readSync, closeSync } from 'node:fs';
 import { join } from 'node:path';
@@ -73,7 +73,7 @@ export function checkPackagedSharp(resources, platform) {
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const [resources, platform] = process.argv.slice(2);
   if (!resources || !platform) {
-    console.error('Usage: node scripts/check-packaged-sharp.mjs <Resources dir> <darwin-x64|linux-x64>');
+    console.error('Usage: node scripts/check-packaged-sharp.mjs <Resources dir> <darwin-arm64|darwin-x64|linux-x64>');
     process.exit(2);
   }
   const fejl = checkPackagedSharp(resources, platform);

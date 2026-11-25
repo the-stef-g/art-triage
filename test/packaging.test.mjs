@@ -22,15 +22,18 @@ describe('package.json', () => {
     ]));
   });
 
-  it('bygger til Intel', () => {
+  it('bygger til Apple Silicon, uden signatur fra electron-builder (appen signeres ad hoc bagefter)', () => {
     const arch = pkg.build.mac.target.flatMap((t) => t.arch);
-    expect(arch).toEqual(['x64']);
+    expect(arch).toEqual(['arm64']);
+    expect(pkg.build.mac.artifactName).toBe('stef-g-art-mac-arm64.zip');
+    expect(pkg.scripts['dist:mac']).toContain('--arm64');
+    expect(pkg.build.mac.identity).toBeNull();
   });
 
   it('har sharp som almindelig afhaengighed i lock-filen', () => {
     const lock = JSON.parse(readFileSync(new URL('../package-lock.json', import.meta.url), 'utf8'));
     expect(lock.packages['node_modules/sharp'].dev).toBeUndefined();
-    expect(lock.packages['node_modules/@img/sharp-darwin-x64'].dev).toBeUndefined();
+    expect(lock.packages['node_modules/@img/sharp-darwin-arm64'].dev).toBeUndefined();
   });
 });
 

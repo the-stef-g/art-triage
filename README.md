@@ -2,7 +2,7 @@
 
 Stef G Art is a macOS app for sorting and organising image files. It does not edit your images itself. Instead it sends files to your own editor apps (Luminar Neo, Topaz Photo AI, Gigapixel and others) and notices when you save. The app keeps track of an ordinary folder in Finder: your files stay where they are, and all catalogue data lives in a hidden `.art-triage` subfolder in the same place.
 
-Built for Intel Mac (iMac 2019) on macOS Sequoia. Runs on newer versions too.
+Built for Apple Silicon Macs (M1 to M5; made for a MacBook Air M5). Up to version 0.65 it was built for an Intel Mac (iMac 2019); an Intel build from those versions also runs on Apple Silicon through Rosetta 2, only slower.
 
 The app was called Art Triage until version 0.10.0, and Billedflow until 0.2.8. On the first start of Stef G Art your settings, keys and the downloaded model are copied over from the old Art Triage folder in `~/Library/Application Support`, which is left untouched. The repository and the hidden `.art-triage` data folder keep their names.
 
@@ -14,14 +14,14 @@ The app is built automatically by GitHub Actions on every push and published as 
 
 1. Open the repository on GitHub and click **Releases** in the right-hand column.
 2. The newest version on main is marked **Latest**. A build from a work branch is a **Pre-release**, for trying out before it is merged.
-3. Download **Stef-G-Art-<version>-mac-x64.zip**.
+3. Download **Stef-G-Art-<version>-mac-arm64.zip**.
 4. Unzip it and drag **Stef G Art.app** to Applications.
 
 Releases do not count against the storage quota for Actions artifacts, which old builds used to fill up. When a version is merged into main without code changes since its branch build, main does not build the Mac app again: it turns the branch's pre-release into the latest release, which takes seconds instead of a wait for a Mac at GitHub.
 
 ## First launch on macOS Sequoia
 
-The app is not signed with an Apple developer certificate, so macOS refuses the first time.
+The app is not signed with an Apple developer certificate, so macOS refuses the first time. Apple Silicon only runs signed programs, so the build signs it ad hoc (no developer account needed) and checks the signature; Gatekeeper still asks the first time.
 
 1. Double-click art-triage. macOS shows a warning. Click **Close**.
 2. Open **System Settings > Privacy & Security**.
@@ -189,9 +189,9 @@ The source lives in this repository and is an Electron project with Vite and Rea
     npm test           # unit tests (vitest)
     npm run build      # build the renderer into dist/
     npm run smoke      # UI smoke test of the built app
-    npm run dist:mac   # builds art-triage-mac-x64.zip (requires macOS)
+    npm run dist:mac   # builds stef-g-art-mac-arm64.zip (requires macOS)
 
-Previews of RAW files (CR2, CR3, NEF, ARW, DNG, RAF, ORF, RW2 and the rest) come from the JPEG the camera embedded in the file, in the RAW file's own orientation. That needs no other program and is the fastest way. Only if the file has no usable embedded JPEG is the preview made by sips, then Quick Look. Other images go sips, then sharp (PNG, TIFF, JPEG, WebP), and only then Quick Look, since Quick Look can make macOS ask whether Stef G Art may use Apple Music (the app never does; answer *Don't Allow*). When Quick Look is used, the log says for which file (`preview qlmanage (file.psd): …`). If a step fails, the real reason goes in the log (Help > Show AI log) as `preview sips (file.tif): …`, even when a later step saves the day. Write texts and Send to shop fall back to a preview already in the cache if a fresh one cannot be made. sharp is a regular dependency, unpacked from the asar (`asarUnpack`), and the build checks that the Intel binary is in the app. At startup the log says `sharp loaded` or `sharp could NOT be loaded` with the reason.
+Previews of RAW files (CR2, CR3, NEF, ARW, DNG, RAF, ORF, RW2 and the rest) come from the JPEG the camera embedded in the file, in the RAW file's own orientation. That needs no other program and is the fastest way. Only if the file has no usable embedded JPEG is the preview made by sips, then Quick Look. Other images go sips, then sharp (PNG, TIFF, JPEG, WebP), and only then Quick Look, since Quick Look can make macOS ask whether Stef G Art may use Apple Music (the app never does; answer *Don't Allow*). When Quick Look is used, the log says for which file (`preview qlmanage (file.psd): …`). If a step fails, the real reason goes in the log (Help > Show AI log) as `preview sips (file.tif): …`, even when a later step saves the day. Write texts and Send to shop fall back to a preview already in the cache if a fresh one cannot be made. sharp is a regular dependency, unpacked from the asar (`asarUnpack`), and the build checks that the Apple Silicon (arm64) binary is in the app. The Mac app is built on GitHub's Intel Macs and cross-built for arm64, since the Apple Silicon machines there were often too busy to get one; sharp's arm64 binary is fetched explicitly, the app is signed ad hoc, and the build checks that the main program is arm64 and the signature holds. At startup the log says `sharp loaded` or `sharp could NOT be loaded` with the reason.
 
 **Smoke tests on Linux.** The smoke tests (`npm run smoke`, `smoke:crop`, `smoke:previews`) start the built app under Xvfb. On Linux, Electron has the system's GLib loaded, and sharp binds to it instead of libvips' own copy: that is where the stream of `GLib-GObject: g_object_unref: assertion 'G_IS_OBJECT (object)' failed` in the test log comes from, and about once in 40 runs GLib stops the whole app with SIGTRAP inside sharp. macOS has no system GLib, so the Mac app is not affected. A smoke test whose app died with SIGTRAP is run once more (`test/smoke-koer.mjs`, with a warning in the log); any other failure fails at once. Each test prints how the app ended and any error from the window. Two real races were found the same way: a scan could mark a file the app had just moved (for instance by a rating) as missing, so it left the grid until the next scan, and an older status message's timer could clear a newer message after a moment. A scan asked for while another scan is running (by the folder watcher, *Scan again* or a new master) is no longer dropped: one more scan runs right after, so a new file is seen at once and not 90 seconds later.
 
